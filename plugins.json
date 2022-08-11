@@ -1,0 +1,97 @@
+[
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/faviconAyzen.png",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "fileSize": 24013,
+        "status": 1,
+        "language": "tr",
+        "authors": [
+            "kraptor"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 6,
+        "internalName": "AyzenTv",
+        "description": "AyzenTV ile canl\u0131 seyirin doruklar\u0131.",
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/AyzenTv.cs3",
+        "name": "AyzenTv"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/faviconFsTv.png",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "fileSize": 9787,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "kerimmkirac"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 5,
+        "internalName": "FsTv",
+        "description": "Watch live sport on tv with full HD streaming videos for football, tennis, basketball games world-wide and more. Get live scores, results, highlights on Fstv",
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/FsTv.cs3",
+        "name": "FsTv"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=fullraces.com&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "fileSize": 9724,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "kerimmkirac"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "FullRaces",
+        "description": "Formula 1 is one of the most popular and dramatic sports in the world. You can watch Formula One races replays videos online and enjoy every moment of this exciting sports event. We offer to watch F1 Full Races replays FREE in HD",
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/FullRaces.cs3",
+        "name": "FullRaces"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=www.fullreplays.com&sz=%size%",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "fileSize": 10566,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "kerimmkirac"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "FullReplays",
+        "description": "Watch latest football full match replay of Premier League, Champions League, LaLiga, Serie A, Bundesliga, Ligue 1, Europa League, and more...",
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/FullReplays.cs3",
+        "name": "FullReplays"
+    },
+    {
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://streamed.pk/&size=128",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "fileSize": 31481,
+        "status": 1,
+        "language": "un",
+        "authors": [
+            "kraptor"
+        ],
+        "tvTypes": [
+            "Live"
+        ],
+        "version": 6,
+        "internalName": "Streamed",
+        "description": "Streamed ile Canl\u0131 Spor Yay\u0131nlar\u0131n\u0131 \u0130zleyebilirsiniz.",
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Streamed.cs3",
+        "name": "Streamed"
+    }
+]
