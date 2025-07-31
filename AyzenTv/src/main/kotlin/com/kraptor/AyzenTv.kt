@@ -220,13 +220,14 @@ class AyzenTv : MainAPI() {
         val loadData = fetchDataFromUrlOrJson(data)
 
         callback.invoke(
-            ExtractorLink(
+            newExtractorLink(
                 source  = this.name,
                 name    = this.name,
                 url     = loadData.url,
-                referer = "",
-                quality = Qualities.Unknown.value,
-                type    = ExtractorLinkType.M3U8
+                type    = INFER_TYPE, {
+                    referer = ""
+                    quality = Qualities.Unknown.value
+                }
             )
         )
 
