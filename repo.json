@@ -1,8 +1,8 @@
 {
-  "name": "SporKeyfi",
-  "description": "Sporla alakalı şeyler",
+  "name": "cs-karma",
+  "description": "ortaya karışık eklentiler.",
   "manifestVersion": 1,
   "pluginLists": [
-    "https://raw.githubusercontent.com/Kraptor123/SporKeyfi/refs/heads/builds/plugins.json"
+    "https://raw.githubusercontent.com/Kraptor123/cs-Karma/refs/heads/builds/plugins.json"
   ]
 }
