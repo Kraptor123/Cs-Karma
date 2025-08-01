@@ -1,4 +1,4 @@
-# `cs-Karma`
+# `Cs-Karma`
 
 `Kısa Kod`: **karmator**
 
