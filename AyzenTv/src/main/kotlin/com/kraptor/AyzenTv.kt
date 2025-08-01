@@ -85,10 +85,20 @@ class AyzenTv : MainAPI() {
         return tumKanallar.filter {
             it.title.toString().lowercase().contains(query.lowercase())
         }.map { kanal ->
-            val poster      = if (kanal.attributes["tvg-logo"].toString().contains("https://i.imgur.com/oLlyfQo.png")) {
-                "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
-            } else {
-                kanal.attributes["tvg-logo"].toString()
+            val defaultLogo = "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
+            val tvgLogoRaw = kanal.attributes["tvg-logo"]?.toString()
+            val poster = when {
+                tvgLogoRaw.isNullOrBlank() -> defaultLogo
+                listOf(
+                    "oLlyfQo.png",
+                    "Teunqw1d",
+                    "7ocHFpm60QjE",
+                    "yYAFZdM",
+                    "10giris",
+                    "PdffNdl.png",
+                    "A99G3T7.png"
+                ).any { tvgLogoRaw.contains(it) } -> defaultLogo
+                else -> tvgLogoRaw
             }
             val streamurl   = kanal.url.toString()
             val channelname = kanal.title.toString()
