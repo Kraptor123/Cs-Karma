@@ -6,6 +6,8 @@ import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import java.net.URLEncoder
+
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 
@@ -31,17 +33,17 @@ class FsTv : MainAPI() {
     private fun Element.toMainPageResult(): SearchResponse? {
         val rawTitle = this.attr("title").takeIf { it.isNotEmpty() } ?: return null
         val channelId = this.attr("data-id").takeIf { it.isNotEmpty() } ?: return null
-        val posterUrl = fixUrlNull(this.attr("data-logo"))
+        val rawPosterUrl = fixUrlNull(this.attr("data-logo"))
         
+       
+        val posterUrl = rawPosterUrl?.let { fixImageFormat(it) }
         
         val cleanTitle = rawTitle
             .removePrefix("VE-")
-            
             .removePrefix("3CDN -")
             .removePrefix("cdn -")
             .removePrefix("cdn-")
             .removePrefix("CDN-")
-
             .removePrefix("VEsv2-")
             .removePrefix("uk -")
             .removePrefix("uk-")
@@ -86,28 +88,34 @@ class FsTv : MainAPI() {
         val channelElement = document.selectFirst("div.item-channel[data-id='${channelId}']") ?: return null
         
         val rawTitle = channelElement.attr("title")
-        val posterUrl = fixUrlNull(channelElement.attr("data-logo"))
+        val rawPosterUrl = fixUrlNull(channelElement.attr("data-logo"))
         val streamUrl = channelElement.attr("data-link")
         
+       
+        val posterUrl = rawPosterUrl?.let { fixImageFormat(it) }
         
         val cleanTitle = rawTitle
             .removePrefix("VE-")
-            
             .removePrefix("3CDN -")
             .removePrefix("cdn -")
             .removePrefix("cdn-")
-
+            .removePrefix("CDN-")
             .removePrefix("VEsv2-")
             .removePrefix("uk -")
             .removePrefix("uk-")
             .removePrefix("usa-")
             .removePrefix("usa -")
+            .removePrefix("1cdn -")
+            .removePrefix("VEuk-sv2-")
             .replace("ve-","")
             .replace("-us-", "-")
             .replace("-uk-", "-")
             .replace("us-", "")
             .replace("usa-", "")
             .replace("uk-", "")
+            .replace("de-", "")
+            .replace("DE -", "")
+            .replace("DE-", "")
             .replace("uk-", "")
             .trim()
         
@@ -135,5 +143,21 @@ class FsTv : MainAPI() {
             }
         )
         return true
+    }
+
+    private fun fixImageFormat(url: String): String {
+        if (url.isEmpty()) return ""
+        
+        
+        return if (url.contains(".svg", ignoreCase = true)) {
+            try {
+                val encodedUrl = URLEncoder.encode(url, "UTF-8")
+                "https://res.cloudinary.com/di0j4jsa8/image/fetch/f_auto/$encodedUrl"
+            } catch (e: Exception) {
+                url
+            }
+        } else {
+            url 
+        }
     }
 }
