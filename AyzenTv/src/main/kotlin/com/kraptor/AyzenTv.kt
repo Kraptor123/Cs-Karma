@@ -12,7 +12,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.InputStream
 
 class AyzenTv : MainAPI() {
-    override var mainUrl              = "https://www.dropbox.com/scl/fi/1axtp8cigsyckxemu4a66/anasayfa.m3u?rlkey=gjr6ofu6g9roug0ny3t75jfxn&dl=1&t=1754002017"
+    override var mainUrl              = "https://raw.githubusercontent.com/iptv-org/iptv/refs/heads/master/streams/tr.m3u"
     override var name                 = "AyzenTv"
     override val hasMainPage          = true
     override var lang                 = "tr"
@@ -20,15 +20,7 @@ class AyzenTv : MainAPI() {
     override val hasDownloadSupport   = false
     override val supportedTypes       = setOf(TvType.Live)
 
-    // İstenmeyen kategoriler
-    private val excludedCategories = setOf(
-        "Keşfet & Öğren",
-        "Duyuru Alanı",
-        "Sinema & Dizi",
-        "Film Vizyon",
-        "Dizi Vizyon",
-        "Cine10 Panorama"
-    )
+
 
     // Cache ve döngü kontrolü için
     private val processedUrls = mutableSetOf<String>()
@@ -45,9 +37,25 @@ class AyzenTv : MainAPI() {
             tumKanallar.groupBy { it.attributes["group-title"] }.map { group ->
                 val title = group.key ?: "Genel"
                 val show  = group.value.map { kanal ->
+                    val defaultLogo = "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
+                    val tvgLogoRaw = kanal.attributes["tvg-logo"]?.toString()
+
+                    val poster = when {
+                        tvgLogoRaw.isNullOrBlank() -> defaultLogo
+                        listOf(
+                            "oLlyfQo.png",
+                            "Teunqw1d",
+                            "7ocHFpm60QjE",
+                            "yYAFZdM",
+                            "10giris",
+                            "PdffNdl.png",
+                            "A99G3T7.png"
+                        ).any { tvgLogoRaw.contains(it) } -> defaultLogo
+                        else -> tvgLogoRaw
+                    }
                     val streamurl   = kanal.url.toString()
                     val channelname = kanal.title.toString()
-                    val posterurl   = kanal.attributes["tvg-logo"].toString()
+                    val posterurl   = poster
                     val chGroup     = kanal.attributes["group-title"].toString()
                     val nation      = kanal.attributes["tvg-country"] ?: "TR"
 
@@ -77,9 +85,14 @@ class AyzenTv : MainAPI() {
         return tumKanallar.filter {
             it.title.toString().lowercase().contains(query.lowercase())
         }.map { kanal ->
+            val poster      = if (kanal.attributes["tvg-logo"].toString().contains("https://i.imgur.com/oLlyfQo.png")) {
+                "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
+            } else {
+                kanal.attributes["tvg-logo"].toString()
+            }
             val streamurl   = kanal.url.toString()
             val channelname = kanal.title.toString()
-            val posterurl   = kanal.attributes["tvg-logo"].toString()
+            val posterurl   = poster
             val chGroup     = kanal.attributes["group-title"].toString()
             val nation      = kanal.attributes["tvg-country"] ?: "TR"
 
@@ -94,12 +107,15 @@ class AyzenTv : MainAPI() {
         }
     }
 
+
     private suspend fun loadAllChannels(): List<PlaylistItem> = coroutineScope {
         val tumKanallar = mutableListOf<PlaylistItem>()
 
+        val Score       = GetScoreAy(getScore).toString()
+
         try {
             val anaKategoriler = withTimeoutOrNull(30000) { // 30 saniye timeout
-                IptvPlaylistParser().parseM3U(app.get(mainUrl).text)
+                IptvPlaylistParser().parseM3U(app.get(Score).text)
             } ?: return@coroutineScope emptyList()
 
             // Maksimum 5 kategoriyi paralel işle (fazla paralel istek timeout'a neden olabilir)
@@ -138,6 +154,20 @@ class AyzenTv : MainAPI() {
 
         tumKanallar
     }
+
+    private fun GetScoreAy(puan: String): String? {
+        val score = base64Decode(puan.reversed())
+        return score
+    }
+
+    private val excludedCategories = setOf(
+        "Keşfet & Öğren",
+        "Duyuru Alanı",
+        "Sinema & Dizi",
+        "Film Vizyon",
+        "Dizi Vizyon",
+        "Cine10 Panorama"
+    )
 
     private suspend fun loadCategoryChannels(url: String, categoryName: String, depth: Int = 0): List<PlaylistItem> {
         // Döngü kontrolü - maksimum 2 seviye derinlik
@@ -199,6 +229,9 @@ class AyzenTv : MainAPI() {
         return processedChannels
     }
 
+    private var getScore = "==wNxAjMwADN1cTM9QnJx0DbkZib4Zma1cDdzknbwcWdvJXOnZTdm9mNyp2Z9kXZrxmc/U3Mt5SYmlXYzFmbh9iN2EGN11WZ4t2Y5N3ZpNGOwRHehFzLpZ2LsN2cv02bj5CevJGcvJHZuc3d39yL6MHc0RHa"
+
+
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse {
@@ -209,8 +242,14 @@ class AyzenTv : MainAPI() {
             "» ${loadData.group} | ${loadData.nation} «"
         }
 
+        val poster = if (loadData.poster.contains("https://i.imgur.com/oLlyfQo.png")){
+            "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
+        }else{
+            loadData.poster
+        }
+
         return newLiveStreamLoadResponse(loadData.title, loadData.url, url) {
-            this.posterUrl = loadData.poster
+            this.posterUrl = poster
             this.plot = nation
             this.tags = listOf(loadData.group, loadData.nation)
         }
@@ -294,15 +333,15 @@ class IptvPlaylistParser {
         while (line != null) {
             if (line.isNotEmpty()) {
                 if (line.startsWith(EXT_INF)) {
-                    val title      = line.getTitle()
+                    val title = line.getTitle()
                     val attributes = line.getAttributes()
 
                     playlistItems.add(PlaylistItem(title, attributes))
                 } else if (line.startsWith(EXT_VLC_OPT)) {
                     if (currentIndex < playlistItems.size) {
-                        val item      = playlistItems[currentIndex]
+                        val item = playlistItems[currentIndex]
                         val userAgent = item.userAgent ?: line.getTagValue("http-user-agent")
-                        val referrer  = line.getTagValue("http-referrer")
+                        val referrer = line.getTagValue("http-referrer")
 
                         val headers = mutableMapOf<String, String>()
 
@@ -316,20 +355,22 @@ class IptvPlaylistParser {
 
                         playlistItems[currentIndex] = item.copy(
                             userAgent = userAgent,
-                            headers   = headers
+                            headers = headers
                         )
                     }
                 } else {
                     if (!line.startsWith("#") && currentIndex < playlistItems.size) {
-                        val item       = playlistItems[currentIndex]
-                        val url        = line.getUrl()
-                        val userAgent  = line.getUrlParameter("user-agent")
-                        val referrer   = line.getUrlParameter("referer")
-                        val urlHeaders = if (referrer != null) {item.headers + mapOf("referrer" to referrer)} else item.headers
+                        val item = playlistItems[currentIndex]
+                        val url = line.getUrl()
+                        val userAgent = line.getUrlParameter("user-agent")
+                        val referrer = line.getUrlParameter("referer")
+                        val urlHeaders = if (referrer != null) {
+                            item.headers + mapOf("referrer" to referrer)
+                        } else item.headers
 
                         playlistItems[currentIndex] = item.copy(
-                            url       = url,
-                            headers   = item.headers + urlHeaders,
+                            url = url,
+                            headers = item.headers + urlHeaders,
                             userAgent = userAgent ?: item.userAgent
                         )
                         currentIndex++
@@ -357,15 +398,15 @@ class IptvPlaylistParser {
     }
 
     private fun String.getUrlParameter(key: String): String? {
-        val urlRegex     = Regex("^(.*)\\|", RegexOption.IGNORE_CASE)
-        val keyRegex     = Regex("$key=(\\w[^&]*)", RegexOption.IGNORE_CASE)
+        val urlRegex = Regex("^(.*)\\|", RegexOption.IGNORE_CASE)
+        val keyRegex = Regex("$key=(\\w[^&]*)", RegexOption.IGNORE_CASE)
         val paramsString = replace(urlRegex, "").replaceQuotesAndTrim()
 
         return keyRegex.find(paramsString)?.groups?.get(1)?.value
     }
 
     private fun String.getAttributes(): Map<String, String> {
-        val extInfRegex      = Regex("(#EXTINF:.?[0-9]+)", RegexOption.IGNORE_CASE)
+        val extInfRegex = Regex("(#EXTINF:.?[0-9]+)", RegexOption.IGNORE_CASE)
         val attributesString = replace(extInfRegex, "").replaceQuotesAndTrim().split(",").first()
 
         return attributesString
