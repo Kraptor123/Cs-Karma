@@ -12,7 +12,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.InputStream
 
 class AyzenTv : MainAPI() {
-    override var mainUrl              = "https://www.dropbox.com/scl/fi/1axtp8cigsyckxemu4a66/anasayfa.m3u?rlkey=gjr6ofu6g9roug0ny3t75jfxn&dl=1&t=1754002017"
+    override var mainUrl              = "https://uc3893d72e464202fcfb4e097435.dl.dropboxusercontent.com/cd/0/get/CunE5Nj0CcpzDykLSLZW0uoQAEoWrpOp_uwp7nfwthxq-gzz4sjkG_SvsP8nLp-kCWbxtOoWW314GQMRX9yEPNZrGUoNsWuQvtTGzgFS8moaSk_xyqPd72KCBy-SI2iZL8X8QDN5-WzQjWgw_lNhJXuH/file?dl=1"
     override var name                 = "AyzenTv"
     override val hasMainPage          = true
     override var lang                 = "tr"
