@@ -2,4 +2,4 @@
 
 Kısa Kod: karmator
 
-[uygulamayı kurmak için tıkla](https://kraptor123.github.io/redirect/?r=cloudstreamrepo://raw.githubusercontent.com/Kraptor123/cs-kekikanime/refs/heads/master/repo.json)
+[tıkla kur](https://kraptor123.github.io/redirect/?r=cloudstreamrepo://raw.githubusercontent.com/Kraptor123/cs-Karma/refs/heads/master/repo.json)
