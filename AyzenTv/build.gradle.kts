@@ -14,5 +14,5 @@ cloudstream {
     **/
     status  = 1 // will be 3 if unspecified
     tvTypes = listOf("Live")
-    iconUrl = "https://www.google.com/s2/favicons?domain=tr.canlitv.team&sz=%size%"
+    iconUrl = "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/faviconAyzen.png"
 }
