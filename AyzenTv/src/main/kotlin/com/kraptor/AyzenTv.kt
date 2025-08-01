@@ -252,10 +252,21 @@ class AyzenTv : MainAPI() {
             "» ${loadData.group} | ${loadData.nation} «"
         }
 
-        val poster = if (loadData.poster.contains("https://i.imgur.com/oLlyfQo.png")){
-            "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
-        }else{
-            loadData.poster
+        val defaultLogo = "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/ayzenTv.png"
+        val tvgLogoRaw = loadData.poster
+
+        val poster = when {
+            tvgLogoRaw.isBlank() -> defaultLogo
+            listOf(
+                "oLlyfQo.png",
+                "Teunqw1d",
+                "7ocHFpm60QjE",
+                "yYAFZdM",
+                "10giris",
+                "PdffNdl.png",
+                "A99G3T7.png"
+            ).any { tvgLogoRaw.contains(it) } -> defaultLogo
+            else -> tvgLogoRaw
         }
 
         return newLiveStreamLoadResponse(loadData.title, loadData.url, url) {
