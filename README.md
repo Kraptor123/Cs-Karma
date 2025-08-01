@@ -1,6 +1,6 @@
 # `cs-Karma`
 
-`Kısa Kod`: `**karmator**`
+`Kısa Kod`: **karmator**
 
 Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekleştirebilirsiniz.
 
