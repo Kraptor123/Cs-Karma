@@ -49,6 +49,15 @@ jobs:
           cp **/build/*.cs3 $GITHUB_WORKSPACE/builds
           cp build/plugins.json $GITHUB_WORKSPACE/builds
 
+      - name: Katkı Sağlayanlar SVG’ini Oluştur
+        uses: jaywcjlove/github-action-contributors@main
+        with:
+          # Bot hesaplarını filtrele
+          filter-author: (renovate\[bot\]|renovate-bot|dependabot\[bot\])
+          # SVG’i builds klasörüne yaz
+          output: builds/katkisaglayanlar.svg
+          avatarSize: 42
+
       - name: Push builds
         run: |
           cd $GITHUB_WORKSPACE/builds
