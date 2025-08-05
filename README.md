@@ -16,3 +16,14 @@ Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekle
 </a>
 
 </div>
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/Kraptor123">
+        <img src="https://avatars.githubusercontent.com/u/89366989?v=4" width="36;" alt="Kraptor123"/><br />
+        <sub><b>Kraptor123</b></sub>
+        </a>
+    </td>
+  </tr>
+</table>
