@@ -15,8 +15,6 @@ Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekle
   <img src="https://raw.githubusercontent.com/Kraptor123/Cs-Karma/873871c50475ef43b6b2e15f3a9729834f1be2c9/katkisaglayanlar.svg" />
 </a>
 
-</div>
-
 <table>
   <tr>
     <td align="center">
@@ -27,3 +25,5 @@ Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekle
     </td>
   </tr>
 </table>
+
+</div>
