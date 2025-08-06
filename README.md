@@ -8,19 +8,31 @@ Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekle
 
 [<img alt="Cs-Karma logo" width="200px" src="https://i.imgur.com/7Wk9P2C.png"/>](https://kraptor123.github.io/redirect/?r=cloudstreamrepo://raw.githubusercontent.com/Kraptor123/cs-Karma/refs/heads/master/repo.json)
 
-<table>
+<table cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
   <tr>
     <td align="center">
       <a href="https://github.com/Kraptor123">
-        <img src="https://avatars.githubusercontent.com/u/89366989?v=4" width="80;" alt="kraptor"/><br />
+        <img
+          src="https://avatars.githubusercontent.com/u/89366989?v=4"
+          width="80"
+          alt="kraptor"
+          style="border: none; display: block;"
+          border="0"
+        /><br />
         <sub><b>kraptor</b></sub>
-        </a>
+      </a>
     </td>
-     <td align="center">
+    <td align="center">
       <a href="https://github.com/kerimmkirac">
-        <img src="https://avatars.githubusercontent.com/u/127618379?v=4" width="80;" alt="kerimmkirac"/><br />
+        <img
+          src="https://avatars.githubusercontent.com/u/127618379?v=4"
+          width="80"
+          alt="kerimmkirac"
+          style="border: none; display: block;"
+          border="0"
+        /><br />
         <sub><b>kerimmkirac</b></sub>
-        </a>
+      </a>
     </td>
   </tr>
 </table>
