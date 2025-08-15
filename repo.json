@@ -1,0 +1,9 @@
+{
+  "iconUrl": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/.github/logo/cskarma.png",
+  "name": "cs-karma",
+  "description": "ortaya karışık eklentiler.",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/builds/plugins.json"
+  ]
+}
