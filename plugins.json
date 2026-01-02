@@ -1,0 +1,698 @@
+[
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/AnimeAV.cs3",
+        "status": 1,
+        "version": 17,
+        "name": "AnimeAV",
+        "internalName": "AnimeAV",
+        "authors": [
+            "kraptor",
+            "ByAyzen"
+        ],
+        "description": "Disfruta de los \u00faltimos episodios y animes agregados en HD y Sub Espa\u00f1ol. Miles de series, pel\u00edculas y OVAs disponibles para ver online totalmente gratis.",
+        "fileSize": 27726,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Anime"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=animeav1.com",
+        "apiVersion": 1,
+        "fileHash": "sha256-fcf47ba472388c30843a5878f370987f58ceea462597afcadf913dd0ad1d6798"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Animejara.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "Animejara",
+        "internalName": "Animejara",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Ver anime online, subtitulado y/o doblado al espa\u00f1ol latino HD y completamente gratis. Aqu\u00ed podr\u00e1s ver y descargar todas tus series preferidas sin anuncios.",
+        "fileSize": 21513,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://ww1.henaojara.net/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-54f4e096c14cd8715976b1ac96823973d19685d1fd39df6252674964e5f48bc8"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/AnimeWorld.cs3",
+        "status": 1,
+        "version": 5,
+        "name": "AnimeWorld",
+        "internalName": "AnimeWorld",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Scopri il nostro Archivio di Anime in Streaming Sub ITA e ITA. Guarda in Streaming o effettua il Download di migliaia di serie animate sempre aggiornate e in alta qualit\u00e0, disponibili su PC, console, tablet, smartphone ed altri dispositivi.",
+        "fileSize": 14772,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "it",
+        "tvTypes": [
+            "Anime"
+        ],
+        "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.animeworld.ac&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-8fb4095e7b24f449d1bdb6425cd17241003b59f295b0f93ade6fccc801410a06"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/AnimeYTX.cs3",
+        "status": 1,
+        "version": 8,
+        "name": "AnimeYTX",
+        "internalName": "AnimeYTX",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "\u00danete a la familia de AnimeYT.es y disfruta del anime online gratis. Disfruta con tus amigos del contenido m\u00e1s popular de la animaci\u00f3n japonesa.",
+        "fileSize": 44160,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Anime"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://animeyt.cc&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-111b67b7f8163644234fcab7103f334fa5d9eb3228003cb90630f929a79a3ef7"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/BasketballReplays.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "BasketballReplays",
+        "internalName": "BasketballReplays",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "BA Replay full games online Free . Stream NBA Basketball replays full games. Spoiler Free , No Blackouts. No signup. Free Download High quality video in HD.",
+        "fileSize": 16980,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://basketballreplays.net/favicon.ico",
+        "apiVersion": 1,
+        "fileHash": "sha256-9d05ef7042422c3ba6df8ccb79cc5949cd33c76d2fb7fd7240b6f4fe70fb5a0c"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/DocumentaryArea.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "DocumentaryArea",
+        "internalName": "DocumentaryArea",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Watch the best online documentary films.Stunning collection of awesome, eyeopening, interesting, just released, full documentaries.",
+        "fileSize": 15657,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Documentary"
+        ],
+        "iconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://documentaryarea.com&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-021886e32fcf3b9b9de3354d568fca7654547d25192c35ae2628074461dba083"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/DoramasLatinoX.cs3",
+        "status": 1,
+        "version": 7,
+        "name": "DoramasLatinoX",
+        "internalName": "DoramasLatinoX",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Doramas en Audio Espa\u00f1ol Latino y Subtitulado.",
+        "fileSize": 30455,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "AsianDrama"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://doramaslatinox.com/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-d91e82e60f2f1d93f97d2bfda2271a4c1175940d2d8fb640f54f130396e2b61b"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Dubbindo.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "Dubbindo",
+        "internalName": "Dubbindo",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Serial TV Bahasa Indonesia",
+        "fileSize": 14360,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "id",
+        "tvTypes": [
+            "AsianDrama"
+        ],
+        "iconUrl": "https://www.dubbindo.site/themes/dubbindo/img/icon.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-da0ee98dff970cd82ae55f2a1d0e3247f2888cac3bc962f2965778931f74bf51"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Esheaq.cs3",
+        "status": 1,
+        "version": 18,
+        "name": "Esheaq",
+        "internalName": "Esheaq",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "\u0642\u0635\u0629 \u0639\u0634\u0642 \u0627\u0644\u0623\u0635\u0644\u064a \u0644\u0623\u062d\u062f\u062b \u0627\u0644\u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0627\u0644\u062a\u0631\u0643\u064a\u0629 \u0648\u0627\u0644\u062f\u0631\u0627\u0645\u0627 \u0627\u0644\u0645\u062a\u0631\u062c\u0645\u0629 \u0639\u0644\u064a \u0642\u0635\u0647 \u0639\u0634\u0642 \u060c \u064a\u0645\u0643\u0646\u0643 \u0645\u0646 \u062e\u0644\u0627\u0644 \u0645\u0648\u0642\u0639 \u0642\u0635\u0629 \u0639\u0634\u0642 \u0645\u0634\u0627\u0647\u062f\u0629 \u0643\u0644 \u062c\u062f\u064a\u062f \u0641\u064a \u0639\u0627\u0644\u0645 \u0627\u0644\u062f\u0631\u0627\u0645\u0627 \u0627\u0644\u062a\u0631\u0643\u064a\u0629",
+        "fileSize": 17196,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "ar",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://esk.onl&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-4850240c4030928ef14f9ded503359c141d188e6576123073996905adecff2e3"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/F1FullRaces.cs3",
+        "status": 1,
+        "version": 10,
+        "name": "F1FullRaces",
+        "internalName": "F1FullRaces",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "F1FullRaces",
+        "fileSize": 25608,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://i.imgur.com/CcDyv7Z.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-60c6d9e12f52a852887e88530098cf6f7c7061480d3ea571dace17da4e2d1f9f"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Flixlatam.cs3",
+        "status": 1,
+        "version": 8,
+        "name": "Flixlatam",
+        "internalName": "Flixlatam",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Mira tus Series, Pel\u00edculas y Animes en Latino Online!",
+        "fileSize": 41676,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Movie"
+        ],
+        "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://flixlatam.com&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-eb6824a7efe8f78ae9410f2ba5e0b807fde9d9e7eecf21699923ebdc6693dae6"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Footballia.cs3",
+        "status": 1,
+        "version": 9,
+        "name": "Footballia",
+        "internalName": "Footballia",
+        "authors": [
+            "kraptor",
+            "ByAyzen"
+        ],
+        "description": "1950\u2019lerden g\u00fcn\u00fcm\u00fcze\u2026 40.000\u2019den fazla ma\u00e7 ve 100.000\u2019den fazla oyuncu.",
+        "fileSize": 43402,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://footballia.net/tr&size=48",
+        "apiVersion": 1,
+        "fileHash": "sha256-86537cb0b500aea1d93ac533ec5eb3cdee56d450276e1a755895bebce3dd4447"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/FootReplays.cs3",
+        "status": 1,
+        "version": 1,
+        "name": "FootReplays",
+        "internalName": "FootReplays",
+        "authors": [
+            "ByAyzen"
+        ],
+        "fileSize": 25573,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Others"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.footreplays.com/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-165ec2dfe90778873a879572e04cf35f7a9f5c0a0466ca50d4fd7b705f203185"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/FullRaces.cs3",
+        "status": 1,
+        "version": 11,
+        "name": "FullRaces",
+        "internalName": "FullRaces",
+        "authors": [
+            "kraptor123",
+            "kerimmkirac"
+        ],
+        "description": "Formula 1 is one of the most popular and dramatic sports in the world. You can watch Formula One races replays videos online and enjoy every moment of this exciting sports event. We offer to watch F1 Full Races replays FREE in HD",
+        "fileSize": 42704,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Movie"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?domain=fullraces.com&sz=%size%",
+        "apiVersion": 1,
+        "fileHash": "sha256-31b09e183787b8b34dbdf2c73519539eef5b4411cd587fa6698ad68562fd566d"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Gnulahd.cs3",
+        "status": 1,
+        "version": 9,
+        "name": "Gnulahd",
+        "internalName": "Gnulahd",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "GnulaHD",
+        "fileSize": 33309,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Movie",
+            "Anime",
+            "TvSeries"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://ww3.gnulahd.nu/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-1990284f109d284242542dd7c80f18ad3078d4b5d31f8356e5d8410cb69aea99"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Iwatchtheoffice.cs3",
+        "status": 1,
+        "version": 3,
+        "name": "Iwatchtheoffice",
+        "internalName": "Iwatchtheoffice",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Stream The Office (US) Online Free in HD on XBOX, Playstation, MOBILE, TABLET and PC",
+        "fileSize": 15788,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Movie"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://iwatchtheoffice.cc&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-6fbc42b219603b51079c568ce4289e593598bf5f638ab73f01e51bbae1d26ea7"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/JPFilms.cs3",
+        "status": 1,
+        "version": 9,
+        "name": "JPFilms",
+        "internalName": "JPFilms",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Watch online The Yagyu Code: Secret Scrolls on Japanese Classic Movies and TVSeries (https://jp-films.com) with English Subtitle.",
+        "fileSize": 16896,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "AsianDrama"
+        ],
+        "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://kodasusaka.com&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-1b736e0cda249cbac483658a2abe2b8c90075c232dd26fd8739797b79a5e5f5f"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/KissKH.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "KissKH",
+        "internalName": "KissKH",
+        "authors": [
+            "kraptor",
+            "ByAyzen"
+        ],
+        "description": "Watch drama online in high quality. Free download high quality drama. Various formats from 240p to 720p HD (or even 1080p). Feel Free To Watch!",
+        "fileSize": 40074,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "AsianDrama"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://kisskh.id/&size=256",
+        "apiVersion": 1,
+        "fileHash": "sha256-d3350a99347d8eaf32c453130e5f900143ae5ade9b5731edbbdc5719a6b2fcec"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Krmzy.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "Krmzy",
+        "internalName": "Krmzy",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "\u0642\u0631\u0645\u0632\u064a \u2013 \u0627\u0644\u0645\u0646\u0635\u0629 \u0631\u0642\u0645 #1 \u0644\u0645\u0634\u0627\u0647\u062f\u0629 \u0627\u0644\u0645\u0633\u0644\u0633\u0644\u0627\u062a \u0627\u0644\u062a\u0631\u0643\u064a\u0629 \u0645\u062a\u0631\u062c\u0645\u0629 \u0627\u0644\u0649 \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0648\u0628\u062c\u0648\u062f\u0629 \u0639\u0627\u0644\u064a\u0629\u060c \u0645\u0639 \u062a\u062d\u062f\u064a\u062b\u0627\u062a \u064a\u0648\u0645\u064a\u0629 \u0644\u0644\u062d\u0644\u0642\u0627\u062a \u0641\u0648\u0631 \u0635\u062f\u0648\u0631\u0647\u0627. \u0645\u062c\u0627\u0646\u064a \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u0648\u0628\u062f\u0648\u0646 \u0625\u0634\u062a\u0631\u0627\u0643.",
+        "fileSize": 19171,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "ar",
+        "tvTypes": [
+            "TvSeries"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=krmzy.org",
+        "apiVersion": 1,
+        "fileHash": "sha256-9d37682df1393aa01f4ae3adb584912ce19629bd5dca8256aa2f136206729040"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Latanime.cs3",
+        "status": 1,
+        "version": 9,
+        "name": "Latanime",
+        "internalName": "Latanime",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "odos los anime con Doblaje Latino/Castellano solo aqu\u00ed en Latanime. Animes de estreno, subtitulado al espa\u00f1ol y con Audio Latino o Castellano, Online, HD y gratis. Para descargar por MEGA, Mediafire o Drive sin limites.",
+        "fileSize": 21666,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "mx",
+        "tvTypes": [
+            "Movie"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://latanime.org/&size=16",
+        "apiVersion": 1,
+        "fileHash": "sha256-e87cee1ce0161273b23a45c73b2de3cea955eb4ddb98cd82c0232313e66751e7"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/LayarKaca.cs3",
+        "status": 1,
+        "version": 14,
+        "name": "LayarKaca",
+        "internalName": "LayarKaca",
+        "authors": [
+            "kraptor",
+            "Phisher98",
+            "Hexated"
+        ],
+        "description": "Nonton dan download film & series terbaru di LK21. Streaming sub Indo gratis, kualitas HD. Tersedia drama Korea, anime, film barat, dan Asia lengkap!",
+        "fileSize": 35722,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "id",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://tv12.lk21official.cc&size=256",
+        "apiVersion": 1,
+        "fileHash": "sha256-b12c84577e673af0870a4bd3133f4cb63b0563935ca468eeb3df2d9da343ec10"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Movix.cs3",
+        "status": 1,
+        "version": 29,
+        "name": "Movix",
+        "internalName": "Movix",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Explorez les films, s\u00e9ries, collections, alertes et recommandations Movix.",
+        "fileSize": 150993,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "fr",
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://movix.fun/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-b7afc32cad4be7c47a63e31e355327d81cf8859e02aede9aa88f65e77014c85e"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Nekokun.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "Nekokun",
+        "internalName": "Nekokun",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Nekokun adalah tempat nonton dan streaming animu favoritmu! Di sini tersedia berbagai resolusi untuk kalian download mulai dari 480p, 720p, dan 1080p. Selain bisa download kalian juga langsung bisa streaming dengan lancar dan tanpa lag!",
+        "fileSize": 25399,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "id",
+        "tvTypes": [
+            "Anime"
+        ],
+        "iconUrl": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://nekokun.my.id&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-96c38b283edf694dfdba1c12afb17abe70c0567332bfbfdc3286934a12fc736d"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/OK.cs3",
+        "status": 1,
+        "version": 8,
+        "name": "OK",
+        "internalName": "OK",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "OKRU Videos.",
+        "fileSize": 32302,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "ru",
+        "tvTypes": [
+            "Movie",
+            "TvSeries"
+        ],
+        "iconUrl": "https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://ok.ru/video/c12842395&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-f79349cf015293af149f239964fb17d14c6ff682c0f1f21e9a5f902001efa965"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/OnShort.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "OnShort",
+        "internalName": "OnShort",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "Discover dubbed and subtitled short dramas from multiple platforms and open every available episode on ONShort.",
+        "fileSize": 22078,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "AsianDrama"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=https://onshort.net",
+        "apiVersion": 1,
+        "fileHash": "sha256-e7db73e98313edb13f010adb433f650d9f554f848ef05d1b48edd6e9dbaea26e"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Sokuja.cs3",
+        "status": 1,
+        "version": 3,
+        "name": "Sokuja",
+        "internalName": "Sokuja",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "SOKUJA menyediakan koleksi anime subtitle Indonesia terlengkap. Nonton streaming dan download anime sub Indo HD gratis, update episode baru setiap hari.",
+        "fileSize": 20313,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "id",
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://x6.sokuja.uk&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-291a22db646e690d9e09ced51fb5061266156541f7466e1ba71b02d01cea934f"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Streamed.cs3",
+        "status": 1,
+        "version": 29,
+        "name": "Streamed",
+        "internalName": "Streamed",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "Streamed ile Canl\u0131 Spor Yay\u0131nlar\u0131n\u0131 \u0130zleyebilirsiniz.",
+        "fileSize": 31145,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://streamed.pk/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-3ac142f8ccfcc3be876418f9034e982c9753d29ee1fe411dfebcbd6048359164"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Subsplease.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "Subsplease",
+        "internalName": "Subsplease",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "One stop shop for new animes!",
+        "fileSize": 15792,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Anime"
+        ],
+        "iconUrl": "https://subsplease.org/favicon.ico",
+        "apiVersion": 1,
+        "fileHash": "sha256-a318b63f10570e4946ab57870c5240d620629abc1600c0c95efe2c6ad5170709"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Supercartoons.cs3",
+        "status": 1,
+        "version": 2,
+        "name": "Supercartoons",
+        "internalName": "Supercartoons",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "Watch Cartoons Online. Here you can Watch old Classical Cartoons like Bugs Bunny, Mickey Mouse, Pink Panther, Tom and Jerry and Many Many More!",
+        "fileSize": 11416,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Cartoon"
+        ],
+        "iconUrl": "https://i.imgur.com/LBfX2k3.png",
+        "apiVersion": 1,
+        "fileHash": "sha256-70b55d491bf7b012a9f0ba46161a3696314c52126a792b191c35eee7e5c1848b"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/TVGarden.cs3",
+        "status": 1,
+        "version": 11,
+        "name": "TVGarden",
+        "internalName": "TVGarden",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "With TVGarden, you can watch the local and legal channels you are looking for from both domestic and international sources.",
+        "fileSize": 14941,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://favicons.teamtailor-cdn.com/icon?size=80..120..200&url=tv.garden",
+        "apiVersion": 1,
+        "fileHash": "sha256-365ffcdd7b4426873950b1dbbed82bbacf3fd4e7c9f611ccffaa0a6baa03efa8"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/WatchWrestling.cs3",
+        "status": 1,
+        "version": 18,
+        "name": "WatchWrestling",
+        "internalName": "WatchWrestling",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "Watch WWE | WWE Raw | Smackdown Live",
+        "fileSize": 18830,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Live"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://instapro.ac&size=32",
+        "apiVersion": 1,
+        "fileHash": "sha256-e60c081865d5584f9fa4dec3006be7cd81cc016499c8d558972bede4d855b5b3"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Wcoflix.cs3",
+        "status": 1,
+        "version": 9,
+        "name": "Wcoflix",
+        "internalName": "Wcoflix",
+        "authors": [
+            "ByAyzen",
+            "kraptor"
+        ],
+        "description": "We have wide range of cartoons and anime that you can watch in HD and High quality for free.",
+        "fileSize": 22311,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "Anime",
+            "Cartoon"
+        ],
+        "iconUrl": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://www.wcoflix.tv/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-3a44e6944851c296e597ef5b4a41a0c9e9a66d8be37348dc152af371df469637"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/Yablom.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "Yablom",
+        "internalName": "Yablom",
+        "authors": [
+            "ByAyzen"
+        ],
+        "description": "French site.",
+        "fileSize": 17031,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "fr",
+        "tvTypes": [
+            "Movie"
+        ],
+        "iconUrl": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://yablom.com/euvcw7/home/yablom/&size=128",
+        "apiVersion": 1,
+        "fileHash": "sha256-d57f8c2b769c63646c47f8b24932313b985b457369915afde8fb278473bd36fc"
+    },
+    {
+        "url": "https://raw.githubusercontent.com/Kraptor123/Cs-Karma/builds/YoTurkish.cs3",
+        "status": 1,
+        "version": 4,
+        "name": "YoTurkish",
+        "internalName": "YoTurkish",
+        "authors": [
+            "kraptor"
+        ],
+        "description": "YoTurkish - is the most favorite website for watching turkish series with english subtitles for free online, only at yoturkish.to",
+        "fileSize": 20039,
+        "repositoryUrl": "https://github.com/Kraptor123/Cs-Karma",
+        "language": "en",
+        "tvTypes": [
+            "TvSeries"
+        ],
+        "iconUrl": "https://www.google.com/s2/favicons?sz=64&domain=yoturkish.to",
+        "apiVersion": 1,
+        "fileHash": "sha256-8b613d44af2acd30aca70ea98bb454556bfba191bf2557550ee332518dd3f00a"
+    }
+]
