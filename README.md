@@ -14,9 +14,12 @@ You can install the repository by clicking the logo below on the device where th
 <h2 align="center">
 <br>
   <a href="https://linktr.ee/kraptorcs">Tüm Linklerim</a>
+  <br>
+  <br>
+  <a href="https://linktr.ee/kraptorcs">All Of My Links</a>
 </h2>
 
-# `Geliştiriciler`
+# `Geliştiriciler` | `Developers`
 
 <table>
   <tr>
