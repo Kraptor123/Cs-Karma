@@ -50,7 +50,7 @@ jobs:
           
           git add -A
           
-          git commit -m "♻️ Domain Değişikliği" \
-            -m "🔄 Otomatik domain güncellemeleri yapıldı."
+          git commit -m "🤖 Domain Update" \
+            -m "🤖 Automatic domain updates have been applied."
           
           git push origin master
