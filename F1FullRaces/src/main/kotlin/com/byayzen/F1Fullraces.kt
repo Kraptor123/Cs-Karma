@@ -16,7 +16,7 @@ class F1Fullraces : MainAPI() {
     override val supportedTypes = setOf(TvType.Live)
 
     override val mainPage = mainPageOf(
-        "${mainUrl}" to "Latest",
+           mainUrl                                                 to "Latest",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2025/" to "2025",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2024/" to "2024",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2023/" to "2023",
@@ -36,25 +36,12 @@ class F1Fullraces : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page == 1) {
-            request.data
-        } else {
-            val baseUrl = request.data.trimEnd('/')
-            "$baseUrl/page/$page/"
-        }
-
-        val document = app.get(url).document
-        val home = document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
+        val url = if (page <= 1) "${request.data.trimEnd('/')}/" else "${request.data.trimEnd('/')}/page/$page/"
+        val home = app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
 
         return newHomePageResponse(
-            list = HomePageList(
-                name = request.name, // <-- DEĞİŞİKLİK 1: Başlıktaki "Page X" ifadesi kaldırıldı.
-                list = home,
-                isHorizontalImages = true
-            ),
-            // DEĞİŞİKLİK 2: Sayfalama kontrolü daha güvenilir bir seçici ile yapıldı.
-            // "Next" metni içeren bir link arıyoruz. Bu, sitenin class ismini değiştirmesi durumunda bile çalışabilir.
-            hasNext = document.selectFirst("a:containsOwn(»), a:containsOwn(Next)") != null
+            list = HomePageList(request.name, home, isHorizontalImages = true),
+            hasNext = home.isNotEmpty()
         )
     }
 
@@ -65,20 +52,16 @@ class F1Fullraces : MainAPI() {
 
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(title, href, TvType.Movie) {
+            this.posterUrl = posterUrl
+        }
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val url = if (page == 1) {
-            "${mainUrl}/?s=${query}"
-        } else {
-            "${mainUrl}/page/$page/?s=${query}"
-        }
+        val url = if (page <= 1) "$mainUrl/?s=$query" else "$mainUrl/page/$page/?s=$query"
+        val results = app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
 
-        val document = app.get(url).document
-        val aramaCevap = document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
-
-        return newSearchResponseList(aramaCevap, hasNext = document.selectFirst("a:containsOwn(»), a:containsOwn(Next)") != null)
+        return newSearchResponseList(results, hasNext = results.isNotEmpty())
     }
 
     override suspend fun load(url: String): LoadResponse? {
@@ -86,24 +69,9 @@ class F1Fullraces : MainAPI() {
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
-
-        val recommendations =
-            document.select("div#masonry article").mapNotNull { it.toRecommendationResult() }
-
         return newMovieLoadResponse(title, url, TvType.Movie, url) {
             this.posterUrl = poster
-            this.recommendations = recommendations
         }
-    }
-
-    private fun Element.toRecommendationResult(): SearchResponse? {
-        val titleElement = this.selectFirst("h2.entry-title a")
-        val title = titleElement?.text()?.trim() ?: return null
-        val href = fixUrlNull(titleElement?.attr("href")) ?: return null
-
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
-
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
     override suspend fun loadLinks(
@@ -193,8 +161,7 @@ class F1Fullraces : MainAPI() {
                         )
                     }
                 }
-        } catch (e: Exception) {
-            Log.e("F1Races", "Luluvid linki işlenemedi: $src", e)
+        } catch (_: Exception) {
         }
     }
 
@@ -205,8 +172,8 @@ class F1Fullraces : MainAPI() {
             val charCodes = cleanedId.chunked(3)
             val decodedChars = charCodes.map { it.toInt(16).toChar() }
             decodedChars.joinToString("")
-        } catch (e: Exception) {
-            Log.e("F1Races", "Mixdrop ID'si çözülemedi: $encodedId", e)
+        } catch (_: Exception) {
+
             ""
         }
     }
