@@ -1,5 +1,5 @@
 // ! Bu araç @Kraptor123 tarafından | @cs-kraptor için yazılmıştır.
-version = 2
+version = 3
 
 cloudstream {
     authors     = listOf("ByAyzen")
@@ -15,7 +15,7 @@ cloudstream {
     **/
     status  = 1 // will be 3 if unspecified
     tvTypes = listOf("Movie") //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
-    iconUrl = "https://www.google.com/s2/favicons?domain=www.setfilmizle.de&sz=%size%"
+    iconUrl = "https://www.google.com/s2/favicons?sz=128&domain=filmbol.org"
 }
 dependencies {
     implementation("androidx.appcompat:appcompat:1.7.1")
