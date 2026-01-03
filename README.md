@@ -5,9 +5,12 @@
 `Kısa Kodlar`: **cskarma** | **karmator**
 `Short Codes`: **cskarma** | **karmator**
 
-Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekleştirebilirsiniz.
+<hr>
 
-You can install the repository by clicking the logo below on the device where the app is installed.
+Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekleştirebilirsiniz. 
+<br>
+<br>
+You can install the repository by clicking the logo down below on the device where the app is installed.
 
 [<img alt="Cs-Karma logo" width="200px" src="https://i.imgur.com/7Wk9P2C.png"/>](https://kraptor123.github.io/redirect/?r=cloudstreamrepo://raw.githubusercontent.com/Kraptor123/cs-Karma/refs/heads/master/repo.json)
 
