@@ -1,12 +1,10 @@
-// ! Bu araç @ByAyzentarafından | @cs-karma için yazılmıştır.
+// ! Bu araç @ByAyzen tarafından | @cs-karma için yazılmıştır.
 
 package com.byayzen
 
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.network.WebViewResolver
-
 class WebCric: MainAPI() {
     override var mainUrl = "https://me.webcric.com"
     override var name = "WebCric"
@@ -86,20 +84,14 @@ class WebCric: MainAPI() {
             ?: document.title().trim()
         val poster = fixUrlNull(document.selectFirst("div.col-lg-12.text-center img")?.attr("src"))
 
-        val bilgi = "West Indies Tour of New Zealand 2025, the tour consists of 5 T20s, 3 ODI's & 3 Test which will be played from 5 Nov to 22 Dec in New Zealand"
-        val siteDescription = document.selectFirst("h5 strong p")?.text()?.trim()
-
-        val finalDescription = if (siteDescription.isNullOrEmpty()) {
-            bilgi
-        } else {
-            "$bilgi\n\n$siteDescription"
-        }
+        val description = document.selectFirst("h5 p strong")?.text()?.trim()
 
         return newMovieLoadResponse(title, url, TvType.Live, url) {
             this.posterUrl = poster
-            this.plot = finalDescription
+            this.plot = description
         }
     }
+
 
     override suspend fun loadLinks(
         data: String,
@@ -107,31 +99,59 @@ class WebCric: MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val targetUrl = app.get(data).document.select("iframe[src*='frame']").attr("src")
-            .takeIf { it.isNotEmpty() }
-            ?.let { if (it.startsWith("http")) it else "${data.substringBeforeLast("/")}/$it" }
-            ?: return false
+        try {
+            val userAgent =
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"
+            val baseHeaders = mapOf(
+                "Referer" to "https://me.webcric.com/",
+                "User-Agent" to userAgent
+            )
 
-        val ua =
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+            val mainPageSource = app.get(data, headers = baseHeaders).text
+            val kanaladi =
+                Regex("""channel\s*=\s*['"]([^'"]+)['"]""").find(mainPageSource)?.groupValues?.get(1)
+            val gatewayValue =
+                Regex("""g\s*=\s*['"]([^'"]+)['"]""").find(mainPageSource)?.groupValues?.get(1)
+                    ?: "6"
+            val targetChannel = kanaladi ?: "webcrice09"
+            val embedUrl =
+                "https://web.wayout.top/hembedplayer/$targetChannel/$gatewayValue/850/480"
 
-        val link = app.get(
-            targetUrl,
-            headers = mapOf("Referer" to data, "User-Agent" to ua),
-            interceptor = WebViewResolver(Regex("""\.m3u8"""))
-        ).url.toString()
 
-        if (link.contains(".m3u8")) {
-            callback.invoke(
+            val playerHeaders = baseHeaders.plus("Referer" to data)
+            val playerSource = app.get(embedUrl, headers = playerHeaders).text
+
+            val duzPk =
+                Regex("""var\s+pk\s*=\s*["']([^"']+)["']""").find(playerSource)?.groupValues?.get(1)
+                    ?: return false
+
+            val serverHost =
+                Regex("""ea\s*=\s*["']([^"']+)["']""").find(playerSource)?.groupValues?.get(1)
+                    ?: return false
+
+            val urlPath =
+                Regex("""hlsUrl\s*=\s*["']https?://["']\s*\+\s*ea\s*\+\s*["']([^"']+)["']""").find(
+                    playerSource
+                )?.groupValues?.get(1)
+                    ?: return false
+
+            val pktemizle = duzPk.replace(Regex("(773fb)."), "$1")
+            val sonUrl = "https://$serverHost$urlPath$pktemizle"
+            callback(
                 newExtractorLink(
-                    "WebCric",
-                    "WebCric",
-                    link,
-                    type = ExtractorLinkType.M3U8
-                )
+                    source = "WebCric",
+                    name = "WebCric",
+                    url = sonUrl,
+                    type = if (sonUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                ) {
+                    this.referer = embedUrl
+                    this.quality = Qualities.Unknown.value
+                }
             )
             return true
+
+        } catch (e: Exception) {
+            return false
         }
-        return false
     }
 }

@@ -15,9 +15,6 @@ import com.lagradost.api.Log
 import com.lagradost.cloudstream3.network.WebViewResolver
 import com.lagradost.cloudstream3.utils.JsUnpacker
 
-// ==============================
-// LULU STREAM EXTRACTOR
-// ==============================
 class LulusStream : ExtractorApi() {
     override val name = "LuluStream"
     override val mainUrl = "https://luluvid.com"
@@ -59,9 +56,6 @@ class LulusStream : ExtractorApi() {
     }
 }
 
-// ==============================
-// UQLOAD EXTRACTORS
-// ==============================
 class Uqloadnet : Uqload() {
     override var mainUrl = "https://uqload.net"
 }
@@ -89,12 +83,8 @@ open class Uqload : ExtractorApi() {
     }
 }
 
-// ==============================
-// VIDHIDE & TÜREVLERİ
-// ==============================
-
 open class VidHidePro : ExtractorApi() {
-    override val name = "Vidhide" // İstenen isim
+    override val name = "Vidhide"
     override val mainUrl = "https://vidhidepro.com"
     override val requiresReferer = true
 
@@ -143,29 +133,54 @@ open class VidHidePro : ExtractorApi() {
     }
 }
 
-// Alt Sınıflar - İsimleri Vidhide olarak sabitlendi
-class VidHidePro1 : VidHidePro() { override var mainUrl = "https://filelions.live" }
-class Dhcplay : VidHidePro() { override var mainUrl = "https://dhcplay.com" }
-class VidHidePro2 : VidHidePro() { override var mainUrl = "https://filelions.online" }
-class VidHidePro3 : VidHidePro() { override var mainUrl = "https://filelions.to" }
-class VidHidePro4 : VidHidePro() { override val mainUrl = "https://kinoger.be" }
-class VidHidePro7 : VidHidePro() { override val mainUrl = "https://vidhidehub.com" }
-class VidHidePro5 : VidHidePro() { override val mainUrl = "https://vidhidevip.com" }
-class VidHidePro6 : VidHidePro() { override val mainUrl = "https://vidhidepre.com" }
-class Smoothpre : VidHidePro() { override var mainUrl = "https://smoothpre.com" }
-class Dhtpre : VidHidePro() { override var mainUrl = "https://dhtpre.com" }
-class Peytonepre : VidHidePro() { override var mainUrl = "https://peytonepre.com" }
-class Movearnpre : VidHidePro() { override var mainUrl = "https://movearnpre.com" }
-class Dintezuvio : VidHidePro() { override var mainUrl = "https://dintezuvio.com" }
-class Moorearn : VidHidePro() { override var mainUrl = "https://moorearn.com" }
-class Travid : VidHidePro() { override var mainUrl = "https://travid.pro" }
-class Vidspeeder : VidHidePro() { override var mainUrl = "https://vidspeeder.com" }
-
-
-// ==============================
-// STREAMWISH EXTRACTORS
-// ==============================
-
+class VidHidePro1 : VidHidePro() {
+    override var mainUrl = "https://filelions.live"
+}
+class Dhcplay : VidHidePro() {
+    override var mainUrl = "https://dhcplay.com"
+}
+class VidHidePro2 : VidHidePro() {
+    override var mainUrl = "https://filelions.online"
+}
+class VidHidePro3 : VidHidePro() {
+    override var mainUrl = "https://filelions.to"
+}
+class VidHidePro4 : VidHidePro() {
+    override val mainUrl = "https://kinoger.be"
+}
+class VidHidePro7 : VidHidePro() {
+    override val mainUrl = "https://vidhidehub.com"
+}
+class VidHidePro5 : VidHidePro() {
+    override val mainUrl = "https://vidhidevip.com"
+}
+class VidHidePro6 : VidHidePro() {
+    override val mainUrl = "https://vidhidepre.com"
+}
+class Smoothpre : VidHidePro() {
+    override var mainUrl = "https://smoothpre.com"
+}
+class Dhtpre : VidHidePro() {
+    override var mainUrl = "https://dhtpre.com"
+}
+class Peytonepre : VidHidePro() {
+    override var mainUrl = "https://peytonepre.com"
+}
+class Movearnpre : VidHidePro() {
+    override var mainUrl = "https://movearnpre.com"
+}
+class Dintezuvio : VidHidePro() {
+    override var mainUrl = "https://dintezuvio.com"
+}
+class Moorearn : VidHidePro() {
+    override var mainUrl = "https://moorearn.com"
+}
+class Travid : VidHidePro() {
+    override var mainUrl = "https://travid.pro"
+}
+class Vidspeeder : VidHidePro() {
+    override var mainUrl = "https://vidspeeder.com"
+}
 open class StreamWishExtractor : ExtractorApi() {
     override val name = "Streamwish" // İstenen isim
     override val mainUrl = "https://streamwish.to"
@@ -246,39 +261,82 @@ open class StreamWishExtractor : ExtractorApi() {
         }
     }
 }
+class Mwish : StreamWishExtractor() {
+    override val mainUrl = "https://mwish.pro"
+}
+class HgLink : StreamWishExtractor() {
+    override val mainUrl = "https://hglink.to"
+}
+class Dwish : StreamWishExtractor() {
+    override val mainUrl = "https://dwish.pro"
+}
+class Ewish : StreamWishExtractor() {
+    override val mainUrl = "https://embedwish.com"
+}
+class WishembedPro : StreamWishExtractor() {
+    override val mainUrl = "https://wishembed.pro"
+}
+class Kswplayer : StreamWishExtractor() {
+    override val mainUrl = "https://kswplayer.info"
+}
+class Wishfast : StreamWishExtractor() {
+    override val mainUrl = "https://wishfast.top"
+}
+class SfastwishCom : StreamWishExtractor() {
+    override val mainUrl = "https://sfastwish.com"
+}
+class Strwish : StreamWishExtractor() {
+    override val mainUrl = "https://strwish.xyz"
+}
+class Strwish2 : StreamWishExtractor() {
+    override val mainUrl = "https://strwish.com"
+}
+class FlaswishCom : StreamWishExtractor() {
+    override val mainUrl = "https://flaswish.com"
+}
+class Awish : StreamWishExtractor() {
+    override val mainUrl = "https://awish.pro"
+}
+class Obeywish : StreamWishExtractor() {
+    override val mainUrl = "https://obeywish.com"
+}
+class Jodwish : StreamWishExtractor() {
+    override val mainUrl = "https://jodwish.com"
+}
+class Swhoi : StreamWishExtractor() {
+    override val mainUrl = "https://swhoi.com"
+}
+class Multimovies : StreamWishExtractor() {
+    override val mainUrl = "https://multimovies.cloud"
+}
+class UqloadsXyz : StreamWishExtractor() {
+    override val mainUrl = "https://uqloads.xyz"
+}
+class Doodporn : StreamWishExtractor() {
+    override val mainUrl = "https://doodporn.xyz"
+}
+class CdnwishCom : StreamWishExtractor() {
+    override val mainUrl = "https://cdnwish.com"
+}
+class Asnwish : StreamWishExtractor() {
+    override val mainUrl = "https://asnwish.com"
+}
+class Nekowish : StreamWishExtractor() {
+    override val mainUrl = "https://nekowish.my.id"
+}
+class Nekostream : StreamWishExtractor() {
+    override val mainUrl = "https://neko-stream.click"
+}
+class Swdyu : StreamWishExtractor() {
+    override val mainUrl = "https://swdyu.com"
+}
+class Wishonly : StreamWishExtractor() {
+    override val mainUrl = "https://wishonly.site"
+}
+class Playerwish : StreamWishExtractor() {
+    override val mainUrl = "https://playerwish.com"
+}
 
-// Alt Sınıflar - İsimleri Streamwish olarak sabitlendi
-class Mwish : StreamWishExtractor() { override val mainUrl = "https://mwish.pro" }
-class HgLink : StreamWishExtractor() { override val mainUrl = "https://hglink.to" }
-class Dwish : StreamWishExtractor() { override val mainUrl = "https://dwish.pro" }
-class Ewish : StreamWishExtractor() { override val mainUrl = "https://embedwish.com" }
-class WishembedPro : StreamWishExtractor() { override val mainUrl = "https://wishembed.pro" }
-class Kswplayer : StreamWishExtractor() { override val mainUrl = "https://kswplayer.info" }
-class Wishfast : StreamWishExtractor() { override val mainUrl = "https://wishfast.top" }
-class Streamwish2 : StreamWishExtractor() { override val mainUrl = "https://streamwish.site" }
-class SfastwishCom : StreamWishExtractor() { override val mainUrl = "https://sfastwish.com" }
-class Strwish : StreamWishExtractor() { override val mainUrl = "https://strwish.xyz" }
-class Strwish2 : StreamWishExtractor() { override val mainUrl = "https://strwish.com" }
-class FlaswishCom : StreamWishExtractor() { override val mainUrl = "https://flaswish.com" }
-class Awish : StreamWishExtractor() { override val mainUrl = "https://awish.pro" }
-class Obeywish : StreamWishExtractor() { override val mainUrl = "https://obeywish.com" }
-class Jodwish : StreamWishExtractor() { override val mainUrl = "https://jodwish.com" }
-class Swhoi : StreamWishExtractor() { override val mainUrl = "https://swhoi.com" }
-class Multimovies : StreamWishExtractor() { override val mainUrl = "https://multimovies.cloud" }
-class UqloadsXyz : StreamWishExtractor() { override val mainUrl = "https://uqloads.xyz" }
-class Doodporn : StreamWishExtractor() { override val mainUrl = "https://doodporn.xyz" }
-class CdnwishCom : StreamWishExtractor() { override val mainUrl = "https://cdnwish.com" }
-class Asnwish : StreamWishExtractor() { override val mainUrl = "https://asnwish.com" }
-class Nekowish : StreamWishExtractor() { override val mainUrl = "https://nekowish.my.id" }
-class Nekostream : StreamWishExtractor() { override val mainUrl = "https://neko-stream.click" }
-class Swdyu : StreamWishExtractor() { override val mainUrl = "https://swdyu.com" }
-class Wishonly : StreamWishExtractor() { override val mainUrl = "https://wishonly.site" }
-class Playerwish : StreamWishExtractor() { override val mainUrl = "https://playerwish.com" }
-
-
-// ==============================
-// FILEMOON EXTRACTORS
-// ==============================
 
 open class FilemoonV2 : ExtractorApi() {
     override var name = "Filemoon" // İstenen isim
@@ -369,8 +427,16 @@ open class FilemoonV2 : ExtractorApi() {
     }
 }
 
-// Alt Sınıflar - İsimleri Filemoon olarak sabitlendi
-class FileMoon2 : FilemoonV2() { override var mainUrl = "https://filemoon.to" }
-class FileMoonIn : FilemoonV2() { override var mainUrl = "https://filemoon.in" }
-class FileMoonSx : FilemoonV2() { override var mainUrl = "https://filemoon.sx" }
-class Bysedikamoum : FilemoonV2() { override var mainUrl = "https://bysedikamoum.com" }
+class FileMoon2 : FilemoonV2() {
+    override var mainUrl = "https://filemoon.to"
+}
+class FileMoonIn : FilemoonV2() {
+    override var mainUrl = "https://filemoon.in"
+}
+class FileMoonSx : FilemoonV2() {
+    override var mainUrl = "https://filemoon.sx"
+}
+class Bysedikamoum : FilemoonV2() {
+    override var mainUrl = "https://bysedikamoum.com"
+}
+
