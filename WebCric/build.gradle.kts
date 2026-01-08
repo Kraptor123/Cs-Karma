@@ -1,8 +1,8 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
-version = 2
+version = 3
 
 cloudstream {
-    authors     = listOf("ByAyzen")
+    authors     = listOf("ByAyzen", "kraptor")
     language    = "en"
     description = "Webcric Live Cricket Streaming."
     status  = 1 // will be 3 if unspecified
