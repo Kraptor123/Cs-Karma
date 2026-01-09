@@ -10,7 +10,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 
 class Esheaq : MainAPI() {
-    override var mainUrl              = "https://s.esheaq.onl"
+    override var mainUrl              = "https://x.esheeg.onl"
     override var name                 = "Esheaq"
     override val hasMainPage          = true
     override var lang                 = "ar"
