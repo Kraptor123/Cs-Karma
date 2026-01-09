@@ -164,16 +164,35 @@ class AnimeAV : MainAPI() {
         val document = app.get(data).document
         val script = document.selectFirst("script:containsData(__sveltekit)")?.data() ?: return false
 
-        val urls = Regex("""url:"(https?://[^"]+)"""")
-            .findAll(script)
-            .map { it.groupValues[1] }
-            .toList()
+        val embedsData = script.substringAfter("embeds:{", "").substringBefore("},downloads", "")
 
-        if (urls.isEmpty()) return false
+        if (embedsData.isEmpty()) return false
 
-        urls.forEach { url ->
-            Log.d("kraptor_${this.name}","url = $url")
-            loadExtractor(url, subtitleCallback, callback)
+        listOf("DUB", "SUB").forEach { type ->
+
+            val listPattern = Regex("""$type:\[(.*?)\]""")
+            val listMatch = listPattern.find(embedsData)?.groupValues?.get(1)
+
+            if (listMatch != null) {
+                val itemPattern = Regex("""\{server:"([^"]+)",\s*url:"([^"]+)"""")
+
+                itemPattern.findAll(listMatch).forEach { match ->
+                    val server = match.groupValues[1]
+                    val url = match.groupValues[2]
+
+                    Log.d("kraptor_${this.name}", "Type: $type, Server: $server, URL: $url")
+
+                    if (server.equals("PDrain", ignoreCase = true)) {
+                        PixelDrain().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
+                    } else if (server.equals("MP4Upload", ignoreCase = true)) {
+                        Mp4Upload().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
+                    } else if (server.equals("HLS", ignoreCase = true)) {
+                        PlayerZilla().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
+                    } else {
+                        loadExtractor(url, subtitleCallback, callback)
+                    }
+                }
+            }
         }
 
         return true
