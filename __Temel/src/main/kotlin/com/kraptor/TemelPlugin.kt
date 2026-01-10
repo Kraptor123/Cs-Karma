@@ -1,4 +1,4 @@
-// ! Bu araç @Kraptor123 tarafından | @kekikanime için yazılmıştır.
+// ! Bu araç @Kraptor123 tarafından | @cs-kraptor için yazılmıştır.
 package com.kraptor
 
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
