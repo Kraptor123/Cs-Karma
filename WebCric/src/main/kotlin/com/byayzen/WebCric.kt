@@ -41,7 +41,7 @@ class WebCric: MainAPI() {
                     url = href,
                     type = TvType.Live
                 ) {
-                    this.posterUrl = "https://placehold.co/400x800/orange/white.png?text=Web\\nCric"
+                    this.posterUrl = "https://placehold.co/400x800/white/black.png?text=Smart\\nCric"
                 }
             }
 
@@ -120,7 +120,7 @@ class WebCric: MainAPI() {
             val title = document.selectFirst("h2 strong")?.text()?.trim()
                 ?: document.selectFirst("h2")?.text()?.trim()
                 ?: document.title().trim()
-            val poster = "https://placehold.co/1600x400/orange/white.png?text=Web\\nCric"
+            val poster = "https://placehold.co/1600x400/white/black.png?text=Smart\\nCric"
 
             val description = document.selectFirst("meta[name=description]")?.attr("content")?.trim()
 
@@ -184,11 +184,15 @@ class WebCric: MainAPI() {
                 Regex(pattern = "hlsUrl = hlsUrl \\+ enableVideo\\(\"([^\"]*)\"\\);", options = setOf(RegexOption.IGNORE_CASE)).find(playerSource)?.groupValues?.get(1)
                     ?: return false
 
-            val pk = duzPk.replace(Regex("\\s+"), "").replace(Regex("[A-Z]"), "")
+            val pk = duzPk.replace(Regex("\\s+"), "")
+                .replace(Regex("[A-Z]"), "")
+                .replace(Regex("[^0-9a-f]"), "")
 
             val sonUrl = "https://$serverHost$urlPath$pk"
                 .replace(Regex("[A-Z]"), "")
-                .replace("33","333")
+
+
+            Log.d("kraptor_bune", "sonUrl = $sonUrl")
 
             callback.invoke(
                 newExtractorLink(
@@ -205,7 +209,7 @@ class WebCric: MainAPI() {
         }else {
             val urlSplit = data.split('|')
             urlSplit.forEach { url ->
-//            Log.d("kraptor_bune", "url = $url")
+            Log.d("kraptor_bune", "url = $url")
                 try {
                     val userAgent =
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0"
@@ -216,7 +220,7 @@ class WebCric: MainAPI() {
 
                     val mainPageSource = app.get(url, headers = baseHeaders).document
                     val iframe = fixUrlNull(mainPageSource.selectFirst("div.container.text-center iframe")?.attr("src")) ?: ""
-//                Log.d("kraptor_bune", "iframe = $iframe")
+                Log.d("kraptor_bune", "iframe = $iframe")
                     val iframeAl = app.get(iframe, mapOf(
                         "Host" to "me.webcric.com",
                         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0",
@@ -244,7 +248,7 @@ class WebCric: MainAPI() {
                     val embedUrl =
                         "https://web.wayout.top/hembedplayer/$targetChannel/$gatewayValue/850/480"
 
-//                Log.d("kraptor_bune", "embedUrl = $embedUrl")
+                Log.d("kraptor_bune", "embedUrl = $embedUrl")
 
 
                     val playerHeaders = baseHeaders.plus("Referer" to url)
@@ -252,6 +256,7 @@ class WebCric: MainAPI() {
 
                     val duzPk =
                         Regex(pattern = "var pk = \"([^\"]*)\"", options = setOf(RegexOption.IGNORE_CASE)).find(playerSource)?.groupValues?.get(1)
+                            ?.replace(Regex("[^0-9a-f]"), "")
                             ?: return false
 
                     val serverHost =
@@ -266,7 +271,7 @@ class WebCric: MainAPI() {
 
                     val sonUrl = "https://$serverHost$urlPath$duzPk"
                         .replace(Regex("[A-Z]"), "")
-//                Log.d("kraptor_bune", "sonUrl = $sonUrl")
+                Log.d("kraptor_bune", "sonUrl = $sonUrl")
                     callback(
                         newExtractorLink(
                             source = "WebCric",
