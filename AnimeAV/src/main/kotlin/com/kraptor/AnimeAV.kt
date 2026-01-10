@@ -100,7 +100,7 @@ class AnimeAV : MainAPI() {
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val document = if (page == 1) {
-            app.get("${mainUrl}/catalogo?search=${query}&page=$page").document
+            app.get("${mainUrl}/catalogo?search=${query}").document
         } else {
             app.get("${mainUrl}/catalogo?search=${query}&page=$page").document
         }
