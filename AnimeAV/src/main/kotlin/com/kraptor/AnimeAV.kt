@@ -22,6 +22,7 @@ class AnimeAV : MainAPI() {
     private val categoryUrl = "${mainUrl}/catalogo?genre="
 
     override val mainPage = mainPageOf(
+        mainUrl to "Episodios Recientemente Actualizado",
         "Acción" to "Acción",
         "Aventura" to "Aventura",
         "Ciencia Ficción" to "Ciencia Ficción",
@@ -71,18 +72,26 @@ class AnimeAV : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = if (page == 1) {
-            app.get("$categoryUrl${request.data.lowercase()}").document
-        } else {
-            app.get("$categoryUrl${request.data.lowercase()}&page=$page").document
-        }
-        val home = document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
+       if (request.data.contains("$mainUrl")){
+           val document = app.get(request.data).document
 
-        return newHomePageResponse(request.name, home)
+           val home = document.select("section:has(h2:contains(episo)) div.grid article").mapNotNull { it.toMainPageResult() }
+
+           return newHomePageResponse(request.name, home, false)
+       } else {
+           val document = if (page == 1) {
+               app.get("$categoryUrl${request.data.lowercase()}").document
+           } else {
+               app.get("$categoryUrl${request.data.lowercase()}&page=$page").document
+           }
+           val home = document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
+
+           return newHomePageResponse(request.name, home)
+       }
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
-        val title = this.selectFirst("h3")?.text() ?: return null
+        val title = this.selectFirst("h3")?.text() ?: this.selectFirst("span.sr-only")?.text() ?: return null
         val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
@@ -105,7 +114,12 @@ class AnimeAV : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val episodeOrNot = url.substringAfter("media/").substringAfter("/").isNotEmpty()
+        val document = if (episodeOrNot){
+            app.get(url.substringBeforeLast("/")).document
+        } else {
+            app.get(url).document
+        }
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
