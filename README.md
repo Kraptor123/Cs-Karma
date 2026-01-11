@@ -2,7 +2,7 @@
 
 # `Cs-Karma`
 
-`Kısa Kodlar`: **cskarma** or **karmator**
+`Kısa Kodlar`: **cskarma** ya da **karmator**
 <br>
 `Short Codes`: **cskarma** or **karmator**
 
