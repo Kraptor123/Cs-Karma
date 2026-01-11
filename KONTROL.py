@@ -22,7 +22,7 @@ class MainUrlUpdater:
                 dosya for dosya in os.listdir(self.base_dir)
                 if os.path.isdir(os.path.join(self.base_dir, dosya))
                    and not dosya.startswith(".")
-                   and dosya not in {"gradle", "CanliTV", "OxAx", "__Temel", "SineWix", "YouTube", "NetflixMirror", "HQPorner", "WebteIzle", "TrDiziIzle"}
+                   and dosya not in {"gradle", "__Temel"}
             ]
             return sorted(candidates)
         except FileNotFoundError:
