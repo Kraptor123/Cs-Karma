@@ -12,12 +12,14 @@ import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
 
 class Streamed() : MainAPI() {
-    override var mainUrl = "https://streamed.pk"
+    override var mainUrl = "https://streami.su"
     override var name = "Streamed"
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Live)
+    override val vpnStatus      = VPNStatus.MightBeNeeded
+
 
     override val mainPage = mainPageOf(
         "${mainUrl}/api/matches/live/popular" to "Canlı Popüler",

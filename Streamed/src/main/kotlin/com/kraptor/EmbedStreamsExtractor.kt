@@ -19,7 +19,6 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
     override val name = "EmbedStreams"
     override val mainUrl = "https://embedstreams.top"
     override val requiresReferer = true
-
     private var appContext = context
 
     override suspend fun getUrl(
