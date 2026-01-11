@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLDecoder
 
 class TVGarden : MainAPI() {
     override var mainUrl = "https://famelack.com"
@@ -181,7 +182,8 @@ class TVGarden : MainAPI() {
     ): Boolean {
         return try {
             if (data.contains("youtube") || data.contains("youtu.be")) {
-                loadExtractor(data, "$mainUrl/", subtitleCallback, callback)
+                val youtubeId = extractYouTubeId(data)
+                loadExtractor("https://www.youtube.com/watch?v=$youtubeId", subtitleCallback, callback)
             } else {
                 callback.invoke(
                     newExtractorLink(this.name, this.name, data, type = ExtractorLinkType.M3U8) {
@@ -194,5 +196,56 @@ class TVGarden : MainAPI() {
             Log.e("TVGarden", "Error: ${e.message}")
             false
         }
+    }
+}
+
+fun extractYouTubeId(url: String): String {
+    return when {
+        url.contains("oembed") && url.contains("url=") -> {
+            val encodedUrl = url.substringAfter("url=").substringBefore("&")
+            val decodedUrl = URLDecoder.decode(encodedUrl, "UTF-8")
+            extractYouTubeId(decodedUrl)
+        }
+
+        url.contains("attribution_link") && url.contains("u=") -> {
+            val encodedUrl = url.substringAfter("u=").substringBefore("&")
+            val decodedUrl = URLDecoder.decode(encodedUrl, "UTF-8")
+            extractYouTubeId(decodedUrl)
+        }
+
+        url.contains("watch?v=") -> url.substringAfter("watch?v=").substringBefore("&")
+            .substringBefore("#")
+
+        url.contains("&v=") -> url.substringAfter("&v=").substringBefore("&")
+            .substringBefore("#")
+
+        url.contains("youtu.be/") -> url.substringAfter("youtu.be/").substringBefore("?")
+            .substringBefore("#").substringBefore("&")
+
+        url.contains("/embed/") -> url.substringAfter("/embed/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("/v/") -> url.substringAfter("/v/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("/e/") -> url.substringAfter("/e/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("/shorts/") -> url.substringAfter("/shorts/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("/live/") -> url.substringAfter("/live/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("/watch/") -> url.substringAfter("/watch/").substringBefore("?")
+            .substringBefore("#")
+
+        url.contains("watch%3Fv%3D") -> url.substringAfter("watch%3Fv%3D")
+            .substringBefore("%26").substringBefore("#")
+
+        url.contains("v%3D") -> url.substringAfter("v%3D").substringBefore("%26")
+            .substringBefore("#")
+
+        else -> error("No Id Found")
     }
 }
