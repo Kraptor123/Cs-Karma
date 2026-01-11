@@ -16,7 +16,7 @@ class TVGarden : MainAPI() {
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Live)
 
-    private val apiBaseUrl = "https://raw.githubusercontent.com/TVGarden/tv-garden-channel-list/main/channels/raw"
+    private val apiBaseUrl = "https://raw.githubusercontent.com/famelack/famelack-channels/refs/heads/main/channels/raw"
     private val defaultPoster = "https://famelack.com/apple-touch-icon.png"
 
     private val countries = listOf("tr", "us", "uk", "de", "fr", "es", "it", "nl", "ru", "jp", "kr", "cn", "in", "br", "mx", "ar", "ca", "au", "sa")
@@ -67,7 +67,7 @@ class TVGarden : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         return try {
-            val channelsArray = JSONArray(app.get("$apiBaseUrl/all.json").text)
+            val channelsArray = JSONArray(app.get("$apiBaseUrl/all-channels.json").text)
             (0 until channelsArray.length()).mapNotNull {
                 val channel = channelsArray.getJSONObject(it)
                 val name = channel.optString("name", "")
@@ -181,11 +181,7 @@ class TVGarden : MainAPI() {
     ): Boolean {
         return try {
             if (data.contains("youtube") || data.contains("youtu.be")) {
-                val youtubeUrl = if (data.contains("/embed/")) {
-                    "https://www.youtube.com/watch?v=${data.substringAfter("/embed/").substringBefore("?")}"
-                } else data
-
-                loadExtractor(youtubeUrl, "$mainUrl/", subtitleCallback, callback)
+                loadExtractor(data, "$mainUrl/", subtitleCallback, callback)
             } else {
                 callback.invoke(
                     newExtractorLink(this.name, this.name, data, type = ExtractorLinkType.M3U8) {
