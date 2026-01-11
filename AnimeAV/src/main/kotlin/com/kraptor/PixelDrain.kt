@@ -17,9 +17,9 @@ open class PixelDrain : ExtractorApi() {
                 newExtractorLink(
                     this.name,
                     this.name,
-                    url
+                    split[0]
                 ) {
-                    this.referer = url
+                    this.referer = split[0]
                 }
             )
         }
@@ -30,7 +30,7 @@ open class PixelDrain : ExtractorApi() {
                     this.name + " ${split[1]}",
                     "$mainUrl/api/file/${mId}?download",
                 ) {
-                    this.referer = url
+                    this.referer = split[0]
                 }
             )
         }

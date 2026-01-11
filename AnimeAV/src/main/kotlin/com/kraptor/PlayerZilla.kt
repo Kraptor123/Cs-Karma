@@ -1,5 +1,6 @@
 package com.kraptor
 
+import android.annotation.SuppressLint
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -12,6 +13,7 @@ class PlayerZilla : ExtractorApi() {
     override var mainUrl = "https://player.zilla-networks.com"
     override val requiresReferer = false
 
+    @SuppressLint("SuspiciousIndentation")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val split = url.split("|")
         val video = "$mainUrl/m3u8/${split[0].substringAfterLast("/")}"
