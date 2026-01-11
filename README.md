@@ -2,9 +2,9 @@
 
 # `Cs-Karma`
 
-`Kısa Kodlar`: **cskarma** | **karmator**
+`Kısa Kodlar`: **cskarma** or **karmator**
 <br>
-`Short Codes`: **cskarma** | **karmator**
+`Short Codes`: **cskarma** or **karmator**
 
 <hr>
 
