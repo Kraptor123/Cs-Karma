@@ -19,56 +19,58 @@ class AnimeAV : MainAPI() {
     override val supportedTypes = setOf(TvType.Anime)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
-    private val categoryUrl = "${mainUrl}/catalogo?genre="
+    private val categoryUrl = "${mainUrl}/catalogo"
 
     override val mainPage = mainPageOf(
         mainUrl to "Episodios Recientemente Actualizado",
-        "Acción" to "Acción",
-        "Aventura" to "Aventura",
-        "Ciencia Ficción" to "Ciencia Ficción",
-        "Comedia" to "Comedia",
-        "Deportes" to "Deportes",
-        "Drama" to "Drama",
-        "Fantasía" to "Fantasía",
-        "Misterio" to "Misterio",
-        "Recuentos de la Vida" to "Recuentos de la Vida",
-        "Romance" to "Romance",
-        "Seinen" to "Seinen",
-        "Shoujo" to "Shoujo",
-        "Shounen" to "Shounen",
-        "Sobrenatural" to "Sobrenatural",
-        "Suspenso" to "Suspenso",
-        "Terror" to "Terror",
-        "Antropomórfico" to "Antropomórfico",
-        "Artes Marciales" to "Artes Marciales",
-        "Carreras" to "Carreras",
-        "Detectives" to "Detectives",
-        "Ecchi" to "Ecchi",
-        "Elenco Adulto" to "Elenco Adulto",
-        "Escolares" to "Escolares",
-        "Espacial" to "Espacial",
-        "Gore" to "Gore",
-        "Gourmet" to "Gourmet",
-        "Harem" to "Harem",
-        "Histórico" to "Histórico",
-        "Idols (Hombre)" to "Idols (Hombre)",
-        "Idols (Mujer)" to "Idols (Mujer)",
-        "Infantil" to "Infantil",
-        "Isekai" to "Isekai",
-        "Josei" to "Josei",
-        "Juegos Estrategia" to "Juegos Estrategia",
-        "Mahou Shoujo" to "Mahou Shoujo",
-        "Mecha" to "Mecha",
-        "Militar" to "Militar",
-        "Mitología" to "Mitología",
-        "Música" to "Música",
-        "Parodia" to "Parodia",
-        "Psicológico" to "Psicológico",
-        "Samurai" to "Samurai",
-        "Shoujo Ai" to "Shoujo Ai",
-        "Shounen Ai" to "Shounen Ai",
-        "Superpoderes" to "Superpoderes",
-        "Vampiros" to "Vampiros",
+        "?status=emision&order=latest_released" to "Latest Released",
+        "?status=emision&order=latest_added" to "Latest Added",
+        "?genre=Acción" to "Acción",
+        "?genre=Aventura" to "Aventura",
+        "?genre=Ciencia Ficción" to "Ciencia Ficción",
+        "?genre=Comedia" to "Comedia",
+        "?genre=Deportes" to "Deportes",
+        "?genre=Drama" to "Drama",
+        "?genre=Fantasía" to "Fantasía",
+        "?genre=Misterio" to "Misterio",
+        "?genre=Recuentos de la Vida" to "Recuentos de la Vida",
+        "?genre=Romance" to "Romance",
+        "?genre=Seinen" to "Seinen",
+        "?genre=Shoujo" to "Shoujo",
+        "?genre=Shounen" to "Shounen",
+        "?genre=Sobrenatural" to "Sobrenatural",
+        "?genre=Suspenso" to "Suspenso",
+        "?genre=Terror" to "Terror",
+        "?genre=Antropomórfico" to "Antropomórfico",
+        "?genre=Artes Marciales" to "Artes Marciales",
+        "?genre=Carreras" to "Carreras",
+        "?genre=Detectives" to "Detectives",
+        "?genre=Ecchi" to "Ecchi",
+        "?genre=Elenco Adulto" to "Elenco Adulto",
+        "?genre=Escolares" to "Escolares",
+        "?genre=Espacial" to "Espacial",
+        "?genre=Gore" to "Gore",
+        "?genre=Gourmet" to "Gourmet",
+        "?genre=Harem" to "Harem",
+        "?genre=Histórico" to "Histórico",
+        "?genre=Idols (Hombre)" to "Idols (Hombre)",
+        "?genre=Idols (Mujer)" to "Idols (Mujer)",
+        "?genre=Infantil" to "Infantil",
+        "?genre=Isekai" to "Isekai",
+        "?genre=Josei" to "Josei",
+        "?genre=Juegos Estrategia" to "Juegos Estrategia",
+        "?genre=Mahou Shoujo" to "Mahou Shoujo",
+        "?genre=Mecha" to "Mecha",
+        "?genre=Militar" to "Militar",
+        "?genre=Mitología" to "Mitología",
+        "?genre=Música" to "Música",
+        "?genre=Parodia" to "Parodia",
+        "?genre=Psicológico" to "Psicológico",
+        "?genre=Samurai" to "Samurai",
+        "?genre=Shoujo Ai" to "Shoujo Ai",
+        "?genre=Shounen Ai" to "Shounen Ai",
+        "?genre=Superpoderes" to "Superpoderes",
+        "?genre=Vampiros" to "Vampiros",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -114,12 +116,10 @@ class AnimeAV : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        val episodeOrNot = url.substringAfter("media/").substringAfter("/").isNotEmpty()
-        val document = if (episodeOrNot){
-            app.get(url.substringBeforeLast("/")).document
-        } else {
-            app.get(url).document
-        }
+        val afterMedia = url.substringAfter("media/", "")
+        val isEpisode = afterMedia.contains("/")
+        val requestUrl = if (isEpisode) url.substringBeforeLast("/") else url
+        val document = app.get(requestUrl, referer = "$mainUrl/").document
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
