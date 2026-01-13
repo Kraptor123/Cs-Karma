@@ -3,6 +3,7 @@
 package com.byayzen
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.mvvm.safeApiCall
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
@@ -28,18 +29,18 @@ class KissKH : MainAPI() {
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie, TvType.AsianDrama)
 
     override val mainPage = mainPageOf(
-        "&type=0&sub=0&country=0&status=0&order=2" to "Son Çıkanlar",
-        "&type=0&sub=0&country=2&status=0&order=1" to "En İyi Kore Dizileri",
-        "&type=0&sub=0&country=1&status=0&order=1" to "En İyi Çin Dizileri",
-        "&type=2&sub=0&country=2&status=0&order=1" to "Popüler Filmler",
-        "&type=2&sub=0&country=2&status=0&order=2" to "En Son Güncellenen Filmler",
-        "&type=1&sub=0&country=2&status=0&order=1" to "TVSeries Popular",
-        "&type=1&sub=0&country=2&status=0&order=2" to "En Son Güncellenen Diziler",
-        "&type=3&sub=0&country=0&status=0&order=1" to "Anime Popular",
-        "&type=3&sub=0&country=0&status=0&order=2" to "En Son Güncellenen Animeler",
-        "&type=4&sub=0&country=0&status=0&order=1" to "Popüler Hollywood",
-        "&type=4&sub=0&country=0&status=0&order=2" to "En Son Güncellenen Hollywood",
-        "&type=0&sub=0&country=0&status=3&order=2" to "Yakında"
+        "&type=0&sub=0&country=0&status=0&order=2" to "Latest Releases",
+        "&type=0&sub=0&country=2&status=0&order=1" to "Best Korean Dramas",
+        "&type=0&sub=0&country=1&status=0&order=1" to "Best Chinese Dramas",
+        "&type=2&sub=0&country=2&status=0&order=1" to "Popular Movies",
+        "&type=2&sub=0&country=2&status=0&order=2" to "Latest Updated Movies",
+        "&type=1&sub=0&country=2&status=0&order=1" to "Popular TV Series",
+        "&type=1&sub=0&country=2&status=0&order=2" to "Latest Updated TV Series",
+        "&type=3&sub=0&country=0&status=0&order=1" to "Popular Anime",
+        "&type=3&sub=0&country=0&status=0&order=2" to "Latest Updated Anime",
+        "&type=4&sub=0&country=0&status=0&order=1" to "Popular Hollywood",
+        "&type=4&sub=0&country=0&status=0&order=2" to "Latest Updated Hollywood",
+        "&type=0&sub=0&country=0&status=3&order=2" to "Coming Soon"
     )
 
 
@@ -277,19 +278,31 @@ class KissKH : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        Log.d("KISSKH", "loadLinks started with data: $data")
         val KisskhAPI =
             "https://script.google.com/macros/s/AKfycbzn8B31PuDxzaMa9_CQ0VGEDasFqfzI5bXvjaIZH4DM8DNq9q6xj1ALvZNz_JT3jF0suA/exec?id="
         val KisskhSub =
             "https://script.google.com/macros/s/AKfycbyq6hTj0ZhlinYC6xbggtgo166tp6XaDKBCGtnYk8uOfYBUFwwxBui0sGXiu_zIFmA/exec?id="
         val loadData = parseJson<Data>(data)
-        val kkey = app.get("$KisskhAPI${loadData.epsId}&version=2.8.10", timeout = 10000).parsedSafe<Key>()?.key ?: ""
+
+        val videoKeyUrl = "$KisskhAPI${loadData.epsId}&version=2.8.10"
+        Log.d("KISSKH", "Fetching video kkey from: $videoKeyUrl")
+
+        val kkey = app.get(videoKeyUrl, timeout = 10000).parsedSafe<Key>()?.key ?: ""
+        Log.d("KISSKH", "Video kkey received: $kkey")
+
+        val videoApiUrl = "$mainUrl/api/DramaList/Episode/${loadData.epsId}.png?err=false&ts=&time=&kkey=$kkey"
+        val videoReferer = "$mainUrl/Drama/${getTitle("${loadData.title}")}/Episode-${loadData.eps}?id=${loadData.id}&ep=${loadData.epsId}&page=0&pageSize=100"
+
         app.get(
-            "$mainUrl/api/DramaList/Episode/${loadData.epsId}.png?err=false&ts=&time=&kkey=$kkey",
-            referer = "$mainUrl/Drama/${getTitle("${loadData.title}")}/Episode-${loadData.eps}?id=${loadData.id}&ep=${loadData.epsId}&page=0&pageSize=100"
+            videoApiUrl,
+            referer = videoReferer
         ).parsedSafe<Sources>()?.let { source ->
+            Log.d("KISSKH", "Sources found: video=${source.video}, thirdParty=${source.thirdParty}")
             listOf(source.video, source.thirdParty).amap { link ->
                 safeApiCall {
                     if (link?.contains(".m3u8") == true) {
+                        Log.d("KISSKH", "Processing M3U8: $link")
                         M3u8Helper.generateM3u8(
                             this.name,
                             fixUrl(link),
@@ -297,6 +310,7 @@ class KissKH : MainAPI() {
                             headers = mapOf("Origin" to mainUrl)
                         ).forEach(callback)
                     } else if (link?.contains("mp4") == true) {
+                        Log.d("KISSKH", "Processing MP4: $link")
                         callback.invoke(
                             newExtractorLink(
                                 this.name,
@@ -308,10 +322,10 @@ class KissKH : MainAPI() {
                                 this.quality = Qualities.P720.value
                             }
                         )
-
-                    } else {
+                    } else if (link != null) {
+                        Log.d("KISSKH", "Loading Extractor for: $link")
                         loadExtractor(
-                            link?.substringBefore("=http") ?: return@safeApiCall,
+                            link.substringBefore("=http"),
                             "$mainUrl/",
                             subtitleCallback,
                             callback
@@ -321,9 +335,16 @@ class KissKH : MainAPI() {
             }
         }
 
-        val kkey1 = app.get("$KisskhSub${loadData.epsId}&version=2.8.10", timeout = 10000).parsedSafe<Key>()?.key ?: ""
-        app.get("$mainUrl/api/Sub/${loadData.epsId}?kkey=$kkey1").text.let { res ->
+        val subKeyUrl = "$KisskhSub${loadData.epsId}&version=2.8.10"
+        Log.d("KISSKH", "Fetching subtitle kkey from: $subKeyUrl")
+        val kkey1 = app.get(subKeyUrl, timeout = 10000).parsedSafe<Key>()?.key ?: ""
+        Log.d("KISSKH", "Subtitle kkey received: $kkey1")
+
+        val subApiUrl = "$mainUrl/api/Sub/${loadData.epsId}?kkey=$kkey1"
+        app.get(subApiUrl).text.let { res ->
+            Log.d("KISSKH", "Subtitle API Response: $res")
             tryParseJson<List<Subtitle>>(res)?.map { sub ->
+                Log.d("KISSKH", "Processing subtitle: label=${sub.label}, src=${sub.src}")
                 if (sub.src!!.contains(".txt")) {
                     subtitleCallback.invoke(
                         newSubtitleFile(
@@ -331,33 +352,38 @@ class KissKH : MainAPI() {
                             sub.src
                         )
                     )
-                } else
+                } else {
                     subtitleCallback.invoke(
                         newSubtitleFile(
                             getLanguage(sub.label ?: return@map),
                             sub.src
                         )
                     )
-            }
+                }
+            } ?: Log.e("KISSKH", "Failed to parse subtitle JSON")
         }
 
         return true
-
     }
 
     private val CHUNK_REGEX1 by lazy { Regex("^\\d+$", RegexOption.MULTILINE) }
+
     override fun getVideoInterceptor(extractorLink: ExtractorLink): Interceptor {
         return object : Interceptor {
             override fun intercept(chain: Interceptor.Chain): Response {
-                val request = chain.request()
-                    .newBuilder()
-                    .build()
+                val request = chain.request().newBuilder().build()
                 val response = chain.proceed(request)
-                if (response.request.url.toString().contains(".txt")) {
+                val url = response.request.url.toString()
+
+                if (url.contains(".txt")) {
+                    Log.d("KISSKH_SUB", "Intercepting encrypted subtitle: $url")
                     val responseBody = response.body.string()
                     val chunks = responseBody.split(CHUNK_REGEX1)
                         .filter(String::isNotBlank)
                         .map(String::trim)
+
+                    Log.d("KISSKH_SUB", "Total chunks found: ${chunks.size}")
+
                     val decrypted = chunks.mapIndexed { index, chunk ->
                         if (chunk.isBlank()) return@mapIndexed ""
                         val parts = chunk.split("\n")
@@ -369,12 +395,15 @@ class KissKH : MainAPI() {
                             try {
                                 decrypt(line)
                             } catch (e: Exception) {
+                                Log.e("KISSKH_SUB", "Decryption failed for line: $line | Error: ${e.message}")
                                 "DECRYPT_ERROR:${e.message}"
                             }
                         }
                         listOf(index + 1, header, d).joinToString("\n")
                     }.filter { it.isNotEmpty() }
                         .joinToString("\n\n")
+
+                    Log.d("KISSKH_SUB", "Decryption cycle completed for $url")
                     val newBody = decrypted.toResponseBody(response.body.contentType())
                     return response.newBuilder()
                         .body(newBody)
