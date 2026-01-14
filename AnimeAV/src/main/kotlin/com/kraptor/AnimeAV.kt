@@ -63,7 +63,7 @@ class AnimeAV : MainAPI() {
 
            val home = document.select("section:has(h2:contains(episo)) div.grid article").mapNotNull { it.toMainPageResult() }
 
-           return newHomePageResponse(request.name, home, false)
+           return newHomePageResponse(HomePageList(request.name, home, true), false)
        } else {
            val document = if (page == 1) {
                app.get("$categoryUrl${request.data.lowercase()}").document
