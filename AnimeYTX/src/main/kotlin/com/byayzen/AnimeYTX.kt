@@ -29,24 +29,60 @@ class AnimeYTX : MainAPI() {
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     override val mainPage = mainPageOf(
-        "$mainUrl/anime/" to "Anime reciente"
+        "$mainUrl/anime/" to "Anime reciente",
+        "$mainUrl/tv/?type=&sub=&order=" to "All Anime",
+        "$mainUrl/tv/?status=ongoing" to "Ongoing",
+        "$mainUrl/tv/?status=completed&type=&sub=&order=" to "Completed",
+        "$mainUrl/tv/?status=hiatus&type=&sub=&order=" to "Hiatus",
+        "$mainUrl/tv/?status=upcoming" to "Upcoming"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page <= 1) request.data else "${request.data}page/$page/"
+        val data = request.data
+        val isNewCategory = data.contains("/tv/")
+        val url = when {
+            page <= 1 -> data
+            isNewCategory -> "$data${if (data.contains("?")) "&" else "?"}page=$page"
+            else -> "${data.trimEnd('/')}/page/$page/"
+        }
         val document = app.get(url).document
         val items = document.select("article.bs").mapNotNull {
-            it.toSearchResult()
+            if (isNewCategory) it.ikinciSearchResults() else it.toSearchResult()
         }
 
         return newHomePageResponse(request.name, items, items.isNotEmpty())
     }
 
+    private fun Element.ikinciSearchResults(): SearchResponse? {
+        val title = selectFirst(".tt")?.ownText()?.trim()
+            ?: selectFirst(".tt h2")?.text()?.trim()
+            ?: return null
+
+        val href = selectFirst("a")?.attr("href") ?: return null
+
+        val poster = selectFirst("img")?.let {
+            it.attr("data-src").ifEmpty { it.attr("src") }
+        }
+
+        val isMovie = selectFirst(".typez")?.text()?.contains("Movie", true) == true
+
+        return newAnimeSearchResponse(
+            title,
+            href,
+            if (isMovie) TvType.AnimeMovie else TvType.Anime
+        ) {
+            this.posterUrl = poster
+        }
+    }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = selectFirst(".tt")?.text()?.trim() ?: return null
+        val title = selectFirst(".tt")?.ownText()?.trim() ?: return null
         val href = selectFirst("a")?.attr("href") ?: return null
-        val poster = selectFirst("img")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
+
+        val poster = selectFirst("img")?.let {
+            it.attr("data-src").ifEmpty { it.attr("src") }
+        }
+
         val isMovie = select(".typez").text().contains("Movie", true)
 
         return newAnimeSearchResponse(
