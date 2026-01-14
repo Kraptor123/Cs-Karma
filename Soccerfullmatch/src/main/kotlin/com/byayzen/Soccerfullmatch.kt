@@ -19,7 +19,7 @@ class Soccerfullmatch : MainAPI() {
     override var mainUrl = "https://soccerfullmatch.com"
     override var name = "Soccerfullmatch"
     override val hasMainPage = true
-    override var lang = "tr"
+    override var lang = "en"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Live)
 

@@ -13,7 +13,7 @@ class TVGarden : MainAPI() {
     override var mainUrl = "https://famelack.com"
     override var name = "TVGarden"
     override val hasMainPage = true
-    override var lang = "tr"
+    override var lang = "en"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Live)
 
@@ -45,13 +45,25 @@ class TVGarden : MainAPI() {
     )
 
     private val countryNames = mapOf(
-        "tr" to "🇹🇷 Türkiye", "us" to "🇺🇸 ABD", "uk" to "🇬🇧 İngiltere",
-        "de" to "🇩🇪 Almanya", "fr" to "🇫🇷 Fransa", "es" to "🇪🇸 İspanya",
-        "it" to "🇮🇹 İtalya", "nl" to "🇳🇱 Hollanda", "ru" to "🇷🇺 Rusya",
-        "jp" to "🇯🇵 Japonya", "kr" to "🇰🇷 Güney Kore", "cn" to "🇨🇳 Çin",
-        "in" to "🇮🇳 Hindistan", "br" to "🇧🇷 Brezilya", "mx" to "🇲🇽 Meksika",
-        "ar" to "🇦🇷 Arjantin", "ca" to "🇨🇦 Kanada", "au" to "🇦🇺 Avustralya",
-        "sa" to "🇸🇦 Suudi Arabistan"
+        "tr" to "🇹🇷 Turkey",
+        "us" to "🇺🇸 USA",
+        "uk" to "🇬🇧 United Kingdom",
+        "de" to "🇩🇪 Germany",
+        "fr" to "🇫🇷 France",
+        "es" to "🇪🇸 Spain",
+        "it" to "🇮🇹 Italy",
+        "nl" to "🇳🇱 Netherlands",
+        "ru" to "🇷🇺 Russia",
+        "jp" to "🇯🇵 Japan",
+        "kr" to "🇰🇷 South Korea",
+        "cn" to "🇨🇳 China",
+        "in" to "🇮🇳 India",
+        "br" to "🇧🇷 Brazil",
+        "mx" to "🇲🇽 Mexico",
+        "ar" to "🇦🇷 Argentina",
+        "ca" to "🇨🇦 Canada",
+        "au" to "🇦🇺 Australia",
+        "sa" to "🇸🇦 Saudi Arabia"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -169,7 +181,7 @@ class TVGarden : MainAPI() {
 
         return newMovieLoadResponse(channelName, url, TvType.Live, url) {
             this.posterUrl = countryFlags[countryCode] ?: defaultPoster
-            this.plot = "🔴 Canlı Yayın"
+            this.plot = "🔴 Live"
             this.recommendations = recommendations
         }
     }
