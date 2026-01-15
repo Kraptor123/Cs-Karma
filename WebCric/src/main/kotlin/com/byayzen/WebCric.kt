@@ -19,9 +19,6 @@ class WebCric: MainAPI() {
 
     override val mainPage = mainPageOf(
         "LIVE STREAM" to "Live Matches",
-        "MATCH END" to "Finished Matches",
-        "SERIES END" to "Ended Series",
-        "AUCTION END" to "Completed Events",
         smartCric to "Smart Cric",
     )
 
