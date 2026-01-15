@@ -10,7 +10,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 
 class BasketballVideo : MainAPI() {
-    override var mainUrl              = "https://basketball-video.com"
+    override var mainUrl              = "http://basketball-video.com"
     override var name                 = "BasketballVideo"
     override val hasMainPage          = true
     override var lang                 = "en"
