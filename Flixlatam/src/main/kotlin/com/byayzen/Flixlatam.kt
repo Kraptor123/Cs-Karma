@@ -15,7 +15,7 @@ class Flixlatam : MainAPI() {
     override var mainUrl = "https://flixlatam.com"
     override var name = "FlixLatam"
     override val hasMainPage = true
-    override var lang = "es"
+    override var lang = "mx"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.AsianDrama, TvType.Anime)
 

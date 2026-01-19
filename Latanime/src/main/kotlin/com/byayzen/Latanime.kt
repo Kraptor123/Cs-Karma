@@ -68,54 +68,56 @@ class Latanime : MainAPI() {
         }
 
         val document = app.get(url).document
-        val home = document.select("div.col-6, div.col-md-6, div.col-md-4, div.item").mapNotNull {
+        val isRecent = request.name.contains("Añadidos")
+        val elements = document.select("div.col-6, div.col-md-6, div.col-md-4, div.item, article.group\\/item")
+
+        val home = elements.mapNotNull {
             it.toCommonSearchResult()
         }
 
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = home,
+                isHorizontalImages = isRecent
+            ),
+            hasNext = true
+        )
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val url = if (page <= 1) {
-            "$mainUrl/buscar?q=$query"
-        } else {
-            "$mainUrl/buscar?q=$query&p=$page"
-        }
-
+        val url = if (page <= 1) "$mainUrl/buscar?q=$query" else "$mainUrl/buscar?q=$query&p=$page"
         val document = app.get(url).document
-        val aramaCevap =
-            document.select("div.col-6, div.col-md-6, div.col-md-4, div.item").mapNotNull {
-                it.toCommonSearchResult()
-            }
-
+        val aramaCevap = document.select("div.col-6, div.col-md-6, div.col-md-4, div.item").mapNotNull {
+            it.toCommonSearchResult()
+        }
         return newSearchResponseList(aramaCevap, hasNext = true)
     }
 
     private fun Element.toCommonSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h2")?.text()
-            ?: this.selectFirst("h3")?.text()
-            ?: this.selectFirst("span.title")?.text()
-            ?: return null
+        val anchor = this.selectFirst("a")
+        val rawHref = anchor?.attr("href") ?: return null
 
-        val anchor = this.selectFirst("a") ?: return null
-        val href = fixUrlNull(anchor.attr("href")) ?: return null
+        val title = this.selectFirst("h2, h3, span.title, div.text-2xs")?.text()?.trim() ?: return null
+
+        var href = rawHref
+        if (href.contains("/ver/")) {
+            href = href.replace("/ver/", "/anime/").substringBefore("-episodio")
+        } else if (href.contains("/media/")) {
+            val slug = href.split("/").getOrNull(2)
+            href = "/anime/$slug"
+        }
 
         val img = this.selectFirst("img")
-        val posterUrl = fixUrlNull(
-            img?.attr("data-src")?.takeIf { it.isNotEmpty() } ?: img?.attr("src")
-        )
+        val posterUrl = fixUrlNull(img?.attr("data-src")?.takeIf { it.isNotEmpty() } ?: img?.attr("src"))
 
-        val typetxt = this.select("div.info_cap span, span.opacity-75").text()
-        val isMovie = typetxt.contains("Pelicula", ignoreCase = true)
+        val typetxt = this.select("div.info_cap span, span.opacity-75, div.bg-line").text()
+        val ismovie = typetxt.contains("Pelicula", ignoreCase = true)
+        val hasDub = typetxt.contains("Latino", ignoreCase = true) || typetxt.contains("Castellano", ignoreCase = true)
 
-        val hasDub = typetxt.contains("Latino", ignoreCase = true) || typetxt.contains(
-            "Castellano",
-            ignoreCase = true
-        )
-
-        return newAnimeSearchResponse(title, href, if (isMovie) TvType.Movie else TvType.TvSeries) {
+        return newAnimeSearchResponse(title, fixUrl(href), if (ismovie) TvType.Movie else TvType.TvSeries) {
             this.posterUrl = posterUrl
-            this.addDubStatus(isDub = hasDub)
+            addDubStatus(hasDub)
         }
     }
 

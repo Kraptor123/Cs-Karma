@@ -3,18 +3,17 @@
 package com.kraptor
 
 import android.util.Log
-import com.fasterxml.jackson.module.kotlin.readValue
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import org.json.JSONObject
+import org.jsoup.nodes.Document
 
 class AnimeAV : MainAPI() {
     override var mainUrl = "https://animeav1.com"
     override var name = "AnimeAV"
     override val hasMainPage = true
-    override var lang = "es"
+    override var lang = "mx"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Anime)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
@@ -99,58 +98,83 @@ class AnimeAV : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
+
+
     override suspend fun load(url: String): LoadResponse? {
-        val afterMedia = url.substringAfter("media/", "")
-        val isEpisode = afterMedia.contains("/")
-        val requestUrl = if (isEpisode) url.substringBeforeLast("/") else url
-        val document = app.get(requestUrl, referer = "$mainUrl/").document
+        val hamUrl = if (url.contains("media/")) {
+            val parcalar = url.split("/")
+            if (parcalar.size > 5) url.substringBeforeLast("/") else url
+        } else url
 
-        val title = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val poster = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
-        val description = document.selectFirst("div.entry.text-lead p")?.text()?.trim()
-        val year = document.selectFirst("div.text-sm span:contains(0)")?.text()?.trim()?.toIntOrNull()
-        val tags = document.select("div.flex-wrap.gap-2 a[href*=genre]").map { it.text() }
-        val rating = document.selectFirst("div.flex-wrap div.text-lead")?.text()?.trim()?.toIntOrNull()
-        val duration = document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
-        val recommendations = document.select("article.bg-mute").mapNotNull { it.toRecommendationResult() }
-        val actors = document.select("span.valor a").map { Actor(it.text()) }
-        val trailer = Regex("""embed\/(.*)\?rel""").find(document.html())?.groupValues?.get(1)
-            ?.let { "https://www.youtube.com/embed/$it" }
-        val episodes = document.select("div.grid.grid-cols-2 article.group\\/item").map { episode ->
-            val href = fixUrlNull(episode.selectFirst("a")?.attr("href")) ?: return null
-            val name = episode.selectFirst("div.bg-line")?.text()
-            val poster = episode.selectFirst("img")?.attr("src")
-            val episodeN = episode.selectFirst("div.bg-line span")?.text()?.toIntOrNull()
-            val season =
-                title.substringAfter("season").substringAfter("part").replace(" ", "").trim().toIntOrNull() ?: 1
-            newEpisode(href, {
-                this.name = name
-                this.posterUrl = poster
-                this.episode = episodeN
-                this.season = season
-            })
-        }
+        val cevap = app.get(hamUrl.removeSuffix("/"))
+        val doc = cevap.document
+        val baslik = doc.selectFirst("h1")?.text()?.trim() ?: return null
 
-        return newAnimeLoadResponse(title, url, TvType.Anime, true) {
+        val poster = fixUrlNull(doc.selectFirst("img.aspect-poster")?.attr("src"))
+        val ozet = doc.selectFirst("div.entry p")?.text()?.trim()
+
+        val bolumler = jsondanBolumleriAl(hamUrl, baslik, poster).ifEmpty { htmldenBolumleriAl(doc, baslik) }
+        bolumler.sortBy { it.episode }
+
+        return newAnimeLoadResponse(baslik, url, TvType.Anime, true) {
             this.posterUrl = poster
-            this.plot = description
-            this.year = year
-            this.tags = tags
-            this.score = Score.from10(rating)
-            this.episodes = mutableMapOf(DubStatus.None to episodes)
-            this.duration = duration
-            this.recommendations = recommendations
-            addActors(actors)
-            addTrailer(trailer)
+            this.plot = ozet
+            this.year = doc.select("div.flex-wrap span").find { it.text().any { c -> c.isDigit() } }?.text()?.filter { it.isDigit() }?.toIntOrNull()
+            this.tags = doc.select("a[href*=genre]").map { it.text() }
+            this.score = Score.from10(doc.selectFirst("div.text-lead.text-2xl")?.text()?.trim()?.toDoubleOrNull())
+            this.episodes = mutableMapOf(DubStatus.None to bolumler)
+            this.recommendations = doc.select("article.bg-mute").mapNotNull { rec ->
+                val rbaslik = rec.selectFirst("h3")?.text() ?: return@mapNotNull null
+                val rlink = fixUrl(rec.selectFirst("a")?.attr("href") ?: return@mapNotNull null)
+                newAnimeSearchResponse(rbaslik, rlink, TvType.Anime) {
+                    this.posterUrl = fixUrlNull(rec.selectFirst("img")?.attr("src"))
+                }
+            }
+
         }
     }
 
-    private fun Element.toRecommendationResult(): SearchResponse? {
-        val title = this.selectFirst("h3")?.text() ?: return null
-        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
+    private suspend fun jsondanBolumleriAl(temelUrl: String, baslik: String, poster: String?): MutableList<Episode> {
+        val liste = mutableListOf<Episode>()
+        try {
+            val jsonUrl = "${temelUrl.removeSuffix("/")}/__data.json?x-sveltekit-invalidated=0010"
+            val cevap = app.get(jsonUrl, referer = temelUrl).text
+            val json = JSONObject(cevap)
+            val veri = json.getJSONArray("nodes").getJSONObject(2).getJSONArray("data")
+            val sezon = baslik.substringAfter("season").substringAfter("part").filter { it.isDigit() }.toIntOrNull() ?: 1
 
-        return newAnimeSearchResponse(title, href, TvType.Anime) { this.posterUrl = posterUrl }
+            """\{"id":(\d+),"number":(\d+)\}""".toRegex().findAll(cevap).forEach { m ->
+                val idIdx = m.groupValues[1].toInt()
+                val noIdx = m.groupValues[2].toInt()
+                val epId = veri.getString(idIdx)
+                val epNo = veri.getString(noIdx)
+
+                liste.add(newEpisode("$mainUrl/watch/$epId") {
+                    this.name = "Episodio $epNo"
+                    this.episode = epNo.toIntOrNull()
+                    this.season = sezon
+                    this.posterUrl = poster
+                })
+            }
+        } catch (e: Exception) {
+            println("JSON Hatası: ${e.message}")
+        }
+        return liste
+    }
+
+    private fun htmldenBolumleriAl(doc: Document, baslik: String): MutableList<Episode> {
+        val sezon = baslik.substringAfter("season").substringAfter("part").filter { it.isDigit() }.toIntOrNull() ?: 1
+        return doc.select("article.group\\/item").mapNotNull { ep ->
+            val link = fixUrlNull(ep.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
+            val no = ep.selectFirst("div.bg-line span")?.text()?.toIntOrNull()
+
+            newEpisode(link) {
+                this.name = "Episodio $no"
+                this.posterUrl = ep.selectFirst("img")?.attr("src")
+                this.episode = no
+                this.season = sezon
+            }
+        }.toMutableList()
     }
 
     override suspend fun loadLinks(

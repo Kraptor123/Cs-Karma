@@ -3,7 +3,7 @@ version = 2
 
 cloudstream {
     authors     = listOf("ByAyzen")
-    language    = "es"
+    language    = "mx"
     description = "Únete a la familia de AnimeYT.es y disfruta del anime online gratis. Disfruta con tus amigos del contenido más popular de la animación japonesa."
     status  = 1 // will be 3 if unspecified
     tvTypes = listOf("Anime") //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,

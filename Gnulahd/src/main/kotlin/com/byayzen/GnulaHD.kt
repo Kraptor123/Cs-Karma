@@ -12,7 +12,7 @@ class GnulaHD : MainAPI() {
     override var mainUrl = "https://ww3.gnulahd.nu"
     override var name = "GnulaHD"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
-    override var lang = "es"
+    override var lang = "mx"
     override val hasMainPage = true
 
     override val mainPage = mainPageOf(

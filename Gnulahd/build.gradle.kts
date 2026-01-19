@@ -1,9 +1,9 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
-version = 1
+version = 2
 
 cloudstream {
     authors     = listOf("ByAyzen")
-    language    = "es"
+    language    = "mx"
     description = "GnulaHD"
     status  = 1
     tvTypes = listOf("Movie", "Anime", "TvSeries") //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,

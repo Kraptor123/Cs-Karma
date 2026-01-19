@@ -15,7 +15,7 @@ class DoramasLatinoX : MainAPI() {
     override var mainUrl = "https://doramaslatinox.com"
     override var name = "DoramasLatinoX"
     override val hasMainPage = true
-    override var lang = "es"
+    override var lang = "mx"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.AsianDrama)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,

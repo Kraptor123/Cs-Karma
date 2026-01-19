@@ -10,7 +10,7 @@ class Henaojara : MainAPI() {
     override var mainUrl = "https://ww1.henaojara.net"
     override var name = "Henaojara"
     override val hasMainPage = true
-    override var lang = "es"
+    override var lang = "mx"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Anime, TvType.OVA)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
