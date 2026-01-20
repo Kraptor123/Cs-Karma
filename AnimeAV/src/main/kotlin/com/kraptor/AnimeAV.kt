@@ -127,7 +127,7 @@ class AnimeAV : MainAPI() {
         val mediaId = Regex(pattern = "\\{media:\\{id:([0-9]+)", options = setOf(RegexOption.IGNORE_CASE)).find(sveltekitScript)?.groupValues[1]
 
         val episodes = (1..totalEp).map { episodeNum ->
-            val href = "$url/$episodeNum"
+            val href = "$requestUrl/$episodeNum"
             val posterUrl = "https://cdn.animeav1.com/screenshots/$mediaId/$episodeNum.jpg"
 
             newEpisode(href) {
@@ -138,7 +138,7 @@ class AnimeAV : MainAPI() {
             }
         }
 
-        return newAnimeLoadResponse(title, url, TvType.Anime, true) {
+        return newAnimeLoadResponse(title, requestUrl, TvType.Anime, true) {
             this.posterUrl = poster
             this.plot = description
             this.year = year
