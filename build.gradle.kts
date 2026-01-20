@@ -28,7 +28,19 @@ allprojects {
 
 fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
 
-fun Project.android(configuration: BaseExtension.() -> Unit) = extensions.getByName<BaseExtension>("android").configuration()
+fun Project.android(configuration: BaseExtension.() -> Unit) {
+    extensions.getByName<BaseExtension>("android").apply {
+        (extensions.findByName("java") as? JavaPluginExtension)?.apply {
+            // Use Java 17 toolchain even if a higher JDK runs the build.
+            // We still use Java 8 for now which higher JDKs have deprecated.
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(17))
+            }
+        }
+
+        configuration()
+    }
+}
 
 subprojects {
     apply(plugin = "com.android.library")
@@ -47,8 +59,8 @@ subprojects {
 
         defaultConfig {
             minSdk = 21
-            compileSdkVersion(35)
-            targetSdk = 35
+            compileSdkVersion(36)
+            targetSdk = 36
         }
 
         compileOptions {
@@ -63,7 +75,8 @@ subprojects {
                     listOf(
                         "-Xno-call-assertions",
                         "-Xno-param-assertions",
-                        "-Xno-receiver-assertions"
+                        "-Xno-receiver-assertions",
+                        "-Xannotation-default-target=param-property"
                     )
                 )
             }
@@ -83,12 +96,12 @@ subprojects {
         // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle
         implementation(kotlin("stdlib"))                                              // Kotlin'in temel kütüphanesi
         implementation("com.github.Blatzar:NiceHttp:0.4.13")                          // HTTP kütüphanesi
-        implementation("org.jsoup:jsoup:1.19.1")                                      // HTML ayrıştırıcı
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")   // Kotlin için Jackson JSON kütüphanesi
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.16.0")          // JSON-nesne dönüştürme kütüphanesi
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")      // Kotlin için asenkron işlemler
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.0")
-        implementation("androidx.appcompat:appcompat:1.6.1")
+        implementation("org.jsoup:jsoup:1.22.1")                                      // HTML ayrıştırıcı
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.5")   // Kotlin için Jackson JSON kütüphanesi
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.13.5")          // JSON-nesne dönüştürme kütüphanesi
+        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")      // Kotlin için asenkron işlemler
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+        implementation("androidx.appcompat:appcompat:1.7.1")
     }
 }
 
