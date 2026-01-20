@@ -2,7 +2,6 @@
 
 package com.kraptor
 
-import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -14,10 +13,11 @@ class Krmzy : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "ar"
     override val hasQuickSearch       = false
-    override val supportedTypes       = setOf(TvType.Movie)
+    override val supportedTypes       = setOf(TvType.TvSeries)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     override val mainPage = mainPageOf(
+        "${mainUrl}/" to "Main Page",
         "${mainUrl}/series-list/" to "Series"
     )
 
@@ -27,7 +27,7 @@ class Krmzy : MainAPI() {
         } else {
             app.get("${request.data}/page/$page/").document
         }
-        val home     = document.select("article.postEp div.block-post").mapNotNull { it.toMainPageResult() }
+        val home     = document.select("article.postEp div.block-post, article.post div.block-post").mapNotNull { it.toMainPageResult() }
 
         return newHomePageResponse(HomePageList(request.name, home, true))
     }
@@ -100,7 +100,7 @@ class Krmzy : MainAPI() {
     }
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        Log.d("kraptor_$name", "data = ${data}")
+//        Log.d("kraptor_$name", "data = ${data}")
         val document = app.get(data).document
 
         val videoServer = document.selectFirst("a.fullscreen-clickable")?.attr("href") ?: ""
@@ -111,9 +111,9 @@ class Krmzy : MainAPI() {
 
         videolar.forEach { video ->
             val vServer = video.attr("data-server")
-            Log.d("kraptor_$name", "vServer = ${vServer}")
+//            Log.d("kraptor_$name", "vServer = ${vServer}")
             val vName = video.attr("data-name")
-            Log.d("kraptor_$name", "vName = ${vName}")
+//            Log.d("kraptor_$name", "vName = ${vName}")
             if (vServer.contains("http")){
                 loadExtractor(vServer, "${mainUrl}/", subtitleCallback, callback)
             } else if (vName.contains("ok", true)){
@@ -121,15 +121,15 @@ class Krmzy : MainAPI() {
                 loadExtractor(okru, "${mainUrl}/", subtitleCallback, callback)
             } else if (vName.contains("Arab", true)) {
                 val url = "https://v.turkvearab.com/embed-$vServer.html"
-                Log.d("kraptor_$name", "arab url = ${url}")
+//                Log.d("kraptor_$name", "arab url = ${url}")
                 loadExtractor(url, "${mainUrl}/", subtitleCallback, callback)
             } else if (vName.contains("Red", true)){
                 val url =  "https://iplayerhls.com/e/$vServer"
-                Log.d("kraptor_$name", "Red url = ${url}")
+//                Log.d("kraptor_$name", "Red url = ${url}")
                 loadExtractor(url, "${mainUrl}/", subtitleCallback, callback)
             } else if (vName.contains("Pro", true)) {
                 val url = "https://w.larhu.website/hls/$vServer.m3u8"
-                Log.d("kraptor_$name", "Pro url = ${url}")
+//                Log.d("kraptor_$name", "Pro url = ${url}")
                 callback.invoke(newExtractorLink(
                     source = vName,
                     name   = vName,
@@ -140,7 +140,7 @@ class Krmzy : MainAPI() {
                 })
             } else {
                 val url = "https://arabveturk.com/embed-$vServer.html"
-                Log.d("kraptor_$name", "turkvearab url = ${url}")
+//                Log.d("kraptor_$name", "turkvearab url = ${url}")
                 loadExtractor(url, "${mainUrl}/", subtitleCallback, callback)
             }
         }
