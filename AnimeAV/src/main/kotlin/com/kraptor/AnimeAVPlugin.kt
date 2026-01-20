@@ -8,5 +8,8 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class AnimeAVPlugin: Plugin() {
     override fun load() {
         registerMainAPI(AnimeAV())
+        registerExtractorAPI(Mp4Upload())
+        registerExtractorAPI(PixelDrain())
+        registerExtractorAPI(PlayerZilla())
     }
 }

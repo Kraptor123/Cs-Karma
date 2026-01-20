@@ -15,12 +15,11 @@ class PlayerZilla : ExtractorApi() {
 
     @SuppressLint("SuspiciousIndentation")
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val split = url.split("|")
-        val video = "$mainUrl/m3u8/${split[0].substringAfterLast("/")}"
+        val video = "$mainUrl/m3u8/${url.substringAfterLast("/")}"
             callback.invoke(
                 newExtractorLink(
                 this.name,
-                this.name + " ${split[1]}",
+                this.name,
                 url = video,
                 type = ExtractorLinkType.M3U8
             ) {
