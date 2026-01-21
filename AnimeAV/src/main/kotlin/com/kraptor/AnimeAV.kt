@@ -3,11 +3,15 @@
 package com.kraptor
 
 import android.util.Log
+import com.fasterxml.jackson.module.kotlin.readValue
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.json.JSONObject
-import org.jsoup.nodes.Document
+import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class AnimeAV : MainAPI() {
     override var mainUrl = "https://animeav1.com"
@@ -57,22 +61,22 @@ class AnimeAV : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-       if (request.data.contains("$mainUrl")){
-           val document = app.get(request.data).document
+        if (request.data.contains("$mainUrl")){
+            val document = app.get(request.data).document
 
-           val home = document.select("section:has(h2:contains(episo)) div.grid article").mapNotNull { it.toMainPageResult() }
+            val home = document.select("section:has(h2:contains(episo)) div.grid article").mapNotNull { it.toMainPageResult() }
 
-           return newHomePageResponse(HomePageList(request.name, home, true), false)
-       } else {
-           val document = if (page == 1) {
-               app.get("$categoryUrl${request.data.lowercase()}").document
-           } else {
-               app.get("$categoryUrl${request.data.lowercase()}&page=$page").document
-           }
-           val home = document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
+            return newHomePageResponse(HomePageList(request.name, home, true), false)
+        } else {
+            val document = if (page == 1) {
+                app.get("$categoryUrl${request.data.lowercase()}").document
+            } else {
+                app.get("$categoryUrl${request.data.lowercase()}&page=$page").document
+            }
+            val home = document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
 
-           return newHomePageResponse(request.name, home)
-       }
+            return newHomePageResponse(request.name, home)
+        }
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
@@ -98,83 +102,62 @@ class AnimeAV : MainAPI() {
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
-
-
     override suspend fun load(url: String): LoadResponse? {
-        val hamUrl = if (url.contains("media/")) {
-            val parcalar = url.split("/")
-            if (parcalar.size > 5) url.substringBeforeLast("/") else url
-        } else url
+        val afterMedia = url.substringAfter("media/", "")
+        val isEpisode = afterMedia.contains("/")
+        val requestUrl = if (isEpisode) url.substringBeforeLast("/") else url
+        val document = app.get(requestUrl, referer = "$mainUrl/").document
 
-        val cevap = app.get(hamUrl.removeSuffix("/"))
-        val doc = cevap.document
-        val baslik = doc.selectFirst("h1")?.text()?.trim() ?: return null
+        val title = document.selectFirst("h1")?.text()?.trim() ?: return null
+        val poster = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
+        val description = document.selectFirst("div.entry.text-lead p")?.text()?.trim()
+        val year = document.selectFirst("div.text-sm span:contains(0)")?.text()?.trim()?.toIntOrNull()
+        val tags = document.select("div.flex-wrap.gap-2 a[href*=genre]").map { it.text() }
+        val rating = document.selectFirst("div.flex-wrap div.text-lead")?.text()?.trim()?.toIntOrNull()
+        val duration = document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
+        val recommendations = document.select("article.bg-mute").mapNotNull { it.toRecommendationResult() }
+        val actors = document.select("span.valor a").map { Actor(it.text()) }
+        val trailer = Regex("""embed\/(.*)\?rel""").find(document.html())?.groupValues?.get(1)
+            ?.let { "https://www.youtube.com/embed/$it" }
 
-        val poster = fixUrlNull(doc.selectFirst("img.aspect-poster")?.attr("src"))
-        val ozet = doc.selectFirst("div.entry p")?.text()?.trim()
+        val sveltekitScript = document.selectFirst("script:containsData(sveltekit)")?.data() ?: ""
 
-        val bolumler = jsondanBolumleriAl(hamUrl, baslik, poster).ifEmpty { htmldenBolumleriAl(doc, baslik) }
-        bolumler.sortBy { it.episode }
+        val totalEp = Regex(pattern = "episodesCount:([0-9]+)", options = setOf(RegexOption.IGNORE_CASE)).find(sveltekitScript)?.groupValues[1]?.toIntOrNull()
+            ?: 1
+        val mediaId = Regex(pattern = "\\{media:\\{id:([0-9]+)", options = setOf(RegexOption.IGNORE_CASE)).find(sveltekitScript)?.groupValues[1]
 
-        return newAnimeLoadResponse(baslik, url, TvType.Anime, true) {
+        val episodes = (1..totalEp).map { episodeNum ->
+            val href = "$requestUrl/$episodeNum"
+            val posterUrl = "https://cdn.animeav1.com/screenshots/$mediaId/$episodeNum.jpg"
+
+            newEpisode(href) {
+                this.name = "Episode $episodeNum"
+                this.posterUrl = posterUrl
+                this.episode = episodeNum
+                this.season = 1
+            }
+        }
+
+        return newAnimeLoadResponse(title, requestUrl, TvType.Anime, true) {
             this.posterUrl = poster
-            this.plot = ozet
-            this.year = doc.select("div.flex-wrap span").find { it.text().any { c -> c.isDigit() } }?.text()?.filter { it.isDigit() }?.toIntOrNull()
-            this.tags = doc.select("a[href*=genre]").map { it.text() }
-            this.score = Score.from10(doc.selectFirst("div.text-lead.text-2xl")?.text()?.trim()?.toDoubleOrNull())
-            this.episodes = mutableMapOf(DubStatus.None to bolumler)
-            this.recommendations = doc.select("article.bg-mute").mapNotNull { rec ->
-                val rbaslik = rec.selectFirst("h3")?.text() ?: return@mapNotNull null
-                val rlink = fixUrl(rec.selectFirst("a")?.attr("href") ?: return@mapNotNull null)
-                newAnimeSearchResponse(rbaslik, rlink, TvType.Anime) {
-                    this.posterUrl = fixUrlNull(rec.selectFirst("img")?.attr("src"))
-                }
-            }
-
+            this.plot = description
+            this.year = year
+            this.tags = tags
+            this.score = Score.from10(rating)
+            this.episodes = mutableMapOf(DubStatus.None to episodes)
+            this.duration = duration
+            this.recommendations = recommendations
+            addActors(actors)
+            addTrailer(trailer)
         }
     }
 
-    private suspend fun jsondanBolumleriAl(temelUrl: String, baslik: String, poster: String?): MutableList<Episode> {
-        val liste = mutableListOf<Episode>()
-        try {
-            val jsonUrl = "${temelUrl.removeSuffix("/")}/__data.json?x-sveltekit-invalidated=0010"
-            val cevap = app.get(jsonUrl, referer = temelUrl).text
-            val json = JSONObject(cevap)
-            val veri = json.getJSONArray("nodes").getJSONObject(2).getJSONArray("data")
-            val sezon = baslik.substringAfter("season").substringAfter("part").filter { it.isDigit() }.toIntOrNull() ?: 1
+    private fun Element.toRecommendationResult(): SearchResponse? {
+        val title = this.selectFirst("h3")?.text() ?: return null
+        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
+        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-            """\{"id":(\d+),"number":(\d+)\}""".toRegex().findAll(cevap).forEach { m ->
-                val idIdx = m.groupValues[1].toInt()
-                val noIdx = m.groupValues[2].toInt()
-                val epId = veri.getString(idIdx)
-                val epNo = veri.getString(noIdx)
-
-                liste.add(newEpisode("$mainUrl/watch/$epId") {
-                    this.name = "Episodio $epNo"
-                    this.episode = epNo.toIntOrNull()
-                    this.season = sezon
-                    this.posterUrl = poster
-                })
-            }
-        } catch (e: Exception) {
-            println("JSON Hatası: ${e.message}")
-        }
-        return liste
-    }
-
-    private fun htmldenBolumleriAl(doc: Document, baslik: String): MutableList<Episode> {
-        val sezon = baslik.substringAfter("season").substringAfter("part").filter { it.isDigit() }.toIntOrNull() ?: 1
-        return doc.select("article.group\\/item").mapNotNull { ep ->
-            val link = fixUrlNull(ep.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-            val no = ep.selectFirst("div.bg-line span")?.text()?.toIntOrNull()
-
-            newEpisode(link) {
-                this.name = "Episodio $no"
-                this.posterUrl = ep.selectFirst("img")?.attr("src")
-                this.episode = no
-                this.season = sezon
-            }
-        }.toMutableList()
+        return newAnimeSearchResponse(title, href, TvType.Anime) { this.posterUrl = posterUrl }
     }
 
     override suspend fun loadLinks(
@@ -201,22 +184,42 @@ class AnimeAV : MainAPI() {
                 itemPattern.findAll(listMatch).forEach { match ->
                     val server = match.groupValues[1]
                     val url = match.groupValues[2]
+//                    Log.d("kraptor_${this.name}", "Type: $type, Server: $server, URL: $url")
 
-                    Log.d("kraptor_${this.name}", "Type: $type, Server: $server, URL: $url")
-
-                    if (server.equals("PDrain", ignoreCase = true)) {
-                        PixelDrain().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
-                    } else if (server.equals("MP4Upload", ignoreCase = true)) {
-                        Mp4Upload().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
-                    } else if (server.equals("HLS", ignoreCase = true)) {
-                        PlayerZilla().getUrl("$url|$type", subtitleCallback = subtitleCallback, callback = callback)
-                    } else {
-                        loadExtractor(url, subtitleCallback, callback)
-                    }
+                    loadCustomExtractor("${this.name} - $server - $type", url, "$mainUrl/", subtitleCallback, callback)
                 }
             }
         }
 
         return true
+    }
+}
+
+suspend fun loadCustomExtractor(
+    name: String? = null,
+    url: String,
+    referer: String? = null,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit,
+    quality: Int? = null,
+) {
+    loadExtractor(url, referer, subtitleCallback) { link ->
+        CoroutineScope(Dispatchers.IO).launch {
+            callback.invoke(
+                newExtractorLink(
+                    name ?: link.source,
+                    name ?: link.name,
+                    link.url,
+                ) {
+                    this.quality = when {
+                        else -> quality ?: link.quality
+                    }
+                    this.type = link.type
+                    this.referer = link.referer
+                    this.headers = link.headers
+                    this.extractorData = link.extractorData
+                }
+            )
+        }
     }
 }

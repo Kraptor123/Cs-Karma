@@ -9,6 +9,9 @@ import com.lagradost.cloudstream3.APIHolder.capitalize
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class CricHD : MainAPI() {
     override var mainUrl = "https://crichd.asia"
@@ -65,11 +68,13 @@ class CricHD : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val allLinks = document.select("tbody tr.hover\\:bg-neutral-600 a")
+        val allLinks = document.select("tbody tr.hover\\:bg-neutral-600")
 
         allLinks.forEach { link ->
-            val href = link.attr("href")
-            loadExtractor(href, "${mainUrl}/", subtitleCallback, callback)
+            val href = link.selectFirst("a")?.attr("href") ?: ""
+            val name = link.selectFirst("td.py-2.px-4.text-white")?.text()
+            val quality = link.selectFirst("td.hidden:nth-child(4)")?.text()
+            loadCustomExtractor("$name $quality", href, "${mainUrl}/", subtitleCallback, callback)
         }
         return true
     }
@@ -92,4 +97,33 @@ fun posterHelper(
     val txtFont = font?.lowercase()?.replace(" ", "-") ?: "lato"
 
     return "$domain/${txtWidth}x${txtHeight}/$bgColor/$txtColor.png?text=$title&font=$txtFont"
+}
+
+suspend fun loadCustomExtractor(
+    name: String? = null,
+    url: String,
+    referer: String? = null,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit,
+    quality: Int? = null,
+) {
+    loadExtractor(url, referer, subtitleCallback) { link ->
+        CoroutineScope(Dispatchers.IO).launch {
+            callback.invoke(
+                newExtractorLink(
+                    name ?: link.source,
+                    name ?: link.name,
+                    link.url,
+                ) {
+                    this.quality = when {
+                        else -> quality ?: link.quality
+                    }
+                    this.type = link.type
+                    this.referer = link.referer
+                    this.headers = link.headers
+                    this.extractorData = link.extractorData
+                }
+            )
+        }
+    }
 }

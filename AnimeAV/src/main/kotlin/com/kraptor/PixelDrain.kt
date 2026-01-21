@@ -9,17 +9,16 @@ open class PixelDrain : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-       val split = url.split("|")
-        val mId = Regex("/u/(.*)").find(split[0])?.groupValues?.get(1)
+        val mId = Regex("/u/(.*)").find(url)?.groupValues?.get(1)
         if (mId.isNullOrEmpty())
         {
             callback.invoke(
                 newExtractorLink(
                     this.name,
                     this.name,
-                    split[0]
+                    url
                 ) {
-                    this.referer = split[0]
+                    this.referer = url
                 }
             )
         }
@@ -27,10 +26,10 @@ open class PixelDrain : ExtractorApi() {
             callback.invoke(
                 newExtractorLink(
                     this.name,
-                    this.name + " ${split[1]}",
+                    this.name,
                     "$mainUrl/api/file/${mId}?download",
                 ) {
-                    this.referer = split[0]
+                    this.referer = url
                 }
             )
         }

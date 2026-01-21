@@ -16,8 +16,7 @@ open class Mp4Upload : ExtractorApi() {
     override val requiresReferer = true
     private val idMatch = Regex("""mp4upload\.com/(embed-|)([A-Za-z0-9]*)""")
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        val split = url.split("|")
-        val realUrl = idMatch.find(split[0])?.groupValues?.get(2)?.let { id ->
+        val realUrl = idMatch.find(url)?.groupValues?.get(2)?.let { id ->
             "$mainUrl/embed-$id.html"
         } ?: url
         val response = app.get(realUrl)
@@ -28,10 +27,10 @@ open class Mp4Upload : ExtractorApi() {
             return listOf(
                 newExtractorLink(
                     name,
-                    this.name + " ${split[1]}",
+                    this.name,
                     link,
                 ) {
-                    this.referer = split[0]
+                    this.referer = url
                     this.quality = quality ?: Qualities.Unknown.value
                 }
             )
@@ -40,10 +39,10 @@ open class Mp4Upload : ExtractorApi() {
             return listOf(
                 newExtractorLink(
                     name,
-                    this.name + " ${split[1]}",
+                    this.name,
                     link,
                 ) {
-                    this.referer = split[0]
+                    this.referer = url
                     this.quality = quality ?: Qualities.Unknown.value
                 }
             )

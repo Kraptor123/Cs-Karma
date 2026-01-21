@@ -1,4 +1,4 @@
-// ! Bu araç @Kraptor123 tarafından | @kekikanime için yazılmıştır.
+// ! Bu araç @Kraptor123 tarafından | @cs-karma için yazılmıştır.
 version = 0
 
 cloudstream {
