@@ -13,7 +13,7 @@ import org.json.JSONObject
 import java.net.URI
 
 class LayarKaca : MainAPI() {
-    override var mainUrl              = "https://tv7.lk21official.cc"
+    override var mainUrl              = "https://tv8.lk21official.cc"
     override var name                 = "LayarKaca"
     override val hasMainPage          = true
     override var lang                 = "id"
