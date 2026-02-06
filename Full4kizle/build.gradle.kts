@@ -1,5 +1,5 @@
 // ! Bu araç @ByAyzen tarafından | @kekikanime için yazılmıştır.
-version = 7
+version = 8
 
 cloudstream {
     authors     = listOf("ByAyzen")
