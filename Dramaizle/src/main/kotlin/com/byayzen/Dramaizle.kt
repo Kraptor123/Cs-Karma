@@ -12,7 +12,7 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class Dramaizle : MainAPI() {
-    override var mainUrl = "https://dramaizle.net"
+    override var mainUrl = "https://dramaflix.cc"
     override var name = "Dramaizle"
     override val hasMainPage = true
     override var lang = "tr"
