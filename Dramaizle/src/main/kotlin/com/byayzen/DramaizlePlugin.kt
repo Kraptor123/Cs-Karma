@@ -5,8 +5,8 @@ import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
 @CloudstreamPlugin
-class DramaizlePlugin: Plugin() {
+class DramaFlixPlugin: Plugin() {
     override fun load() {
-        registerMainAPI(Dramaizle())
+        registerMainAPI(DramaFlix())
     }
 }

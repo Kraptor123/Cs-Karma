@@ -2,100 +2,87 @@
 
 package com.byayzen
 
-import android.util.Log
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
+import com.lagradost.cloudstream3.utils.AppUtils.toJson
+import java.util.Locale
 
-class Dramaizle : MainAPI() {
+class DramaFlix : MainAPI() {
     override var mainUrl = "https://dramaflix.cc"
-    override var name = "Dramaizle"
-    override val hasMainPage = true
+    override var name = "DramaFlix"
     override var lang = "tr"
-    override val hasQuickSearch = false
+    override val hasMainPage = true
+    override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.AsianDrama)
-    //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
-    override val mainPage = mainPageOf(
-        "${mainUrl}/filmler" to "Tüm Filmler",
-        "${mainUrl}/film/tur/netshort-dizileri" to "Netshort Filmleri",
-        "${mainUrl}/film/tur/shortmax" to "ShortMax Filmleri",
-        "${mainUrl}/film/tur/dramabox" to "DramaBox Filmleri",
-        "${mainUrl}/film/tur/flextv" to "FlexTV Filmleri",
-        "${mainUrl}/film/tur/dramawave" to "DramaWave Filmleri",
-        "${mainUrl}/film/tur/star-dust-tv" to "StarDust TV Filmleri"
-    )
+    private val api = "$mainUrl/api/series"
+
+    private fun Seri.apiconvert(): SearchResponse {
+        return newMovieSearchResponse(this.title, "$mainUrl/api/series/${this.slug}", TvType.TvSeries) {
+            this.posterUrl = this@apiconvert.cover_image
+            this.id = this@apiconvert.id
+        }
+    }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page <= 1) request.data else "${request.data}/$page"
-        val document = app.get(url).document
-        val home = document.select("ul.flex.flex-wrap.row li").mapNotNull {
-            it.toMainPageResult()
+        val listeler = mutableListOf<HomePageList>()
+        val limit = 25
+        val kayma = (page - 1) * limit
+
+        val platformlar = listOf(
+            "NetShort",
+            "DramaBox",
+            "ShortMax",
+            "DramaWawe",
+            "ReelShort",
+            "StarDust"
+        )
+
+        platformlar.forEach { platform ->
+            val link = "$api?limit=$limit&offset=$kayma&language=TR&platform=$platform"
+            val yanit = app.get(link).text
+            val veri = AppUtils.parseJson<List<Seri>>(yanit)
+
+            val icerik = veri.map { it.apiconvert() }
+            if (icerik.isNotEmpty()) {
+                listeler.add(HomePageList(platform, icerik))
+            }
         }
 
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(listeler, true)
     }
 
-    private fun Element.toMainPageResult(): SearchResponse? {
-        val title = this.selectFirst("h2")?.text() ?: return null
-        val href = fixUrl(this.selectFirst("a")?.attr("href") ?: return null)
+    override suspend fun search(query: String): List<SearchResponse> {
+        val link = "$api?search=$query&language=TR&limit=500"
+        val yanit = app.get(link).text
+        val veri = AppUtils.parseJson<List<Seri>>(yanit)
 
-        val imgElement = this.selectFirst("a img")
-        val posterUrl = imgElement?.attr("data-src")?.ifBlank { imgElement.attr("src") } ?: imgElement?.attr("src")
-
-        return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = fixUrlNull(posterUrl)
-        }
+        return veri.map { it.apiconvert() }
     }
 
-    override suspend fun search(query: String, page: Int): SearchResponseList {
-        if (page > 1) return newSearchResponseList(emptyList(), false)
-        return try {
-            val res = app.post("$mainUrl/search", data = mapOf("query" to query),
-                headers = mapOf("X-Requested-With" to "XMLHttpRequest", "Referer" to "$mainUrl/")).text
-            val html = AppUtils.parseJson<SearchJson>(res).theme ?: ""
-            val results = Jsoup.parse(html).select("div.result-movies").mapNotNull {
-                val a = it.selectFirst("div.result-movies-text a") ?: return@mapNotNull null
-                newMovieSearchResponse(a.text().trim(), fixUrlNull(a.attr("href")) ?: return@mapNotNull null, TvType.Movie) {
-                    posterUrl = fixUrlNull(it.selectFirst("img")?.let { i -> i.attr("data-src").ifBlank { i.attr("src") } })
+    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
+
+    override suspend fun load(url: String): LoadResponse {
+        val yanit = app.get(url).text
+        val veri = AppUtils.parseJson<Detay>(yanit)
+        val seri = veri.series
+
+        return newTvSeriesLoadResponse(
+            seri.title.replaceFirstChar { it.titlecase(Locale.ROOT) },
+            url,
+            TvType.TvSeries,
+            veri.episodes.map { bolum ->
+                val data = bolum.toJson()
+                newEpisode(data) {
+                    this.name = "Bölüm ${bolum.episode_number}"
+                    this.episode = bolum.episode_number
+                    this.posterUrl = bolum.thumbnail
                 }
             }
-            newSearchResponseList(results, false)
-        } catch (e: Exception) { newSearchResponseList(emptyList(), false) }
-    }
-
-
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
-
-
-    override suspend fun load(url: String): LoadResponse? {
-        val doc = app.get(url).document
-        val header = doc.selectFirst("div.page-title")
-        val tr = header?.selectFirst("h1")?.ownText()?.trim() ?: ""
-        val en = header?.selectFirst("p")?.text()?.trim() ?: ""
-        val title = if (en.isNotEmpty() && en != tr) "$en - $tr" else tr
-
-        val infos = doc.select("div.filter-result-box ul li, div.series-profile-info ul li")
-        val year = infos.find { it.text().contains("Yıl", true) }?.selectFirst("p")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val duration = infos.find { it.text().contains("Süre", true) }?.selectFirst("p")?.text()?.filter { it.isDigit() }?.toIntOrNull()
-        val rating = infos.find { it.text().contains("IMDB", true) }?.selectFirst("span.color-imdb")?.text()?.toDoubleOrNull()
-
-        val iframeSrc = doc.selectFirst("iframe[src*='/video/']")?.attr("src") ?: url
-
-        return newMovieLoadResponse(title, url, TvType.Movie, iframeSrc) {
-            this.posterUrl = fixUrlNull(doc.selectFirst("div.series-profile-image img")?.attr("src"))
-            this.plot = doc.selectFirst("div.series-profile-infos-in.article p")?.text()?.trim()
-            this.year = year
-            this.duration = duration
-            this.score = rating?.let { Score.from10(it) }
-            this.tags = doc.select("div.series-profile-type a").map { it.text() }
-            addActors(doc.select("div.series-profile-cast ul li").map { Actor(it.text().trim()) })
-            addTrailer(doc.selectFirst("iframe[src*='youtube']")?.attr("src"))
-            this.recommendations = doc.select("ul.flex.flex-wrap.row li").mapNotNull { it.toMainPageResult() }
+        ) {
+            this.posterUrl = seri.cover_image
+            this.plot = seri.description?.replaceFirstChar { it.titlecase(Locale.ROOT) }
+            this.tags = seri.tags
         }
     }
 
@@ -105,40 +92,59 @@ class Dramaizle : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        if (data.isBlank() || !data.contains("/video/")) return false
+        val bolum = AppUtils.parseJson<Bolum>(data)
 
-        try {
-            val baseUrl = data.substringBefore("/video/")
-            val videoId = data.substringAfter("/video/")
-
-            val json = app.post(
-                "$baseUrl/player/index.php?data=$videoId&do=getVideo",
-                headers = mapOf("X-Requested-With" to "XMLHttpRequest", "Referer" to data)
-            ).text
-
-            val m3u8 = """securedLink"\s*:\s*"(.*?)"""".toRegex().find(json)?.groupValues?.get(1)
-                ?.replace("\\/", "/")
-
-            if (!m3u8.isNullOrBlank()) {
-                callback.invoke(
-                    newExtractorLink(
-                        source = this.name,
-                        name = "Dramaİzle",
-                        url = m3u8,
-                        type = ExtractorLinkType.M3U8
-                    ) {
-                        this.referer = "$baseUrl/"
-                        this.headers =
-                            mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                    })
-                return true
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+        bolum.subtitles?.forEach { altyazi ->
+            subtitleCallback.invoke(
+                newSubtitleFile(altyazi.label ?: altyazi.language, altyazi.url)
+            )
         }
 
-        return false
+        bolum.url?.let { link ->
+            callback.invoke(
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = link,
+                ) {
+                    this.referer = "$mainUrl/"
+                    this.type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                }
+            )
+        }
+        return true
     }
-}
 
-data class SearchJson(@JsonProperty("theme") val theme: String? = null)
+    @Suppress("PropertyName")
+    data class Seri(
+        val id: Int,
+        val slug: String,
+        val title: String,
+        val description: String?,
+        val cover_image: String,
+        val platform: String?,
+        val total_episodes: Int?,
+        val tags: List<String>?,
+        val createdAt: Long?
+    )
+
+    data class Detay(
+        val series: Seri,
+        val episodes: List<Bolum>
+    )
+
+    @Suppress("PropertyName")
+    data class Bolum(
+        val id: Int,
+        val episode_number: Int,
+        val url: String?,
+        val thumbnail: String?,
+        val subtitles: List<Altyazi>?
+    )
+
+    data class Altyazi(
+        val language: String,
+        val url: String,
+        val label: String?
+    )
+}
