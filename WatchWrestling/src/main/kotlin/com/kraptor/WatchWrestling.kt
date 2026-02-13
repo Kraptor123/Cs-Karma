@@ -11,7 +11,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 
 class WatchWrestling : MainAPI() {
-    override var mainUrl              = "https://instapro.ac"
+    override var mainUrl              = "https://watchwrestling.ae"
     override var name                 = "WatchWrestling"
     override val hasMainPage          = true
     override var lang                 = "tr"
