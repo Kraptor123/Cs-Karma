@@ -26,8 +26,8 @@ class AnimeAV : MainAPI() {
 
     override val mainPage = mainPageOf(
         mainUrl to "Episodios Recientemente Actualizado",
-        "?status=emision&order=latest_released" to "Latest Released",
-        "?status=emision&order=latest_added" to "Latest Added",
+        "?order=latest_released" to "Últimos Estrenos",
+        "?order=latest_added" to "Recién añadidos",
         "?genre=Acción" to "Acción",
         "?genre=Aventura" to "Aventura",
         "?genre=Comedia" to "Comedia",
