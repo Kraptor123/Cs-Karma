@@ -12,7 +12,7 @@ import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
 
 class Streamed() : MainAPI() {
-    override var mainUrl = "https://streami.su"
+    override var mainUrl = "https://streamed.st"
     override var name = "Streamed"
     override val hasMainPage = true
     override var lang = "en"
