@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
@@ -18,33 +19,33 @@ class Streamed() : MainAPI() {
     override var lang = "en"
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Live)
-    override val vpnStatus      = VPNStatus.MightBeNeeded
+    override val vpnStatus = VPNStatus.MightBeNeeded
 
 
     override val mainPage = mainPageOf(
         "${mainUrl}/api/matches/live/popular" to "Canlı Popüler",
-        "${mainUrl}/api/matches/live"                  to "Canlı",
-        "${mainUrl}/api/matches/all-today/popular"     to "Bugünün Popüler Maçları",
-        "${mainUrl}/api/matches/football/popular"      to "Futbol",
-        "${mainUrl}/api/matches/fight/popular"         to "Dövüş",
+        "${mainUrl}/api/matches/live" to "Canlı",
+        "${mainUrl}/api/matches/all-today/popular" to "Bugünün Popüler Maçları",
+        "${mainUrl}/api/matches/football/popular" to "Futbol",
+        "${mainUrl}/api/matches/fight/popular" to "Dövüş",
         "${mainUrl}/api/matches/american-football/popular" to "Amerikan Futbolu",
-        "${mainUrl}/api/matches/basketball/popular"    to "Basketbol",
-        "${mainUrl}/api/matches/tennis/popular"        to "Tenis",
-        "${mainUrl}/api/matches/hockey/popular"        to "Hokey",
-        "${mainUrl}/api/matches/baseball/popular"      to "Beyzbol",
-        "${mainUrl}/api/matches/darts/popular"         to "Dart",
-        "${mainUrl}/api/matches/motor-sports/popular"  to "Motor Sporları",
-        "${mainUrl}/api/matches/golf/popular"          to "Golf",
-        "${mainUrl}/api/matches/billiards/popular"     to "Bilardo",
-        "${mainUrl}/api/matches/afl/popular"           to "AFL",
-        "${mainUrl}/api/matches/cricket/popular"       to "Kriket",
-        "${mainUrl}/api/matches/other/popular"         to "Diğer"
+        "${mainUrl}/api/matches/basketball/popular" to "Basketbol",
+        "${mainUrl}/api/matches/tennis/popular" to "Tenis",
+        "${mainUrl}/api/matches/hockey/popular" to "Hokey",
+        "${mainUrl}/api/matches/baseball/popular" to "Beyzbol",
+        "${mainUrl}/api/matches/darts/popular" to "Dart",
+        "${mainUrl}/api/matches/motor-sports/popular" to "Motor Sporları",
+        "${mainUrl}/api/matches/golf/popular" to "Golf",
+        "${mainUrl}/api/matches/billiards/popular" to "Bilardo",
+        "${mainUrl}/api/matches/afl/popular" to "AFL",
+        "${mainUrl}/api/matches/cricket/popular" to "Kriket",
+        "${mainUrl}/api/matches/other/popular" to "Diğer"
     )
 
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
 
-        val textdoc  = app.get(request.data).text
+        val textdoc = app.get(request.data).text
         val document = textdoc
         val mapper = jacksonObjectMapper().registerKotlinModule()
         val matches: List<Matches> = mapper.readValue(document)
@@ -53,7 +54,8 @@ class Streamed() : MainAPI() {
             .filter { it.sources?.isNotEmpty() == true }
             .mapNotNull { match ->
                 val title = match.title ?: return@mapNotNull null
-                val firstSourceId = match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
+                val firstSourceId =
+                    match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
                 val href = "$mainUrl/watch/${firstSourceId}"
                 val poster = "${match.poster}"
                 val posterUrl = if (poster.contains("api")) {
@@ -117,7 +119,8 @@ class Streamed() : MainAPI() {
 
         return filtered.mapNotNull { match ->
             val title = match.title ?: return@mapNotNull null
-            val firstSourceId = match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
+            val firstSourceId =
+                match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
             val href = "$mainUrl/watch/${firstSourceId}"
             val poster = match.poster ?: ""
             val posterUrl = if (poster.contains("api")) {
@@ -136,7 +139,15 @@ class Streamed() : MainAPI() {
 
     private fun normalizeTurkish(s: String): String {
         var res = s.lowercase()
-        val map = mapOf('ç' to 'c', 'ğ' to 'g', 'ı' to 'i', 'ö' to 'o', 'ş' to 's', 'ü' to 'u', 'İ' to 'i')
+        val map = mapOf(
+            'ç' to 'c',
+            'ğ' to 'g',
+            'ı' to 'i',
+            'ö' to 'o',
+            'ş' to 's',
+            'ü' to 'u',
+            'İ' to 'i'
+        )
         map.forEach { (k, v) -> res = res.replace(k.toString(), v.toString()) }
         res = java.text.Normalizer.normalize(res, java.text.Normalizer.Form.NFD)
             .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
@@ -235,95 +246,84 @@ class Streamed() : MainAPI() {
     ): Boolean = withContext(Dispatchers.IO) {
         val sourceId = data.substringAfterLast("/")
         val mapper = jacksonObjectMapper().registerKotlinModule()
-        val txt = app.get("$mainUrl/api/matches/all").text
-        val matches: List<Matches> = mapper.readValue(txt)
 
-        val match = matches.find { match ->
-            match.sources?.any { it.id == sourceId } == true || match.id == sourceId
-        }
+        try {
+            val txt = app.get("$mainUrl/api/matches/all").text
+            val matches: List<Matches> = mapper.readValue(txt)
 
-        if (match == null) {
+            val match = matches.find { match ->
+                match.sources?.any { it.id == sourceId } == true || match.id == sourceId
+            } ?: return@withContext false
+
+            fun viewersOf(s: Stream): Int {
+                return try {
+                    when (val v = s.viewers) {
+                        is Number -> v.toInt()
+                        is String -> v.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                } catch (e: Exception) {
+                    0
+                }
+            }
+
+            val allStreams = mutableListOf<Pair<Stream, String>>()
+
+            match.sources?.forEach { source ->
+                try {
+                    val sourceType = source.source
+                    val sourceIdForApi = source.id
+
+                    if (sourceType != null && sourceIdForApi != null) {
+                        val streamResponse =
+                            app.get("$mainUrl/api/stream/$sourceType/$sourceIdForApi").text
+                        val streams: List<Stream> = mapper.readValue(
+                            streamResponse,
+                            object :
+                                com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
+                        )
+
+                        streams.forEach { stream ->
+                            allStreams.add(Pair(stream, sourceType))
+                        }
+                    }
+                } catch (e: Exception) {
+                }
+            }
+
+            val streamsWithPositiveViewers = allStreams.filter { viewersOf(it.first) > 0 }
+
+            val streamsToProcess: List<Pair<Stream, String>> =
+                if (streamsWithPositiveViewers.size >= 2) {
+                    streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) }
+                } else {
+                    val zeroViewerStreams = allStreams.filter { viewersOf(it.first) == 0 }
+                    streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) } + zeroViewerStreams
+                }
+
+            val processedStreams = mutableSetOf<String>()
+
+            streamsToProcess.forEach { (stream, sourceType) ->
+                try {
+                    val embedUrl = stream.embedUrl.toString()
+                    if (embedUrl.isNotEmpty() && !processedStreams.contains(embedUrl)) {
+                        processedStreams.add(embedUrl)
+
+                        loadExtractor(
+                            url = embedUrl,
+                            referer = mainUrl,
+                            subtitleCallback = subtitleCallback,
+                            callback = callback
+                        )
+                    }
+                } catch (e: Exception) {
+                }
+            }
+
+            return@withContext true
+        } catch (e: Exception) {
             return@withContext false
         }
-
-        fun viewersOf(s: Stream): Int {
-            return try {
-                when (val v = s.viewers) {
-                    is Number -> v.toInt()
-                    is String -> v.toIntOrNull() ?: 0
-                    else -> 0
-                }
-            } catch (e: Exception) {
-                0
-            }
-        }
-
-        val allStreams = mutableListOf<Pair<Stream, String>>()
-
-        match.sources?.forEach { source ->
-            try {
-                val sourceType = source.source
-                val sourceIdForApi = source.id
-
-                if (sourceType != null && sourceIdForApi != null) {
-                    val streamResponse = app.get("$mainUrl/api/stream/$sourceType/$sourceIdForApi").text
-                    val streams: List<Stream> = mapper.readValue(
-                        streamResponse,
-                        object : com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
-                    )
-
-//                    Log.d("kraptor","sourcetype = $sourceType")
-
-                    streams.forEach { stream ->
-                        allStreams.add(Pair(stream, sourceType))
-                    }
-                }
-            } catch (e: Exception) {
-//                Log.e("kraptor_$name", "Error getting streams for source ${source.source}/${source.id}: ${e.message}")
-            }
-        }
-
-        val streamsWithPositiveViewers = allStreams.filter { viewersOf(it.first) > 0 }
-
-//        Log.d("kraptor_$name", "Total streams: ${allStreams.size}")
-//        Log.d("kraptor_$name", "Streams with positive viewers: ${streamsWithPositiveViewers.size}")
-//        streamsWithPositiveViewers.forEach { (stream, sourceType) ->
-//            Log.d("kraptor_$name", "Positive viewer stream: ${stream.id} (${viewersOf(stream)} viewers) from $sourceType")
-//        }
-
-        val streamsToProcess: List<Pair<Stream, String>> = if (streamsWithPositiveViewers.size >= 2) {
-//            Log.d("kraptor_$name", "DECISION: Processing only positive viewer streams (${streamsWithPositiveViewers.size} >= 2)")
-            streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) }
-        } else {
-//            Log.d("kraptor_$name", "DECISION: Processing all streams (positive viewers: ${streamsWithPositiveViewers.size} < 2)")
-            val zeroViewerStreams = allStreams.filter { viewersOf(it.first) == 0 }
-            streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) } + zeroViewerStreams
-        }
-
-        val processedStreams = mutableSetOf<String>()
-
-        streamsToProcess.forEach { (stream, sourceType) ->
-            try {
-//                Log.d("kraptor_$name", "Processing stream: ${stream.id}, viewers = ${stream.viewers}, sourceType = $sourceType")
-                val embedUrl = stream.embedUrl.toString()
-                if (embedUrl.isNotEmpty() && !processedStreams.contains(embedUrl)) {
-                    processedStreams.add(embedUrl)
-
-//                    Log.d("kraptor_$name", "Processing stream: ${stream.id}, embedUrl: $embedUrl")
-
-                    loadExtractor(
-                        url = embedUrl,
-                        referer = mainUrl,
-                        subtitleCallback = subtitleCallback,
-                        callback = callback
-                    )
-                }
-            } catch (e: Exception) {
-//                Log.e("kraptor_$name", "Error loading stream ${stream.id}: ${e.message}")
-            }
-        }
-
-        return@withContext true
     }
 }
 

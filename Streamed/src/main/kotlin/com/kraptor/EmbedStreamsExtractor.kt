@@ -17,7 +17,7 @@ import kotlin.coroutines.resume
 
 open class EmbedStreams(context: Context) : ExtractorApi() {
     override val name = "EmbedStreams"
-    override val mainUrl = "https://embedstreams.top"
+    override val mainUrl = "https://embedsporty.top"
     override val requiresReferer = true
     private var appContext = context
 
@@ -187,10 +187,10 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
             type = ExtractorLinkType.M3U8
         ) {
             this.quality = Qualities.Unknown.value
-            this.referer = "https://embedsports.top/"
+            this.referer = "https://embedsporty.top/"
             this.headers = mapOf(
                 "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.48 Safari/537.36",
-                "Origin" to "https://embedsports.top",
+                "Origin" to "https://embedsporty.top",
                 "Connection" to "keep-alive"
             )
         })
