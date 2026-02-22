@@ -5,13 +5,17 @@ package com.byayzen
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import kotlinx.coroutines.coroutineScope
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLDecoder
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+
 class TVGarden : MainAPI() {
     override var mainUrl = "https://famelack.com"
-    override var name = "TVGarden"
+    override var name = "FamelackTV"
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
@@ -20,7 +24,12 @@ class TVGarden : MainAPI() {
     private val apiBaseUrl = "https://raw.githubusercontent.com/famelack/famelack-channels/refs/heads/main/channels/raw"
     private val defaultPoster = "https://famelack.com/apple-touch-icon.png"
 
-    private val countries = listOf("tr", "us", "uk", "de", "fr", "es", "it", "nl", "ru", "jp", "kr", "cn", "in", "br", "mx", "ar", "ca", "au", "sa")
+    private val countries = listOf(
+        "tr", "us", "uk", "de", "fr", "es", "it", "nl", "ru", "jp",
+        "kr", "cn", "in", "br", "mx", "ar", "ca", "au", "sa", "ae",
+        "az", "ch", "at", "be", "se", "no", "dk", "fi", "pt", "gr",
+        "id", "pl", "ie", "ua"
+    )
 
     private val countryFlags = mapOf(
         "tr" to "https://flagcdn.com/w320/tr.png",
@@ -41,7 +50,22 @@ class TVGarden : MainAPI() {
         "ar" to "https://flagcdn.com/w320/ar.png",
         "ca" to "https://flagcdn.com/w320/ca.png",
         "au" to "https://flagcdn.com/w320/au.png",
-        "sa" to "https://flagcdn.com/w320/sa.png"
+        "sa" to "https://flagcdn.com/w320/sa.png",
+        "ae" to "https://flagcdn.com/w320/ae.png",
+        "az" to "https://flagcdn.com/w320/az.png",
+        "ch" to "https://flagcdn.com/w320/ch.png",
+        "at" to "https://flagcdn.com/w320/at.png",
+        "be" to "https://flagcdn.com/w320/be.png",
+        "se" to "https://flagcdn.com/w320/se.png",
+        "no" to "https://flagcdn.com/w320/no.png",
+        "dk" to "https://flagcdn.com/w320/dk.png",
+        "fi" to "https://flagcdn.com/w320/fi.png",
+        "pt" to "https://flagcdn.com/w320/pt.png",
+        "gr" to "https://flagcdn.com/w320/gr.png",
+        "id" to "https://flagcdn.com/w320/id.png",
+        "pl" to "https://flagcdn.com/w320/pl.png",
+        "ie" to "https://flagcdn.com/w320/ie.png",
+        "ua" to "https://flagcdn.com/w320/ua.png"
     )
 
     private val countryNames = mapOf(
@@ -63,7 +87,22 @@ class TVGarden : MainAPI() {
         "ar" to "🇦🇷 Argentina",
         "ca" to "🇨🇦 Canada",
         "au" to "🇦🇺 Australia",
-        "sa" to "🇸🇦 Saudi Arabia"
+        "sa" to "🇸🇦 Saudi Arabia",
+        "ae" to "🇦🇪 UAE",
+        "az" to "🇦🇿 Azerbaijan",
+        "ch" to "🇨🇭 Switzerland",
+        "at" to "🇦🇹 Austria",
+        "be" to "🇧🇪 Belgium",
+        "se" to "🇸🇪 Sweden",
+        "no" to "🇳🇴 Norway",
+        "dk" to "🇩🇰 Denmark",
+        "fi" to "🇫🇮 Finland",
+        "pt" to "🇵🇹 Portugal",
+        "gr" to "🇬🇷 Greece",
+        "id" to "🇮🇩 Indonesia",
+        "pl" to "🇵🇱 Poland",
+        "ie" to "🇮🇪 Ireland",
+        "ua" to "🇺🇦 Ukraine"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -78,38 +117,47 @@ class TVGarden : MainAPI() {
         return newHomePageResponse(homePageLists)
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        return try {
-            val channelsArray = JSONArray(app.get("$apiBaseUrl/all-channels.json").text)
-            (0 until channelsArray.length()).mapNotNull {
-                val channel = channelsArray.getJSONObject(it)
-                val name = channel.optString("name", "")
+    override suspend fun search(query: String): List<SearchResponse> = coroutineScope {
+        countries.map { countryCode ->
+            async {
+                try {
+                    val response = app.get("$apiBaseUrl/countries/$countryCode.json").text
+                    val channelsArray = JSONArray(response)
+                    val results = mutableListOf<SearchResponse>()
 
-                if (name.isEmpty() || !name.lowercase().contains(query.lowercase())) return@mapNotNull null
+                    for (i in 0 until channelsArray.length()) {
+                        val channel = channelsArray.getJSONObject(i)
+                        val name = channel.optString("name", "")
 
-                val countryCode = channel.optString("country", "")
-                Log.d("TVGarden", "Search: $name - Country: $countryCode")
+                        if (name.lowercase().contains(query.lowercase())) {
+                            Log.d("TVGarden", "Arama eslesmesi: $name ($countryCode)")
 
-                val iptvUrls = channel.optJSONArray("iptv_urls")
-                val youtubeUrls = channel.optJSONArray("youtube_urls")
+                            val iptvUrls = channel.optJSONArray("iptv_urls")
+                            val youtubeUrls = channel.optJSONArray("youtube_urls")
 
-                val streamUrl = when {
-                    iptvUrls != null && iptvUrls.length() > 0 && iptvUrls.getString(0).isNotBlank() -> iptvUrls.getString(0)
-                    youtubeUrls != null && youtubeUrls.length() > 0 && youtubeUrls.getString(0).isNotBlank() -> youtubeUrls.getString(0)
-                    else -> return@mapNotNull null
-                }
+                            val streamUrl = when {
+                                iptvUrls != null && iptvUrls.length() > 0 && iptvUrls.getString(0).isNotBlank() -> iptvUrls.getString(0)
+                                youtubeUrls != null && youtubeUrls.length() > 0 && youtubeUrls.getString(0).isNotBlank() -> youtubeUrls.getString(0)
+                                else -> null
+                            }
 
-                val posterUrl = countryFlags[countryCode] ?: defaultPoster
-                Log.d("TVGarden", "Poster URL: $posterUrl")
+                            if (streamUrl != null) {
+                                val logo = channel.optString("logo", "")
+                                val posterUrl = if (logo.isNotBlank()) logo else (countryFlags[countryCode] ?: defaultPoster)
 
-                newMovieSearchResponse(name, streamUrl, TvType.Live) {
-                    this.posterUrl = posterUrl
+                                results.add(newMovieSearchResponse(name, streamUrl, TvType.Live) {
+                                    this.posterUrl = posterUrl
+                                })
+                            }
+                        }
+                    }
+                    results
+                } catch (e: Exception) {
+                    Log.d("TVGarden", "Arama hatasi ($countryCode): ${e.message}")
+                    emptyList<SearchResponse>()
                 }
             }
-        } catch (e: Exception) {
-            Log.e("TVGarden", "Search error: ${e.message}")
-            emptyList()
-        }
+        }.awaitAll().flatten()
     }
 
     private suspend fun getChannelsForCountry(countryCode: String): List<SearchResponse> {
