@@ -7,7 +7,7 @@ import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 class WebCric: MainAPI() {
-    override var mainUrl = "https://me.webcric.com"
+    override var mainUrl = "https://go.webcric.com"
     override var name = "WebCric"
     override val hasMainPage = true
     override var lang = "en"
