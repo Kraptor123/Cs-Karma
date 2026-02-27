@@ -262,9 +262,7 @@ class Streamed() : MainAPI() {
                         is String -> v.toIntOrNull() ?: 0
                         else -> 0
                     }
-                } catch (e: Exception) {
-                    0
-                }
+                } catch (e: Exception) { 0 }
             }
 
             val allStreams = mutableListOf<Pair<Stream, String>>()
@@ -273,26 +271,21 @@ class Streamed() : MainAPI() {
                 try {
                     val sourceType = source.source
                     val sourceIdForApi = source.id
-
                     if (sourceType != null && sourceIdForApi != null) {
                         val streamResponse =
                             app.get("$mainUrl/api/stream/$sourceType/$sourceIdForApi").text
                         val streams: List<Stream> = mapper.readValue(
                             streamResponse,
-                            object :
-                                com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
+                            object : com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
                         )
-
                         streams.forEach { stream ->
                             allStreams.add(Pair(stream, sourceType))
                         }
                     }
-                } catch (e: Exception) {
-                }
+                } catch (e: Exception) { }
             }
 
             val streamsWithPositiveViewers = allStreams.filter { viewersOf(it.first) > 0 }
-
             val streamsToProcess: List<Pair<Stream, String>> =
                 if (streamsWithPositiveViewers.size >= 2) {
                     streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) }
@@ -303,54 +296,57 @@ class Streamed() : MainAPI() {
 
             val processedStreams = mutableSetOf<String>()
 
-            streamsToProcess.forEach { (stream, sourceType) ->
-                try {
+            coroutineScope {
+                val jobs = streamsToProcess.mapNotNull { (stream, _) ->
                     val embedUrl = stream.embedUrl.toString()
-                    if (embedUrl.isNotEmpty() && !processedStreams.contains(embedUrl)) {
-                        processedStreams.add(embedUrl)
-
-                        loadExtractor(
-                            url = embedUrl,
-                            referer = mainUrl,
-                            subtitleCallback = subtitleCallback,
-                            callback = callback
-                        )
-                    }
-                } catch (e: Exception) {
+                    if (embedUrl.isNotEmpty() && processedStreams.add(embedUrl)) {
+                        launch {
+                            try {
+                                loadExtractor(
+                                    url = embedUrl,
+                                    referer = mainUrl,
+                                    subtitleCallback = subtitleCallback,
+                                    callback = callback
+                                )
+                            } catch (e: Exception) { }
+                        }
+                    } else null
                 }
+                jobs.joinAll()
             }
 
             return@withContext true
+
         } catch (e: Exception) {
             return@withContext false
         }
     }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class Matches(
+        @JsonProperty("id") val id: String?,
+        @JsonProperty("title") val title: String?,
+        @JsonProperty("category") val category: String?,
+        @JsonProperty("date") val date: Long?,
+        @JsonProperty("popular") val popular: Boolean?,
+        @JsonProperty("sources") val sources: List<Sources>?,
+        @JsonProperty("poster") val poster: String?
+    )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class Sources(
+        @JsonProperty("id") val id: String?,
+        @JsonProperty("source") val source: String?,
+    )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class Stream(
+        @JsonProperty("id") val id: String?,
+        @JsonProperty("streamNo") val streamNo: Int?,
+        @JsonProperty("language") val language: String?,
+        @JsonProperty("embedUrl") val embedUrl: String?,
+        @JsonProperty("source") val source: String?,
+        @JsonProperty("hd") val hd: Boolean?,
+        @JsonProperty("viewers") val viewers: Int?
+    )
 }
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class Matches(
-    @JsonProperty("id") val id: String?,
-    @JsonProperty("title") val title: String?,
-    @JsonProperty("category") val category: String?,
-    @JsonProperty("date") val date: Long?,
-    @JsonProperty("popular") val popular: Boolean?,
-    @JsonProperty("sources") val sources: List<Sources>?,
-    @JsonProperty("poster") val poster: String?
-)
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class Sources(
-    @JsonProperty("id") val id: String?,
-    @JsonProperty("source") val source: String?,
-)
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class Stream(
-    @JsonProperty("id") val id: String?,
-    @JsonProperty("streamNo") val streamNo: Int?,
-    @JsonProperty("language") val language: String?,
-    @JsonProperty("embedUrl") val embedUrl: String?,
-    @JsonProperty("source") val source: String?,
-    @JsonProperty("hd") val hd: Boolean?,
-    @JsonProperty("viewers") val viewers: Int?
-)
