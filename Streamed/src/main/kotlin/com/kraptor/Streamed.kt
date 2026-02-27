@@ -244,16 +244,29 @@ class Streamed() : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
+
         val sourceId = data.substringAfterLast("/")
+
         val mapper = jacksonObjectMapper().registerKotlinModule()
 
         try {
-            val txt = app.get("$mainUrl/api/matches/all").text
+            val apiUrl = "$mainUrl/api/matches/all"
+
+            val response = app.get(apiUrl)
+            val txt = response.text
+
             val matches: List<Matches> = mapper.readValue(txt)
 
-            val match = matches.find { match ->
-                match.sources?.any { it.id == sourceId } == true || match.id == sourceId
-            } ?: return@withContext false
+            val match = matches.find { m ->
+                val hasSourceId = m.sources?.any { it.id == sourceId } == true
+                val isMatchId = m.id == sourceId
+                hasSourceId || isMatchId
+            }
+
+            if (match == null) {
+                return@withContext false
+            }
+
 
             fun viewersOf(s: Stream): Int {
                 return try {
@@ -267,22 +280,24 @@ class Streamed() : MainAPI() {
 
             val allStreams = mutableListOf<Pair<Stream, String>>()
 
-            match.sources?.forEach { source ->
-                try {
-                    val sourceType = source.source
-                    val sourceIdForApi = source.id
-                    if (sourceType != null && sourceIdForApi != null) {
-                        val streamResponse =
-                            app.get("$mainUrl/api/stream/$sourceType/$sourceIdForApi").text
+            match.sources?.forEachIndexed { index, source ->
+                val sType = source.source
+                val sId = source.id
+                if (sType != null && sId != null) {
+                    try {
+                        val streamApiUrl = "$mainUrl/api/stream/$sType/$sId"
+                        val sResponse = app.get(streamApiUrl).text
                         val streams: List<Stream> = mapper.readValue(
-                            streamResponse,
+                            sResponse,
                             object : com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
                         )
-                        streams.forEach { stream ->
-                            allStreams.add(Pair(stream, sourceType))
+
+                        streams.forEach {
+                            allStreams.add(Pair(it, sType))
                         }
+                    } catch (e: Exception) {
                     }
-                } catch (e: Exception) { }
+                }
             }
 
             val streamsWithPositiveViewers = allStreams.filter { viewersOf(it.first) > 0 }
@@ -296,31 +311,34 @@ class Streamed() : MainAPI() {
 
             val processedStreams = mutableSetOf<String>()
 
-            coroutineScope {
-                val jobs = streamsToProcess.mapNotNull { (stream, _) ->
+            streamsToProcess.forEachIndexed { idx, (stream, sourceType) ->
+                try {
                     val embedUrl = stream.embedUrl.toString()
-                    if (embedUrl.isNotEmpty() && processedStreams.add(embedUrl)) {
-                        launch {
-                            try {
-                                loadExtractor(
-                                    url = embedUrl,
-                                    referer = mainUrl,
-                                    subtitleCallback = subtitleCallback,
-                                    callback = callback
-                                )
-                            } catch (e: Exception) { }
-                        }
-                    } else null
+                    if (embedUrl.isNotEmpty() && !processedStreams.contains(embedUrl)) {
+                        processedStreams.add(embedUrl)
+
+                        loadExtractor(
+                            url = embedUrl,
+                            referer = mainUrl,
+                            subtitleCallback = { sub ->
+                                subtitleCallback.invoke(sub)
+                            },
+                            callback = { link ->
+                                callback.invoke(link)
+                            }
+                        )
+                    }
+                } catch (e: Exception) {
                 }
-                jobs.joinAll()
             }
 
             return@withContext true
-
         } catch (e: Exception) {
             return@withContext false
         }
     }
+
+
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Matches(
