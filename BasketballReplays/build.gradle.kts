@@ -1,5 +1,5 @@
-// ! Bu araç @Kraptor123 tarafından | @kekikanime için yazılmıştır.
-version = 1
+// ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
+version = 2
 
 cloudstream {
     authors     = listOf("ByAyzen")

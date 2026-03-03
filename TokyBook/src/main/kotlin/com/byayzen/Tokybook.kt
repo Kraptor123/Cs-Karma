@@ -109,7 +109,7 @@ class Tokybook : MainAPI() {
         val href = "$mainUrl/post/$slug"
 
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        return newMovieSearchResponse(title, href, TvType.AudioBook) {
             this.posterUrl = poster
         }
     }

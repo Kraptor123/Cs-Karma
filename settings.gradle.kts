@@ -5,9 +5,20 @@ rootProject.name = "CloudstreamPlugins"
 
 val disabled = listOf("__Temel", "ExampleProvider")
 
+val buildAll = providers.gradleProperty("buildAll").getOrElse("false").toBoolean()
+
 File(rootDir, ".").eachDir { dir ->
-    if (!disabled.contains(dir.name) && File(dir, "build.gradle.kts").exists()) {
-        include(dir.name)
+    val buildFile = java.io.File(dir, "build.gradle.kts")
+    if (!disabled.contains(dir.name) && buildFile.exists()) {
+
+        val content = buildFile.readText()
+        val hasStatusZero = content.contains(Regex("""status\s*=\s*0"""))
+
+        if (buildAll || !hasStatusZero) {
+            include(dir.name)
+        } else {
+            println("Skipping disabled extension: ${dir.name} (Use -PbuildAll=true to include)")
+        }
     }
 }
 

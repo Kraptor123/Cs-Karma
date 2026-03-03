@@ -18,7 +18,7 @@ class JPFilms : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie)
+    override val supportedTypes = setOf(TvType.AsianDrama)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     override val mainPage = mainPageOf(
@@ -144,7 +144,7 @@ class JPFilms : MainAPI() {
 
 
 
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = poster
             this.plot = description
             this.year = year

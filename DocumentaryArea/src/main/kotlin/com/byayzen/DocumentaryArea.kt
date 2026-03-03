@@ -94,7 +94,7 @@ class DocumentaryArea : MainAPI() {
         }.distinctBy { it.url }
 
         val cookie = res.cookies["PHPSESSID"] ?: ""
-        return newMovieLoadResponse(title, url, TvType.Movie, "$url|$cookie") {
+        return newMovieLoadResponse(title, url, TvType.Documentary, "$url|$cookie") {
             this.posterUrl = fixUrlNull(poster)
             this.plot = doc.selectFirst("div.comments")?.text()?.trim()
             this.year = doc.selectFirst("div.s-author p")?.text()?.let { Regex("\\d{4}").find(it)?.value?.toIntOrNull() }

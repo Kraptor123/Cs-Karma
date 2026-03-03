@@ -97,7 +97,7 @@ class Filmmirasim : MainAPI() {
             }
         }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        return newMovieLoadResponse(title, url, TvType.Documentary, url) {
             this.posterUrl = poster
             this.plot = description
             this.duration = duration

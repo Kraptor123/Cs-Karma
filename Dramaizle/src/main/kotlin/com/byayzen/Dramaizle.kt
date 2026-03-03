@@ -70,7 +70,7 @@ class DramaFlix : MainAPI() {
         return newTvSeriesLoadResponse(
             seri.title.replaceFirstChar { it.titlecase(Locale.ROOT) },
             url,
-            TvType.TvSeries,
+            TvType.AsianDrama,
             veri.episodes.map { bolum ->
                 val data = bolum.toJson()
                 newEpisode(data) {

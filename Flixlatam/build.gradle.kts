@@ -1,5 +1,5 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
-version = 3
+version = 4
 dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
 }

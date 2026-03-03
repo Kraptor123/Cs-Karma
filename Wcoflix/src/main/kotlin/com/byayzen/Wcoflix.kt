@@ -121,7 +121,7 @@ class Wcoflix : MainAPI() {
             newEpisode(epHref) { name = epName; episode = epNumber }
         }
 
-        return newAnimeLoadResponse(title, finalUrl, TvType.TvSeries) {
+        return newAnimeLoadResponse(title, finalUrl, TvType.Anime) {
             this.posterUrl = poster
             this.plot = description
             this.tags = tags

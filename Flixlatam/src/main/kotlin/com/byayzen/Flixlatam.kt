@@ -1,4 +1,4 @@
-// ! Bu araç @ByAyzen tarafından | @kekikanime için yazılmıştır.
+// ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
 
 package com.byayzen
 
@@ -17,12 +17,10 @@ class Flixlatam : MainAPI() {
     override val hasMainPage = true
     override var lang = "mx"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.AsianDrama, TvType.Anime)
-
-    // --- DİNAMİK COOKIE DEPOSU ---
+    override val supportedTypes =
+        setOf(TvType.Movie, TvType.TvSeries, TvType.AsianDrama, TvType.Anime)
     private var dynamicCookies: Map<String, String> = emptyMap()
 
-    // --- HEADER AYARLARI ---
     private val protectionHeaders = mapOf(
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
         "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -48,7 +46,7 @@ class Flixlatam : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get("${request.data}").document
+        val document = app.get(request.data).document
         val home = document.select("article.item").mapNotNull { it.toMainPageResult() }
         return newHomePageResponse(request.name, home)
     }
@@ -91,8 +89,8 @@ class Flixlatam : MainAPI() {
                 }
             }
         }
-        val hasNext = document.selectFirst(".pagination .next, .pagination a.next") != null
-        return newSearchResponseList(results, hasNext = hasNext)
+
+        return newSearchResponseList(results, hasNext = results.isNotEmpty())
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
@@ -103,13 +101,8 @@ class Flixlatam : MainAPI() {
 
         val response = app.get(url, headers = requestHeaders)
 
-        // --- LOG COOKIE ---
-        // Sunucudan gelen cookie'leri yazdırıyoruz
         if (response.cookies.isNotEmpty()) {
             dynamicCookies = response.cookies
-            Log.d("ByAyzen", "🍪 Load Kısmında ALINAN Cookie'ler: ${response.cookies}")
-        } else {
-            Log.d("ByAyzen", "⚠️ Load Kısmında sunucu hiç Cookie göndermedi!")
         }
 
         val document = response.document
@@ -120,20 +113,27 @@ class Flixlatam : MainAPI() {
         }
 
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")
-            ?.replace(Regex("(?i)▷? ?Ver | ?Audio Latino| ?Online| - Series Latinoamerica| - FlixLatam"), "")
+            ?.replace(
+                Regex("(?i)▷? ?Ver | ?Audio Latino| ?Online| - Series Latinoamerica| - FlixLatam"),
+                ""
+            )
             ?.trim() ?: return null
 
         val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description = document.selectFirst("meta[property=og:description]")?.attr("content")
             ?: document.selectFirst("div.wp-content p")?.text()?.trim()
 
-        val year = Regex("""datePublished":"(\d{4})""").find(html)?.groupValues?.get(1)?.toIntOrNull()
+        val year =
+            Regex("""datePublished":"(\d{4})""").find(html)?.groupValues?.get(1)?.toIntOrNull()
         val tags = document.select(".sgeneros a").map { it.text().trim() }
-        val rating = document.selectFirst(".dt_rating_vgs")?.text()?.replace(",", ".")?.toDoubleOrNull()
-        val duration = document.selectFirst(".runtime")?.text()?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
+        val rating =
+            document.selectFirst(".dt_rating_vgs")?.text()?.replace(",", ".")?.toDoubleOrNull()
+        val duration =
+            document.selectFirst(".runtime")?.text()?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
 
         val trailerUrl = document.selectFirst("iframe#iframe-trailer")?.attr("src")
-            ?: Regex("""embed\/(.*?)[\?|\"]""").find(html)?.groupValues?.get(1)?.let { "https://www.youtube.com/embed/$it" }
+            ?: Regex("""embed\/(.*?)[\?|\"]""").find(html)?.groupValues?.get(1)
+                ?.let { "https://www.youtube.com/embed/$it" }
 
         val recommendations =
             document.select(".srelacionados article, #single_relacionados article")
@@ -151,7 +151,12 @@ class Flixlatam : MainAPI() {
                 }
 
         val isAnime = tags.any { it.contains("Anime", ignoreCase = true) }
-        val isAsian = tags.any { it.contains("Doramas", ignoreCase = true) || it.contains("Asiatica", ignoreCase = true) }
+        val isAsian = tags.any {
+            it.contains("Doramas", ignoreCase = true) || it.contains(
+                "Asiatica",
+                ignoreCase = true
+            )
+        }
         val isTvSeries = url.contains("/series/") || document.select("#seasons").isNotEmpty()
 
         val episodesList = if (isTvSeries || isAnime || isAsian) {
@@ -175,45 +180,25 @@ class Flixlatam : MainAPI() {
             emptyList()
         }
 
-        return when {
+        val loadResponse = when {
             isAnime -> newAnimeLoadResponse(title, url, TvType.Anime) {
                 this.episodes = mutableMapOf(DubStatus.None to episodesList)
-                this.posterUrl = poster
-                this.plot = description
-                this.year = year
-                this.tags = tags
-                this.score = rating?.let { Score.from10(it) }
-                this.recommendations = recommendations
-                if (trailerUrl != null) addTrailer(trailerUrl)
             }
-            isAsian -> newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodesList) {
-                this.posterUrl = poster
-                this.plot = description
-                this.year = year
-                this.tags = tags
-                this.score = rating?.let { Score.from10(it) }
-                this.recommendations = recommendations
-                if (trailerUrl != null) addTrailer(trailerUrl)
-            }
-            isTvSeries -> newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodesList) {
-                this.posterUrl = poster
-                this.plot = description
-                this.year = year
-                this.tags = tags
-                this.score = rating?.let { Score.from10(it) }
-                this.recommendations = recommendations
-                if (trailerUrl != null) addTrailer(trailerUrl)
-            }
-            else -> newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = poster
-                this.plot = description
-                this.year = year
-                this.tags = tags
-                this.score = rating?.let { Score.from10(it) }
-                this.duration = duration
-                this.recommendations = recommendations
-                if (trailerUrl != null) addTrailer(trailerUrl)
-            }
+
+            isAsian -> newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodesList)
+            isTvSeries -> newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodesList)
+            else -> newMovieLoadResponse(title, url, TvType.Movie, url)
+        }
+
+        return loadResponse.apply {
+            this.posterUrl = poster
+            this.plot = description
+            this.year = year
+            this.tags = tags
+            this.score = rating?.let { Score.from10(it) }
+            this.recommendations = recommendations
+            if (trailerUrl != null) addTrailer(trailerUrl)
+            if (this is MovieLoadResponse) this.duration = duration
         }
     }
 
@@ -223,117 +208,115 @@ class Flixlatam : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        Log.d("ByAyzen", "LoadLinks: $data")
+
+        val sayfayaniti = app.get(
+            data,
+            headers = protectionHeaders + ("Referer" to mainUrl),
+            cookies = dynamicCookies
+        ).also {
+            if (it.cookies.isNotEmpty()) dynamicCookies = it.cookies
+        }
+
+        val icerikid = postIdBul(sayfayaniti.document, sayfayaniti.text) ?: return false
+        val iceriktipi = if (data.contains(Regex("episodio|/series/|/tv/"))) "tv" else "movie"
+
+        var bulundu = false
+        val islenenadresler = mutableSetOf<String>()
+
+        for (i in 1..6) {
+            val apiadresi = "$mainUrl/wp-json/dooplayer/v2/$icerikid/$iceriktipi/$i"
+            val sunucuyaniti = app.get(
+                apiadresi,
+                headers = protectionHeaders + mapOf(
+                    "Referer" to data,
+                    "X-Requested-With" to "XMLHttpRequest"
+                ),
+                cookies = dynamicCookies
+            ).text
+
+            if (sunucuyaniti.contains("server_error") || sunucuyaniti.trim() == "0") continue
+
+            val embedurl = AppUtils.parseJson<DooPlayerResponse>(sunucuyaniti).embedUrl?.let {
+                if (it.startsWith("//")) "https:$it" else it
+            } ?: continue
+
+            if (islenenadresler.add(embedurl)) {
+                Log.d("ByAyzen", "Server $i: $embedurl")
+                if (embedurl.contains(Regex("embed69|dintezuvio"))) {
+                    resolveEmbed69(embedurl, data, subtitleCallback, callback)
+                    bulundu = true
+                } else {
+                    if (loadExtractor(embedurl, data, subtitleCallback, callback)) bulundu = true
+                }
+            }
+            if (!bulundu && i >= 3) break
+        }
+        return bulundu
+    }
+
+    private fun postIdBul(dokuman: Document, htmlicerik: String): String? {
+        return dokuman.selectFirst("link[rel*='shortlink']")?.attr("href")
+            ?.let { Regex("""[?&]p=(\d+)""").find(it)?.groupValues?.get(1) }
+            ?: Regex(""""postId":\s*"(\d+)"""").find(htmlicerik)?.groupValues?.get(1)
+            ?: dokuman.selectFirst("input[name=postid]")?.attr("value")
+            ?: Regex("""postid-(\d+)""").find(dokuman.body().className())?.groupValues?.get(1)
+    }
+
+    private suspend fun resolveEmbed69(
+        url: String,
+        referer: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
         try {
-            Log.d("ByAyzen", "LoadLinks: $data")
-            // İsteği at ve cookie gelirse anında güncelle
-            val res = app.get(data, headers = protectionHeaders + ("Referer" to mainUrl), cookies = dynamicCookies).also {
-                if (it.cookies.isNotEmpty()) dynamicCookies = it.cookies
+            val yanit = app.get(url, headers = mapOf("Referer" to referer))
+
+            if (yanit.url != url && !yanit.url.contains(Regex("embed69|dintezuvio"))) {
+                loadExtractor(yanit.url, referer, subtitleCallback, callback)
+                return
             }
 
-            if (res.text.contains("Bot Verification") || res.text.contains("hcaptcha")) {
-                Log.e("ByAyzen", "⛔ Bot Koruması!")
-                return false
+            val veriblogu = Regex("""let\s+dataLink\s*=\s*(\[\{.*?\}\]);""").find(yanit.text)?.groupValues?.get(1) ?: return
+            val diller = AppUtils.parseJson<List<Embed69Language>>(veriblogu)
+
+            val sifrelilinkler = diller.flatMap { dil ->
+                dil.sortedEmbeds?.mapNotNull { it.link ?: it.download } ?: emptyList()
+            }.distinct()
+
+            if (sifrelilinkler.isNotEmpty()) {
+                val cozmeyaniti = app.post(
+                    "https://embed69.org/api/decrypt",
+                    headers = mapOf(
+                        "X-Requested-With" to "XMLHttpRequest",
+                        "Referer" to url,
+                        "Origin" to "https://embed69.org"
+                    ),
+                    json = mapOf("links" to sifrelilinkler)
+                )
+
+                if (cozmeyaniti.code == 200) {
+                    AppUtils.parseJson<Embed69ApiResponse>(cozmeyaniti.text).links?.forEach { oge ->
+                        oge.link?.let { hamlink ->
+                            val temizlink = hamlink.replace("`", "").trim()
+                            val yonlendirilmislink = temizlink
+                                .replace("dintezuvio.com", "vidhide.com")
+                                .replace("hglink.to", "streamwish.to")
+
+                            Log.d("ByAyzen", "Extractor: $yonlendirilmislink")
+                            loadExtractor(yonlendirilmislink, url, subtitleCallback, callback)
+                        }
+                    }
+                }
             }
-
-            // ID'yi bulamazsa loglayıp çık
-            val id = findPostId(res.document, res.text) ?: return false.also { Log.e("ByAyzen", "⛔ ID Bulunamadı") }
-            Log.d("ByAyzen", "🎯 ID: $id")
-
-            val type = if (data.contains("episodio") || data.contains("/series/") || data.contains("/tv/")) "tv" else "movie"
-            var found = false
-
-            // Sunucuları tara (1..6)
-            for (i in 1..6) {
-                if (processDooplayLink(id, type, "$i", data, subtitleCallback, callback)) found = true
-                // İlk 3 denemede sonuç yoksa döngüyü kes (Boşuna deneme)
-                if (!found && i >= 3) break
-            }
-            return found
         } catch (e: Exception) {
-            Log.e("ByAyzen", "Err: ${e.message}")
-            return false
+            Log.d("ByAyzen", "Resolve Error: ${e.message}")
         }
     }
 
-    // Tek satırlık zincirleme kontrol (Elvis Operatörü)
-    private fun findPostId(doc: Document, html: String) =
-        doc.selectFirst("link[rel*='shortlink']")?.attr("href")?.let { Regex("""[?&]p=(\d+)""").find(it)?.groupValues?.get(1) }
-            ?: Regex(""""postId":\s*"(\d+)"""").find(html)?.groupValues?.get(1)
-            ?: doc.selectFirst("input[name=postid]")?.attr("value")
-            ?: Regex("""postid-(\d+)""").find(doc.body().className())?.groupValues?.get(1)
-            ?: doc.selectFirst("[data-post]")?.attr("data-post")
-
-    private suspend fun processDooplayLink(id: String, type: String, num: String, ref: String, sub: (SubtitleFile) -> Unit, cb: (ExtractorLink) -> Unit): Boolean {
-        return try {
-            val url = "$mainUrl/wp-json/dooplayer/v2/$id/$type/$num"
-            val headers = protectionHeaders + mapOf("Referer" to ref, "X-Requested-With" to "XMLHttpRequest", "Content-Type" to "application/json")
-
-            val json = app.get(url, headers = headers, cookies = dynamicCookies).text
-            if (json.contains("server_error") || json.trim() == "0") return false
-
-            val embedUrl = AppUtils.parseJson<DooPlayerResponse>(json).embedUrl?.let { if (it.startsWith("//")) "https:$it" else it } ?: return false
-            Log.d("ByAyzen", "✅ Server $num: $embedUrl")
-            resolveEmbed69(embedUrl, ref, sub, cb)
-            true
-        } catch (e: Exception) { false }
-    }
-
-    private suspend fun resolveEmbed69(url: String, ref: String, sub: (SubtitleFile) -> Unit, cb: (ExtractorLink) -> Unit) {
-        try {
-            val ua = protectionHeaders["User-Agent"]!!
-            val res = app.get(url, headers = mapOf("User-Agent" to ua, "Referer" to ref))
-
-            if (res.url != url && !res.url.contains("embed69") && !res.url.contains("dintezuvio")) {
-                loadExtractor(res.url, ref, sub, cb); return
-            }
-            val json = Regex("""let\s+dataLink\s*=\s*(\[\{.*?\}\]);""").find(res.text)?.groupValues?.get(1)
-            if (json != null) {
-                val links = AppUtils.parseJson<List<Embed69File>>(json)
-                    .flatMap { it.sortedEmbeds ?: emptyList() }
-                    .mapNotNull { it.link ?: it.download }
-
-                if (links.isNotEmpty()) {
-                    val decrypted = app.post("https://embed69.org/api/decrypt",
-                        headers = mapOf("User-Agent" to ua, "Content-Type" to "application/json", "X-Requested-With" to "XMLHttpRequest", "Referer" to res.url, "Origin" to "https://embed69.org"),
-                        json = mapOf("links" to links)
-                    ).text
-                    AppUtils.parseJson<Embed69ApiResponse>(decrypted).links?.forEach { it.link?.let { l -> loadExtractor(l, res.url, sub, cb) } }
-                }
-            } else {
-                // Iframe Kontrolü
-                res.document.selectFirst("iframe")?.attr("src")?.let {
-                    val fixed = if (it.startsWith("//")) "https:$it" else it
-                    if (fixed.contains("embed69") || fixed.contains("dintezuvio")) {
-                        if (fixed != url) resolveEmbed69(fixed, res.url, sub, cb)
-                    } else loadExtractor(fixed, res.url, sub, cb)
-                }
-            }
-        } catch (e: Exception) { Log.e("ByAyzen", "Embed Err: ${e.message}") }
-    }
-
-    data class Embed69File(
-        @JsonProperty("video_language") val videoLanguage: String?,
-        @JsonProperty("sortedEmbeds") val sortedEmbeds: List<Embed69Server>?
-    )
-
-    data class Embed69Server(
-        @JsonProperty("servername") val servername: String?,
-        @JsonProperty("link") val link: String?,
-        @JsonProperty("download") val download: String?
-    )
-
-    data class Embed69ApiResponse(
-        @JsonProperty("success") val success: Boolean?,
-        @JsonProperty("links") val links: List<Embed69LinkItem>?
-    )
-
-    data class Embed69LinkItem(
-        @JsonProperty("link") val link: String?,
-        @JsonProperty("index") val index: Int?
-    )
-
-    data class DooPlayerResponse(
-        @JsonProperty("embed_url") val embedUrl: String?,
-        @JsonProperty("type") val type: String?
-    )
+    data class Embed69Language(val video_language: String?, val sortedEmbeds: List<Embed69Link>?)
+    data class Embed69Link(val link: String?, val download: String?)
+    data class DecryptedLink(val link: String?)
+    data class Embed69ApiResponse(val links: List<DecryptedLink>?)
+    data class DooPlayerResponse(@JsonProperty("embed_url") val embedUrl: String?)
 }
