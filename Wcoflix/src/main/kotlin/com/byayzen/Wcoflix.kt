@@ -112,22 +112,50 @@ class Wcoflix : MainAPI() {
         val description = document.selectFirst("div#sidebar_cat p")?.text()?.trim()
         val tags = document.select("div#sidebar_cat a.genre-buton").map { it.text() }
 
-        val episodeList = document.select("div#episodeList a.dark-episode-item, div#sidebar_right3 div.cat-eps a").mapNotNull { ep ->
-            val epHref = fixUrlNull(ep.attr("href")) ?: return@mapNotNull null
+        val bolumler = document.select("div#episodeList a.dark-episode-item, div#sidebar_right3 div.cat-eps a")
+        val alt = mutableListOf<Episode>()
+        val dub = mutableListOf<Episode>()
 
-            val epName = ep.selectFirst("span")?.text() ?: ep.text()
+        bolumler.forEach { el ->
+            val lnk = fixUrlNull(el.attr("href")) ?: return@forEach
+            val ad = el.selectFirst("span")?.text() ?: el.text()
 
-            val epNumber = Regex("Episode (\\d+)").find(epName)?.groupValues?.get(1)?.toIntOrNull()
-            newEpisode(epHref) { name = epName; episode = epNumber }
+            val sznHam = el.attr("data-season")
+            val sznNo = if (sznHam.isEmpty()) {
+                Regex("Season (\\d+)").find(ad)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            } else {
+                Regex("s(\\d+)").find(sznHam)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            }
+
+            val blmNo = Regex("Episode (\\d+)").find(ad)?.groupValues?.get(1)?.toIntOrNull()
+            val dil = el.attr("data-lang").ifEmpty { ad }.lowercase()
+
+            val ep = newEpisode(lnk) {
+                this.name = ad
+                this.episode = blmNo
+                this.season = sznNo
+            }
+
+            if (dil.contains("dub")) {
+                dub.add(ep)
+            } else {
+                alt.add(ep)
+            }
         }
+
+        alt.reverse()
+        dub.reverse()
 
         return newAnimeLoadResponse(title, finalUrl, TvType.Anime) {
             this.posterUrl = poster
             this.plot = description
             this.tags = tags
-            this.episodes = mutableMapOf(DubStatus.Subbed to episodeList)
+            this.episodes = mutableMapOf(
+                DubStatus.Subbed to alt,
+                DubStatus.Dubbed to dub
+            )
         }
-    }
+        }
 
     override suspend fun loadLinks(
         data: String,
