@@ -1,4 +1,4 @@
-// ! Bu araç @ByAyzen tarafından | @kekikanime için yazılmıştır.
+// ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
 version = 8
 
 cloudstream {

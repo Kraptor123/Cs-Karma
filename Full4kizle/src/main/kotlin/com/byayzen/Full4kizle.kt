@@ -53,7 +53,6 @@ class Full4kizle : MainAPI() {
 
     private fun Element.toMainPageResult(): SearchResponse? {
         val titleElement = this.selectFirst(".movie-title a") ?: return null
-        // "izle" kelimesini temizliyoruz
         val title = titleElement.text().replace("(?i) izle".toRegex(), "").trim()
         val href = fixUrl(titleElement.attr("href"))
         val posterUrl = this.selectFirst(".movie-poster img")?.attr("src")

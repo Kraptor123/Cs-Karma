@@ -12,7 +12,7 @@ class F1FullracesPlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(F1Fullraces())
         registerExtractorAPI(Gofile())
-        registerExtractorAPI(MixDrop())
+        registerExtractorAPI(com.byayzen.MixDrop())
         registerExtractorAPI(MixDropBz())
         registerExtractorAPI(MixDropAg())
         registerExtractorAPI(MixDropCh())

@@ -2,14 +2,11 @@
 
 package com.byayzen
 
-import android.util.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-
-const val TAG = "GoodShortAPI"
 
 class GoodShort : MainAPI() {
     override var mainUrl = "https://www.goodshort.com"
@@ -26,7 +23,6 @@ class GoodShort : MainAPI() {
         "${mainUrl}/dramas/fantasy-playlets-299" to "Male Fantasy"
     )
 
-    // --- Basitleştirilmiş Helper Fonksiyonlar ---
     private fun getBody(bookId: String, pageNo: Int = 0, pageSize: Int = 0): okhttp3.RequestBody {
         val json = JSONObject().apply {
             put("bookId", bookId)
@@ -47,7 +43,6 @@ class GoodShort : MainAPI() {
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
         "Cookie" to "currentLanguage=en"
     )
-    // --- Helper Fonksiyonlar Bitiş ---
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page == 1) request.data else "${request.data}?page=$page"
@@ -59,7 +54,6 @@ class GoodShort : MainAPI() {
             val marker = "window.__INITIAL_STATE__="
             val jsonStart = jsonData.indexOf(marker) + marker.length
             val jsonEnd = jsonData.indexOf(";(function()", jsonStart)
-
             val rawJson = jsonData.substring(jsonStart, jsonEnd).replace("\\u002F", "/")
             val json = JSONObject(rawJson)
             val bookList = json.getJSONObject("Browse").getJSONArray("bookList")
@@ -67,12 +61,9 @@ class GoodShort : MainAPI() {
             val items = (0 until bookList.length()).mapNotNull { i ->
                 runCatching {
                     val book = bookList.getJSONObject(i)
-                    val title = book.getString("bookName")
-                    val resourceUrl = book.getString("bookResourceUrl")
                     var cover = book.getString("cover")
                     if (!cover.contains("?")) cover = "$cover?w=293&h=410"
-
-                    newTvSeriesSearchResponse(title, "$mainUrl/drama/$resourceUrl", TvType.TvSeries) {
+                    newTvSeriesSearchResponse(book.getString("bookName"), "$mainUrl/drama/${book.getString("bookResourceUrl")}", TvType.TvSeries) {
                         this.posterUrl = cover
                     }
                 }.getOrNull()
@@ -86,28 +77,19 @@ class GoodShort : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        Log.d(TAG, "Başlangıç: load($url)")
         return try {
             val bookId = url.substringAfterLast("-").filter { it.isDigit() }
-            if (bookId.isEmpty()) {
-                Log.d(TAG, "HATA: bookId boş.")
-                return null
-            }
+            if (bookId.isEmpty()) return null
             val headers = getCommonHeaders(url)
 
-            // 1. Kısım: Metadata ve Öneriler (/book/detail)
             val detailApiUrl = "https://www.goodshort.com/hwycreels/book/detail"
             val detailReqBody = getBody(bookId)
             val jsonDetail = app.post(detailApiUrl, headers = headers, requestBody = detailReqBody).text.let(::JSONObject)
 
-            if (!jsonDetail.optBoolean("success", false)) {
-                Log.e(TAG, "Kitap detayı çekilemedi.")
-                return null
-            }
+            if (!jsonDetail.optBoolean("success", false)) return null
 
             val data = jsonDetail.getJSONObject("data")
             val book = data.getJSONObject("book")
-
             val title = book.getString("bookName")
             var poster = book.optString("cover", "")
             if (poster.isNotEmpty() && !poster.contains("?")) poster = "$poster?w=293&h=410"
@@ -123,16 +105,11 @@ class GoodShort : MainAPI() {
                 (0 until recs.length()).mapNotNull { i ->
                     runCatching {
                         val rec = recs.getJSONObject(i)
-                        newTvSeriesSearchResponse(
-                            rec.optString("bookName"),
-                            "$mainUrl/drama/${rec.optString("bookResourceUrl")}",
-                            TvType.TvSeries
-                        ) { this.posterUrl = rec.optString("cover") }
+                        newTvSeriesSearchResponse(rec.optString("bookName"), "$mainUrl/drama/${rec.optString("bookResourceUrl")}", TvType.TvSeries) { this.posterUrl = rec.optString("cover") }
                     }.getOrNull()
                 }
             } ?: emptyList()
 
-            // 2. Kısım: Tüm Bölümleri Sayfalama ile çekme (/chapter/page)
             val chapterPageUrl = "https://www.goodshort.com/hwycreels/chapter/page"
             val episodes = mutableListOf<Episode>()
             var pageNo = 1
@@ -148,32 +125,24 @@ class GoodShort : MainAPI() {
                     val pageData = jsonPage.getJSONObject("data")
                     totalPages = pageData.optInt("pages", 1)
                     val records = pageData.getJSONArray("records")
-
                     for (i in 0 until records.length()) {
                         runCatching {
                             val record = records.getJSONObject(i)
                             val name = record.optString("chapterName")
                             val index = record.optInt("index") + 1
-                            val img = record.optString("image")
                             val m3u8Link = record.optString("m3u8Path")
-
                             val linkData = if (m3u8Link.isNotEmpty()) m3u8Link else "locked_chapter_no_link"
 
                             episodes.add(newEpisode(linkData) {
                                 this.name = "Chapter $name" + if (linkData.startsWith("locked")) " (Locked)" else ""
                                 this.episode = index
-                                this.posterUrl = img
+                                this.posterUrl = record.optString("image")
                             })
-                        }.onFailure { Log.e(TAG, "Bölüm kaydı işlenirken hata: ${it.message}") }
+                        }
                     }
-                } else {
-                    Log.e(TAG, "Bölüm sayfası $pageNo başarısız.")
-                    break
-                }
+                } else break
                 pageNo++
             }
-
-            Log.d(TAG, "İşlem Başarılı. Toplam ${episodes.size} bölüm listelendi.")
 
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
@@ -182,11 +151,7 @@ class GoodShort : MainAPI() {
                 this.recommendations = recommendations
                 this.year = year
             }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "KRİTİK HATA: load fonksiyonu tamamen başarısız oldu: ${e.message}", e)
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
     override suspend fun loadLinks(

@@ -6,12 +6,16 @@ import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 
 class F1Fullraces : MainAPI() {
     override var mainUrl = "https://f1fullraces.com"
     override var name = "F1Fullraces"
     override val hasMainPage = true
-    override var lang = "tr"
+    override var lang = "en"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Live)
 
@@ -79,45 +83,47 @@ class F1Fullraces : MainAPI() {
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        Log.d("F1Races", "İstenen sayfa: $data")
+    ): Boolean = coroutineScope {
         val document = app.get(data).document
-
+        val jobs = mutableListOf<Job>()
         val luluvidMainUrl = "https://luluvid.com"
 
-        val firstIframe = document.selectFirst("div#netu > iframe[src*='luluvid.com']")
-        firstIframe?.let {
-            val src = it.attr("src")
-            val name = "Pre-Race Build Up"
-            processLuluvidLink(src, name, data, luluvidMainUrl, callback)
+        document.selectFirst("div#netu > iframe[src*='luluvid.com']")?.let {
+            jobs += launch {
+                processLuluvidLink(it.attr("src"), "Pre-Race Build Up", data, luluvidMainUrl, callback)
+            }
         }
 
         document.select("div#netu p:has(iframe[src*='luluvid.com'])").forEach { pElement ->
             val name = pElement.ownText().trim()
             val src = pElement.selectFirst("iframe")?.attr("src")
             if (!src.isNullOrBlank()) {
-                processLuluvidLink(src, name, data, luluvidMainUrl, callback)
+                jobs += launch {
+                    processLuluvidLink(src, name, data, luluvidMainUrl, callback)
+                }
             }
         }
 
         document.select("div#mixdrop div[id^=07b022]").forEach { div ->
-            val encodedId = div.attr("id")
-            val decodedId = mixdropIdCoz(encodedId)
+            val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
             if (decodedId.isNotBlank()) {
-                val mixdropUrl = "https://mixdrop.co/f/$decodedId"
-                loadExtractor(mixdropUrl, data, subtitleCallback, callback)
+                jobs += launch {
+                    loadExtractor("https://mixdrop.co/f/$decodedId", data, subtitleCallback, callback)
+                }
             }
         }
 
-        document.select("div#drive a[href]").forEach { linkElement ->
-            val href = linkElement.attr("href")
+        document.select("div#drive a[href], div#gofile a[href]").forEach { link ->
+            val href = link.attr("href")
             if (href.isNotBlank()) {
-                Log.d("F1Races", "Bulunan Gofile Linki: $href")
-                loadExtractor(href, data, subtitleCallback, callback)
+                jobs += launch {
+                    loadExtractor(href, data, subtitleCallback, callback)
+                }
             }
         }
 
-        return true
+        jobs.joinAll()
+        true
     }
 
     private suspend fun processLuluvidLink(

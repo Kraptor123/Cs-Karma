@@ -63,33 +63,20 @@ open class HotStreamExtractor : ExtractorApi() {
 }
 
 private fun decryptAES(ct: String, password: String, ivHex: String, saltHex: String): String {
-    // EVP_BytesToKey implementasyonu
     val salt = hexToBytes(saltHex)
     val passwordBytes = password.toByteArray(Charsets.UTF_8)
-
-    // D_1 = MD5(password + salt)
     val md5_1 = MessageDigest.getInstance("MD5")
     md5_1.update(passwordBytes)
     md5_1.update(salt)
     val d1 = md5_1.digest()
-
-    // D_2 = MD5(D_1 + password + salt)
     val md5_2 = MessageDigest.getInstance("MD5")
     md5_2.update(d1)
     md5_2.update(passwordBytes)
     md5_2.update(salt)
     val d2 = md5_2.digest()
-
-    // Key = D_1 + D_2 (32 bytes = 256 bit)
     val key = d1 + d2
-
-    // IV hex'ten byte array'e
     val iv = hexToBytes(ivHex)
-
-    // Ciphertext Base64'ten decode et
     val ciphertext = base64DecodeArray(ct)
-
-    // AES-256-CBC ile decrypt
     val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
     val keySpec = SecretKeySpec(key, "AES")
     val ivSpec = IvParameterSpec(iv)

@@ -40,7 +40,6 @@ class FootballiaPlugin : Plugin() {
         private const val CLUBS_ORDER_KEY = "${PREFS_PREFIX}CLUBS_order"
         private const val PRIMARY_COLOR = "#8842f3"
 
-        // Kulüp & Lig listeleri (isim -> slug)
         private val clubCategories = listOf(
             "Galatasaray" to "teams/galatasaray-sk",
             "Fenerbahçe" to "teams/fenerbahce-sk",
@@ -106,7 +105,6 @@ class FootballiaPlugin : Plugin() {
             "Süper Lig", "Şampiyonlar Ligi", "Dünya Kupası"
         )
 
-        // Pref yardımcıları
         fun isCategoryEnabled(categoryName: String): Boolean {
             return getKey("${PREFS_PREFIX}${categoryName}_enabled")
                 ?: defaultEnabledNames.contains(categoryName)
@@ -147,7 +145,6 @@ class FootballiaPlugin : Plugin() {
             }
         }
 
-        // Settings dialog ve controller
         private object SettingsManager {
             private enum class Tab(val key: String, val title: String) {
                 COUNTRIES("COUNTRIES", "Ülke ve Ligler"),
@@ -155,7 +152,6 @@ class FootballiaPlugin : Plugin() {
             }
 
             fun showSettingsDialog(activity: AppCompatActivity) {
-                // Controller'ı oluşturup dialogView'i ondan alıyoruz — böylece controller referansını setupDialogButtons'a geçiririz.
                 val controller = DialogController(activity)
                 val dialogView = controller.rootView
                 val dialog = createDialog(activity, dialogView)
@@ -176,7 +172,6 @@ class FootballiaPlugin : Plugin() {
             private fun setupDialogButtons(dialog: AlertDialog, activity: AppCompatActivity, controller: DialogController) {
                 val buttonColor = Color.parseColor(PRIMARY_COLOR)
 
-                // dialog.show() zaten çağrıldıktan sonra burası çağrılır
                 val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 positive.id = android.R.id.button1
                 positive.setTextColor(buttonColor)
@@ -184,16 +179,14 @@ class FootballiaPlugin : Plugin() {
                 val negative = dialog.getButton(AlertDialog.BUTTON_NEGATIVE)
                 negative.setTextColor(Color.GRAY)
 
-                // RecyclerView'e doğrudan referans üzerinden nextFocusUpId ata (defensive try/catch)
                 try {
                     val rv = controller.recyclerView
                     positive.nextFocusUpId = rv.id
                     negative.nextFocusUpId = rv.id
                 } catch (_: Exception) {
-                    // recycler henüz init edilmemiş olabilir; ama adapter later post ile focuslayacak
+
                 }
 
-                // DPAD_UP için defansif handler — buton üstteyken yukarı okla listeye düşsün
                 fun safeMoveFocusToList(buttonView: View): Boolean {
                     val rv = try { controller.recyclerView } catch (_: Exception) { null } ?: return false
                     val adapter = rv.adapter as? CategoryAdapter ?: return false
@@ -227,7 +220,6 @@ class FootballiaPlugin : Plugin() {
                     } else false
                 }
 
-                // Geri tuşu ile kapatma
                 dialog.setOnKeyListener { dialogInterface, keyCode, event ->
                     if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
                         dialogInterface.dismiss()
@@ -237,7 +229,6 @@ class FootballiaPlugin : Plugin() {
                     }
                 }
 
-                // positive'un click'i - restart confirmation
                 positive.setOnClickListener {
                     AlertDialog.Builder(activity)
                         .setTitle("Emin misiniz?")
@@ -252,7 +243,6 @@ class FootballiaPlugin : Plugin() {
                 }
             }
 
-            // DialogController: dialog görünümü, tab ve recycler yönetimi
             private class DialogController(private val activity: AppCompatActivity) {
                 private var currentTab = Tab.COUNTRIES
                 private val buttonColor = Color.parseColor(PRIMARY_COLOR)
@@ -260,7 +250,6 @@ class FootballiaPlugin : Plugin() {
                 private lateinit var countriesTabButton: Button
                 private lateinit var clubsTabButton: Button
 
-                // recyclerView ve adapter burada erişilebilir olmalı (setupDialogButtons tarafından kullanılıyor)
                 lateinit var recyclerView: RecyclerView
                 lateinit var adapter: CategoryAdapter
 
@@ -319,11 +308,9 @@ class FootballiaPlugin : Plugin() {
                         isFocusable = true
                         isFocusableInTouchMode = true
 
-                        // Tamamen temiz bir görünüm için
                         background = null
-                        stateListAnimator = null // Android L+ için efektleri kaldır
+                        stateListAnimator = null
 
-                        // Metin rengi için özel durum listesi
                         setTextColor(createTabTextColorStateList(isActive))
                     }
                 }
@@ -331,30 +318,23 @@ class FootballiaPlugin : Plugin() {
                 private fun createTabTextColorStateList(isActive: Boolean): ColorStateList {
                     return ColorStateList(
                         arrayOf(
-                            // Aktif durum
                             intArrayOf(android.R.attr.state_activated),
-                            // Odaklanma durumu
                             intArrayOf(android.R.attr.state_focused),
-                            // Basılı durumu
                             intArrayOf(android.R.attr.state_pressed),
-                            // Varsayılan durum
                             intArrayOf()
                         ),
                         intArrayOf(
-                            if (isActive) Color.WHITE else buttonColor, // Aktif renk
-                            Color.parseColor("#00D9FF"), // Odaklanma rengi
-                            Color.parseColor("#00D9FF"), // Basılı rengi
-                            if (isActive) Color.WHITE else buttonColor // Varsayılan renk
+                            if (isActive) Color.WHITE else buttonColor,
+                            Color.parseColor("#00D9FF"),
+                            Color.parseColor("#00D9FF"),
+                            if (isActive) Color.WHITE else buttonColor
                         )
                     )
                 }
 
                 private fun Button.updateTabButtonStyle(isActive: Boolean) {
-                    // Arka planı tamamen temizle
                     background = null
-                    // Metin rengini güncelle
                     setTextColor(createTabTextColorStateList(isActive))
-                    // Aktivite durumunu ayarla
                     isActivated = isActive
                 }
 
@@ -365,7 +345,6 @@ class FootballiaPlugin : Plugin() {
                         }
                     )
 
-                    // create RecyclerView and assign id
                     val rv = RecyclerView(activity).apply {
                         id = recyclerId
                         layoutManager = LinearLayoutManager(activity)
@@ -387,7 +366,6 @@ class FootballiaPlugin : Plugin() {
                     countriesTabButton.updateTabButtonStyle(tab == Tab.COUNTRIES)
                     clubsTabButton.updateTabButtonStyle(tab == Tab.CLUBS)
 
-                    // Görünümü manuel olarak yenile
                     countriesTabButton.refreshDrawableState()
                     clubsTabButton.refreshDrawableState()
 
@@ -422,12 +400,10 @@ class FootballiaPlugin : Plugin() {
             }
         }
 
-        // CategoryAdapter: selected/unselected mantığı + fokus kontrolü + move logic
         private class CategoryAdapter(
             private val onCheckedChange: (String, Boolean) -> Unit
         ) : RecyclerView.Adapter<CategoryAdapter.ViewHolder>() {
 
-            // items: [ selected..., unselected... ] — unselected her zaman alfabetik
             private val items = mutableListOf<String>()
             private var orderKey: String = ""
             private var recyclerViewRef: RecyclerView? = null
@@ -435,12 +411,9 @@ class FootballiaPlugin : Plugin() {
             fun setRecyclerView(rv: RecyclerView) { recyclerViewRef = rv }
             fun setOrderKey(key: String) { orderKey = key }
 
-            // public helper: kaç tane seçili öğe var
             fun getSelectedCount(): Int = items.count { isCategoryEnabled(it) }
 
-            // listeyi yükler: selected kısmı caller tarafından verilen sırayı koruyorsa kullanılır
             fun setList(newList: List<String>) {
-                // selected'ları koru, unselected'ları alfabetik sırala
                 val selected = newList.filter { isCategoryEnabled(it) }.toMutableList()
                 val unselected = newList.filter { !isCategoryEnabled(it) }.sortedBy { it.lowercase() }.toMutableList()
                 items.clear()
@@ -448,7 +421,6 @@ class FootballiaPlugin : Plugin() {
                 items.addAll(unselected)
                 notifyDataSetChanged()
 
-                // ilk yüklemede ilk öğeye focus vermeyi dene
                 recyclerViewRef?.post {
                     val rv = recyclerViewRef ?: return@post
                     if (items.isNotEmpty()) {
@@ -475,7 +447,6 @@ class FootballiaPlugin : Plugin() {
             override fun onBindViewHolder(holder: ViewHolder, position: Int) {
                 val name = items[position]
 
-                // defensive UI reset
                 holder.checkBox.text = name
                 holder.checkBox.isChecked = isCategoryEnabled(name)
                 holder.container.setBackgroundColor(Color.TRANSPARENT)
@@ -489,7 +460,6 @@ class FootballiaPlugin : Plugin() {
                 val selectedCount = getSelectedCount()
                 val isInSelected = position < selectedCount
 
-                // container click (mouse)
                 holder.container.isClickable = true
                 holder.container.setOnClickListener {
                     val pos = holder.bindingAdapterPosition
@@ -525,7 +495,6 @@ class FootballiaPlugin : Plugin() {
                     } else false
                 }
 
-                // --- NAV BUTTONS: enable logic (keeps previous logic) ---
                 val canMoveUp: Boolean
                 val canMoveDown: Boolean
 
@@ -542,7 +511,6 @@ class FootballiaPlugin : Plugin() {
                     }
                 }
 
-                // UP button: single click => one up, long => to top
                 holder.upButton.apply {
                     isEnabled = canMoveUp
                     alpha = if (canMoveUp) 1f else 0.3f
@@ -561,7 +529,6 @@ class FootballiaPlugin : Plugin() {
                     }
                 }
 
-                // DOWN button: single click => one down, long => to bottom
                 holder.downButton.apply {
                     isEnabled = canMoveDown
                     alpha = if (canMoveDown) 1f else 0.3f
@@ -571,10 +538,8 @@ class FootballiaPlugin : Plugin() {
                     setOnClickListener {
                         val cur = holder.bindingAdapterPosition
                         if (cur != RecyclerView.NO_POSITION) {
-                            // single-step down (swap with next selected item)
                             val target = cur + 1
                             val lastIndexInSelected = getSelectedCount() - 1
-                            // only move one step if there's room inside selected group
                             if (cur < lastIndexInSelected) moveItem(cur, target.coerceAtMost(lastIndexInSelected), R.id.btn_down)
                         }
                     }
@@ -587,37 +552,20 @@ class FootballiaPlugin : Plugin() {
                 }
             }
 
-
-            /**
-             * Toggle (enable/disable) merkezi
-             * - fromPos: kullanıcının fiziksel olarak bulunduğu satır indeksi (bindingAdapterPosition)
-             * - newState: true => enabled (selected group'e katılacak), false => disabled
-             *
-             * Davranış:
-             * - Enabled: seçili grubun sonuna ekle (çünkü kullanıcı seçti)
-             * - Disabled: unselected grubuna alfabetik sıraya göre ekle
-             * - taşıma sonrası kullanıcı aynı fiziksel satırda kalacak (yani yerine gelen öğe focus alacak)
-             */
             private fun handleToggle(categoryName: String, newState: Boolean, fromPos: Int) {
                 if (fromPos == RecyclerView.NO_POSITION) return
 
-                // selected sayısını toggle öncesi hesapla (exclude toggled item)
                 val selectedBefore = items.count { it != categoryName && isCategoryEnabled(it) }
 
-                // hedef indeks (combined list indices) toggle öncesi olarak hesaplanır
                 if (newState) {
-                    // enabling → hedef selected grubun sonu (index = selectedBefore)
                     val toBefore = selectedBefore
 
-                    // persist
                     setCategoryEnabled(categoryName, true)
                     onCheckedChange(categoryName, true)
 
-                    // bul current index
                     val currentIndex = items.indexOf(categoryName)
                     if (currentIndex == -1) return
 
-                    // hesaplanan hedefin güncellenmesi (removal shifts indices)
                     var adjustedTo = toBefore
                     if (currentIndex < toBefore) adjustedTo = toBefore - 1
                     adjustedTo = adjustedTo.coerceIn(0, items.size - 1)
@@ -633,28 +581,23 @@ class FootballiaPlugin : Plugin() {
                         setOrderedCategories(orderKey, items)
                     }
 
-                    // Ekstra notify: selected group'un tümünü güncelle (canMove değişimleri için)
                     notifyItemRangeChanged(0, getSelectedCount())
 
-                    // focus: kullanıcı fiziksel olarak bulunduğu satırda kalmalı -> focus same index
                     val focusTarget = fromPos.coerceIn(0, items.size - 1)
                     ensureFocusOnPositionAndClearPressed(focusTarget)
                     setOrderedCategories(orderKey, items)
                     return
                 } else {
-                    // disabling -> unselected alfabetik içine yerleştir
-                    val selectedCountNow = items.count { isCategoryEnabled(it) } // includes categoryName if currently selected
+                    val selectedCountNow = items.count { isCategoryEnabled(it) }
                     val unselected = items.filter { it != categoryName && !isCategoryEnabled(it) }.sortedBy { it.lowercase() }
                     val insertInUnselected = (unselected.indexOfFirst { it.lowercase() > categoryName.lowercase() }).let {
                         if (it == -1) unselected.size else it
                     }
                     var toBefore = selectedCountNow + insertInUnselected
 
-                    // persist
                     setCategoryEnabled(categoryName, false)
                     onCheckedChange(categoryName, false)
 
-                    // find current index
                     val currentIndex = items.indexOf(categoryName)
                     if (currentIndex == -1) return
 
@@ -673,7 +616,6 @@ class FootballiaPlugin : Plugin() {
                         setOrderedCategories(orderKey, items)
                     }
 
-                    // Ekstra notify: selected group'un tümünü güncelle (canMove değişimleri için)
                     notifyItemRangeChanged(0, getSelectedCount())
 
                     val focusTarget = fromPos.coerceIn(0, items.size - 1)
@@ -683,16 +625,12 @@ class FootballiaPlugin : Plugin() {
                 }
             }
 
-            // selected grubunda taşımaya izin verir
             private fun moveItem(from: Int, to: Int, focusTargetId: Int = R.id.checkbox) {
                 if (from == RecyclerView.NO_POSITION) return
                 if (from == to) return
 
-                // Clamp 'to' to valid bounds for insertion AFTER removal (0..items.size)
-                // We'll remove first, then insert at 'to' index relative to the new list.
                 val item = items.removeAt(from)
 
-                // 'to' is passed relative to original list. After removal, legal insert indices are 0..items.size
                 val boundedTo = to.coerceIn(0, items.size)
 
                 items.add(boundedTo, item)
@@ -706,11 +644,10 @@ class FootballiaPlugin : Plugin() {
                 ensureFocusOnPositionAndClearPressed(boundedTo.coerceIn(0, items.size - 1), focusTargetId)
             }
 
-
             private fun moveItemToTop(from: Int, focusTargetId: Int = R.id.checkbox) {
                 if (from == RecyclerView.NO_POSITION) return
                 val selectedCount = getSelectedCount()
-                if (from >= selectedCount) return // sadece selected grubunda çalışsın
+                if (from >= selectedCount) return
                 if (from <= 0) return
 
                 val item = items.removeAt(from)
@@ -721,18 +658,15 @@ class FootballiaPlugin : Plugin() {
                 ensureFocusOnPositionAndClearPressed(0, focusTargetId)
             }
 
-
             private fun moveItemToBottom(from: Int, focusTargetId: Int = R.id.checkbox) {
                 if (from == RecyclerView.NO_POSITION) return
                 val selectedCountBefore = getSelectedCount()
-                if (from >= selectedCountBefore) return // yalnızca selected grubunda çalışsın
+                if (from >= selectedCountBefore) return
 
-                // hedef: selected grubun sonu (after removal)
                 val targetAfterRemoval = selectedCountBefore - 1
-                if (from == targetAfterRemoval) return // zaten en sondaysa no-op
+                if (from == targetAfterRemoval) return
 
                 val item = items.removeAt(from)
-                // insert at targetAfterRemoval (which is valid index in new list; if removal was before it, indices are correct)
                 val boundedTo = targetAfterRemoval.coerceIn(0, items.size)
                 items.add(boundedTo, item)
 
@@ -745,8 +679,6 @@ class FootballiaPlugin : Plugin() {
                 ensureFocusOnPositionAndClearPressed(boundedTo.coerceIn(0, items.size - 1), focusTargetId)
             }
 
-
-            // scroll + focus helper
             private fun ensureFocusOnPositionAndClearPressed(position: Int, focusTargetId: Int = R.id.checkbox) {
                 val rv = recyclerViewRef ?: return
                 rv.scrollToPosition(position)
@@ -765,7 +697,6 @@ class FootballiaPlugin : Plugin() {
                 }
             }
 
-            // UI builders
             private fun createItemLayout(context: Context): LinearLayout {
                 return LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL

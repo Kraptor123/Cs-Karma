@@ -1,4 +1,4 @@
-// ! Bu araç @Kraptor123 tarafından | @cs-karma için yazılmıştır.
+// ! Bu araç @Kraptor123 tarafından | @CS-Karma için yazılmıştır.
 
 package com.kraptor
 

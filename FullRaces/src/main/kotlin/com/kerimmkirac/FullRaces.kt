@@ -1,4 +1,4 @@
-// ! Bu araç @kerimmkirac tarafından | @SporKeyfi için yazılmıştır.
+// ! Bu araç @kerimmkirac tarafından | @CS-Karma için yazılmıştır!
 
 package com.kerimmkirac
 

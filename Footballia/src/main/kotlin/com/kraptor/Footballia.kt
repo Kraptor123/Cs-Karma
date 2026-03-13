@@ -1,4 +1,4 @@
-// ! Bu araç @Kraptor123 tarafından | @kekikanime için yazılmıştır.
+// ! Bu araç @Kraptor123 tarafından | @CS-Karma için yazılmıştır.
 package com.kraptor
 
 import android.util.Log
@@ -15,25 +15,20 @@ class Footballia : MainAPI() {
     override var mainUrl = "https://footballia.net"
     override var name = "Footballia"
     override val hasMainPage = true
-    override var lang = "tr"
+    override var lang = "en"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Live)
 
-    // mainPage artık bir val değil, ayarlara göre liste döndüren bir fonksiyon.
     override val mainPage = mainPageOf(
-        // FootballiaPlugin'deki tüm kategorileri döngüye al
         *FootballiaPlugin.allCategories.mapNotNull { (name, path) ->
-            // Eğer kategori ayarlardan etkinse, ana sayfaya ekle
             if (FootballiaPlugin.isCategoryEnabled(name)) {
                 "${mainUrl}/tr/$path" to name
             } else {
-                null // Eğer etkin değilse, listeye ekleme
+                null
             }
         }.toTypedArray()
     )
 
-    // Geri kalan kodunuzda bir değişiklik yapmaya gerek yok.
-    // ... (getMainPage, search, load vb. fonksiyonlarınız aynen kalacak)
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val pageAl = app.get("${request.data}", referer = "${request.data}").document
         val lastPageElement = pageAl.select("ul.pagination li:not(.next)").lastOrNull()
@@ -140,7 +135,6 @@ class Footballia : MainAPI() {
                 .toList()
 
             if (videos.size == 2) {
-                // İki video varsa TV Series olarak döndür
                 val episodes = videos.mapIndexed { index, videoUrl ->
                     newEpisode(videoUrl) {
                         this.name = if (index == 0) "İlk Yarı | First Half" else "İkinci Yarı | Second Half"
@@ -163,7 +157,6 @@ class Footballia : MainAPI() {
             } else if (videos.size == 1) {
                 video = videos[0]
             } else if (videos.isEmpty()) {
-                // "file" da yoksa, "video" değişkeninde bak
                 val regex3 = Regex(pattern = "\"video\":\"([^\"]*)\"", options = setOf(RegexOption.IGNORE_CASE))
                 val videoEncoded = regex3.find(scriptText)?.groupValues[1]?.replace("\\n", "") ?: ""
                 if (videoEncoded.isNotEmpty()) {

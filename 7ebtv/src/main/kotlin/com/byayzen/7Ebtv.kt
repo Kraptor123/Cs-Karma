@@ -15,7 +15,6 @@ class `7Ebtv` : MainAPI() {
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Movie)
 
-
     override val mainPage = mainPageOf(
         "${mainUrl}/series/page/" to "Series"
     )
@@ -42,22 +41,16 @@ class `7Ebtv` : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/?s=$query").document
-
-        val aramaCevap = document.select("div.row article")
-            .mapNotNull { it.toSearchResult() }
-
-        return aramaCevap
+        return document.select("div.row article").mapNotNull { it.toSearchResult() }
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
         val href = fixUrlNull(selectFirst("a")?.attr("href")) ?: return null
         val title = selectFirst("div.title")?.text() ?: return null
-
         val posterUrl = selectFirst("div.posterThumb div.imgBG")
             ?.attr("style")
             ?.let { Regex("url\\((.*?)\\)").find(it)?.groupValues?.get(1) }
             ?.let(::fixUrlNull)
-
         val type = TvType.Movie
 
         return if (type == TvType.TvSeries) {
@@ -71,13 +64,10 @@ class `7Ebtv` : MainAPI() {
         }
     }
 
-
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-//        Log.d("7ebtv","url = $url")
         val document = app.get(url).document
-
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(
             document.selectFirst("div.imgser")?.attr("style")
@@ -100,19 +90,16 @@ class `7Ebtv` : MainAPI() {
         val script = document.selectFirst("script:containsData(vo_theme_dir)")?.data().toString()
         val themeDir = """vo_theme_dir\s*=\s*"([^"]+)"""".toRegex().find(script)?.groupValues[1]
         val seasonButtons = document.select("ul.listSeasons2 li")
+
         if (seasonButtons.isNotEmpty() && themeDir != null) {
             seasonButtons.forEach { seasonButton ->
                 val seasonId = seasonButton.attr("data-season")
                 val seasonText = seasonButton.text().trim()
                 val seasonNumber = seasonText.replace("""[^\d]""".toRegex(), "").toIntOrNull() ?: 1
 
-//                Log.d("7ebtv", "Sezon text: '$seasonText' -> Numara: $seasonNumber")
-
                 if (seasonId.isNotEmpty()) {
                     try {
                         val seasonAjaxUrl = "$themeDir/temp/ajax/seasons2.php?seriesID=$seasonId"
-//                        Log.d("7ebtv", "Sezon $seasonNumber (ID: $seasonId) AJAX URL: $seasonAjaxUrl")
-
                         val seasonResponse = app.get(
                             seasonAjaxUrl,
                             headers = mapOf(
@@ -121,28 +108,18 @@ class `7Ebtv` : MainAPI() {
                                 "Referer" to "${mainUrl}/",
                             )
                         )
-
                         val seasonDoc = seasonResponse.document
                         val seasonArticles = seasonDoc.select("article.postEp")
-//                        Log.d("7ebtv", "Sezon $seasonNumber - Bölüm sayısı: ${seasonArticles.size}")
 
                         seasonArticles.forEachIndexed { index, episodeDiv ->
-                            val episodeUrl = episodeDiv.selectFirst("a")?.attr("href")?.let { episodeUrl ->
-                                if (!episodeUrl.contains("?do=views")) {
-                                    "$episodeUrl?do=views"
-                                } else {
-                                    episodeUrl
-                                }
+                            val episodeUrl = episodeDiv.selectFirst("a")?.attr("href")?.let { eUrl ->
+                                if (!eUrl.contains("?do=views")) "$eUrl?do=views" else eUrl
                             }
                             val episodeTitle = episodeDiv.selectFirst("div.title")?.text()
-
                             val episodePoster = episodeDiv.selectFirst("div.imgser")?.attr("style")?.let { style ->
-                                val regex = """url\((.*?)\)""".toRegex()
-                                regex.find(style)?.groupValues?.get(1)
+                                """url\((.*?)\)""".toRegex().find(style)?.groupValues?.get(1)
                             }?.let { fixUrlNull(it) }
-
-                            val episodeNumber = episodeDiv.selectFirst("div.episodeNum span")?.text()?.toIntOrNull()
-                                ?: (index + 1)
+                            val episodeNumber = episodeDiv.selectFirst("div.episodeNum span")?.text()?.toIntOrNull() ?: (index + 1)
 
                             if (!episodeUrl.isNullOrEmpty() && !episodeTitle.isNullOrEmpty()) {
                                 episodes.add(
@@ -155,33 +132,20 @@ class `7Ebtv` : MainAPI() {
                                 )
                             }
                         }
-
-                    } catch (e: Exception) {
-//                        Log.d("7ebtv", "Sezon $seasonNumber hatası: ${e.message}")
-                    }
+                    } catch (e: Exception) {}
                 }
             }
         } else {
             val allArticles = document.select("article.postEp")
-//            Log.d("7ebtv", "Tek sezon - Bölüm sayısı: ${allArticles.size}")
-
             allArticles.forEachIndexed { index, episodeDiv ->
-                val episodeUrl = episodeDiv.selectFirst("a")?.attr("href")?.let { episodeUrl ->
-                    if (!episodeUrl.contains("?do=views")) {
-                        "$episodeUrl?do=views"
-                    } else {
-                        episodeUrl
-                    }
+                val episodeUrl = episodeDiv.selectFirst("a")?.attr("href")?.let { eUrl ->
+                    if (!eUrl.contains("?do=views")) "$eUrl?do=views" else eUrl
                 }
                 val episodeTitle = episodeDiv.selectFirst("div.title")?.text()
-
                 val episodePoster = episodeDiv.selectFirst("div.imgser")?.attr("style")?.let { style ->
-                    val regex = """url\((.*?)\)""".toRegex()
-                    regex.find(style)?.groupValues?.get(1)
+                    """url\((.*?)\)""".toRegex().find(style)?.groupValues?.get(1)
                 }?.let { fixUrlNull(it) }
-
-                val episodeNumber = episodeDiv.selectFirst("div.episodeNum span")?.text()?.toIntOrNull()
-                    ?: (index + 1)
+                val episodeNumber = episodeDiv.selectFirst("div.episodeNum span")?.text()?.toIntOrNull() ?: (index + 1)
 
                 if (!episodeUrl.isNullOrEmpty() && !episodeTitle.isNullOrEmpty()) {
                     episodes.add(
@@ -196,13 +160,7 @@ class `7Ebtv` : MainAPI() {
             }
         }
 
-
-        return newTvSeriesLoadResponse(
-            title,
-            url,
-            TvType.TvSeries,
-            episodes
-        ) {
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
             this.posterUrl = poster
             this.year = year
             this.plot = description
@@ -218,15 +176,11 @@ class `7Ebtv` : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-//        Log.d("7ebtv", "LoadLinks çağrıldı - URL: $data")
         val document = app.get(data, referer = "${mainUrl}/", timeout = 10000L).document
         val script = document.selectFirst("script:containsData(vo_theme_dir)")?.data()
-//        Log.d("7ebtv", "script: $script")
         val postId = script?.substringBeforeLast("\"")?.substringAfterLast("\"")
         val themeDir = script?.substringAfter("\"")?.substringBefore("\"")
-//        Log.d("7ebtv", "Post ID: $postId, Theme Dir: $themeDir")
         val servers = document.select("ul.serversList li")
-//        Log.d("7ebtv", "Bulunan player sunucu sayısı: ${servers.size}")
 
         if (postId != null && themeDir != null) {
             servers.forEach { server ->
@@ -236,7 +190,6 @@ class `7Ebtv` : MainAPI() {
 
                 try {
                     val ajaxIframeUrl = "$themeDir/temp/ajax/iframe2.php?id=$postId&video=$serverNumber"
-//                    Log.d("7ebtv", "Player $serverNumber ($serverName) - AJAX URL: $ajaxIframeUrl")
                     val response = app.get(
                         ajaxIframeUrl,
                         headers = mapOf(
@@ -250,7 +203,6 @@ class `7Ebtv` : MainAPI() {
                         val videoIframe = ajaxDoc.select("iframe").firstOrNull()?.attr("src")
                         if (!videoIframe.isNullOrEmpty()) {
                             val fixedVideoUrl = fixUrlNull(videoIframe)
-//                            Log.d("7ebtv", "Player $serverNumber - Video URL: $fixedVideoUrl")
                             if (!fixedVideoUrl.isNullOrEmpty()) {
                                 if (fixedVideoUrl.endsWith(".m3u8") || fixedVideoUrl.contains(".m3u8?")) {
                                     callback.invoke(
@@ -264,38 +216,27 @@ class `7Ebtv` : MainAPI() {
                                             }
                                         )
                                     )
-//                                    Log.d("7ebtv", "M3U8 link eklendi: $serverName")
                                 } else {
                                     loadExtractor(fixedVideoUrl, subtitleCallback, callback)
                                 }
                             }
                         }
                     }
-
-                } catch (e: Exception) {
-//                    Log.d("7ebtv", "Player $serverNumber hatası: ${e.message}")
-                }
+                } catch (e: Exception) {}
             }
         }
-        val downloadLinks = document.select("div.downloadsList a.downloadsLink")
-//        Log.d("7ebtv", "Bulunan indirme linki sayısı: ${downloadLinks.size}")
 
+        val downloadLinks = document.select("div.downloadsList a.downloadsLink")
         downloadLinks.forEachIndexed { index, link ->
             val downloadUrl = link.attr("href")
             val downloadName = link.text().trim()
 
-//            Log.d("7ebtv", "İndirme linki $index ($downloadName): $downloadUrl")
-
             if (downloadUrl.isNotEmpty()) {
                 try {
                     val fixedDownloadUrl = fixUrlNull(downloadUrl)
-
                     if (!fixedDownloadUrl.isNullOrEmpty()) {
                         val extracted = loadExtractor(fixedDownloadUrl, subtitleCallback, callback)
-
                         if (!extracted) {
-//                            Log.d("7ebtv", "Extractor çalışmadı, manuel ekleniyor: $fixedDownloadUrl")
-
                             if (fixedDownloadUrl.contains(".mp4", ignoreCase = true)) {
                                 callback.invoke(
                                     newExtractorLink(
@@ -305,10 +246,8 @@ class `7Ebtv` : MainAPI() {
                                         type = ExtractorLinkType.VIDEO
                                     )
                                 )
-//                                Log.d("7ebtv", "MP4 link eklendi: $downloadName")
                             } else {
                                 val downloadPageDoc = app.get(fixedDownloadUrl).document
-
                                 val videoUrl = downloadPageDoc.select("video source, a[href*=.mp4]")
                                     .firstOrNull()?.attr("src") ?:
                                 downloadPageDoc.select("a[href*=.mp4]").firstOrNull()?.attr("href")
@@ -324,19 +263,14 @@ class `7Ebtv` : MainAPI() {
                                                 type = ExtractorLinkType.VIDEO
                                             )
                                         )
-//                                        Log.d("7ebtv", "Video URL bulundu ve eklendi: $downloadName")
                                     }
                                 }
                             }
                         }
                     }
-
-                } catch (e: Exception) {
-//                    Log.d("7ebtv", "İndirme linki $index hatası: ${e.message}")
-                }
+                } catch (e: Exception) {}
             }
         }
-
         return true
     }
 }

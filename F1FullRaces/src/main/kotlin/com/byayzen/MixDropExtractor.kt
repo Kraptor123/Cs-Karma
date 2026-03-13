@@ -3,22 +3,23 @@ package com.byayzen
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.*
 
-class MixDropBz : MixDrop(){
+class MixDropBz : MixDrop() {
     override var mainUrl = "https://mixdrop.bz"
 }
 
-class MixDropAg : MixDrop(){
+class MixDropAg : MixDrop() {
     override var mainUrl = "https://mixdrop.ag"
 }
 
-class MixDropCh : MixDrop(){
+class MixDropCh : MixDrop() {
     override var mainUrl = "https://mixdrop.ch"
 }
-class MixDropTo : MixDrop(){
+
+class MixDropTo : MixDrop() {
     override var mainUrl = "https://mixdrop.to"
 }
 
-class MixDrop977 : MixDrop(){
+class MixDrop977 : MixDrop() {
     override var mainUrl = "https://mdy48tn97.com"
 }
 
@@ -33,21 +34,21 @@ open class MixDrop : ExtractorApi() {
     }
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
-        with(app.get(url.replaceFirst("/f/", "/e/"))) {
-            getAndUnpack(this.text).let { unpackedText ->
-                srcRegex.find(unpackedText)?.groupValues?.get(1)?.let { link ->
-                    return listOf(
-                        newExtractorLink(
-                            name,
-                            name,
-                            httpsify(link),
-                        ) {
-                            this.referer = url
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
+        val targetUrl = url.replaceFirst("/f/", "/e/")
+        val response = app.get(targetUrl)
+        val unpackedText = getAndUnpack(response.text)
+
+        srcRegex.find(unpackedText)?.groupValues?.get(1)?.let { link ->
+            return listOf(
+                newExtractorLink(
+                    name,
+                    name,
+                    httpsify(link),
+                ) {
+                    this.referer = url
+                    this.quality = Qualities.Unknown.value
                 }
-            }
+            )
         }
         return null
     }

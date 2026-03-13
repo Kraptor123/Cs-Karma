@@ -182,7 +182,7 @@ class Vidspeeder : VidHidePro() {
     override var mainUrl = "https://vidspeeder.com"
 }
 open class StreamWishExtractor : ExtractorApi() {
-    override val name = "Streamwish" // İstenen isim
+    override val name = "Streamwish"
     override val mainUrl = "https://streamwish.to"
     override val requiresReferer = true
 
@@ -339,7 +339,7 @@ class Playerwish : StreamWishExtractor() {
 
 
 open class FilemoonV2 : ExtractorApi() {
-    override var name = "Filemoon" // İstenen isim
+    override var name = "Filemoon"
     override var mainUrl = "https://filemoon.to"
     override val requiresReferer = true
 
