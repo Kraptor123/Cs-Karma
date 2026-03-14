@@ -48,8 +48,8 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
-        // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/Kraptor123/Cs-Karma")
+        // when running through gitHub workflow, GITHUB_REPOSITORY should contain current repository name
+        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/Kraptor123/kraptoranime")
 
         authors = listOf("kraptor")
     }
@@ -92,7 +92,7 @@ subprojects {
         cloudstream("com.lagradost:cloudstream3:pre-release")
 
         // these dependencies can include any of those which are added by the app,
-        // but you dont need to include any of them if you dont need them
+        // but you don't need to include any of them if you don't need them
         // https://github.com/recloudstream/cloudstream/blob/master/app/build.gradle
         implementation(kotlin("stdlib"))                                              // Kotlin'in temel kütüphanesi
         implementation("com.github.Blatzar:NiceHttp:0.4.13")                          // HTTP kütüphanesi
@@ -101,10 +101,21 @@ subprojects {
         implementation("com.fasterxml.jackson.core:jackson-databind:2.13.5")          // JSON-nesne dönüştürme kütüphanesi
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")      // Kotlin için asenkron işlemler
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-        implementation("androidx.appcompat:appcompat:1.7.1")
+        implementation("org.mozilla:rhino:1.9.0")
+        implementation("me.xdrop:fuzzywuzzy:1.4.0")
+        implementation("com.google.code.gson:gson:2.13.2")
+        implementation("app.cash.quickjs:quickjs-android:0.9.2")
+        implementation("com.github.vidstige:jadb:v1.2.1")
     }
 }
 
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
+}
+tasks.register("derle") {
+    group = "help"
+    doLast {
+        println("Filtreleme modu aktif: status=0 olan eklentiler derleme dışı bırakıldı.")
+    }
 }
