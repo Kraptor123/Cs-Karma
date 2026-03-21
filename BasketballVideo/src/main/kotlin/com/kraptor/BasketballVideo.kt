@@ -6,8 +6,10 @@ import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 class BasketballVideo : MainAPI() {
     override var mainUrl              = "https://basketball-video.com"
@@ -38,7 +40,7 @@ class BasketballVideo : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = if (page == 1){
-            app.get("${request.data}").document
+            app.get(request.data).document
         } else {
             app.get("${request.data}?page$page").document
         }
@@ -104,48 +106,60 @@ class BasketballVideo : MainAPI() {
         return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        Log.d("kraptor_$name", "data = ${data}")
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean = coroutineScope {
+        Log.d("kraptor_$name", "data = $data")
         val document = app.get(data).document
-
         val iframe = document.selectFirst("div.video-responsive iframe")?.attr("src") ?: ""
+        val bosmu = document.selectFirst("td a[onclick]")?.attr("onclick")?.substringAfter("('")?.substringBefore("'") ?: ""
 
-        Log.d("kraptor_$name", "iframe = ${iframe}")
+        when {
+            iframe.isNotEmpty() -> {
+                loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
+            }
+            bosmu.isNotEmpty() -> {
+                document.select("td a[onclick]").mapIndexed { index, onclick ->
+                    async {
+                        val link = onclick.attr("onclick").substringAfter("('").substringBefore("'")
+                        Log.d("kraptor_$name", "bosmu_link[$index] = $link")
+                        loadExtractor(link, "$mainUrl/", subtitleCallback, callback)
+                    }
+                }.awaitAll()
+            }
+            else -> {
+                document.select("strong a.su-button").mapIndexed { bindex, button ->
+                    async {
+                        val gitlink = fixUrlNull(button.attr("href")).toString()
+                        if (gitlink.isNotEmpty() && gitlink != "null") {
+                            val innerdoc = app.get(gitlink).document
+                            val iframes = innerdoc.select("iframe")
+                            val totalparts = iframes.size
 
-        val bosMu = document.selectFirst("td a[onclick]")?.attr("onclick")?.substringAfter("('")?.substringBefore("'") ?: ""
-
-
-       if (iframe.isNotEmpty()) {
-           loadExtractor(iframe, "${mainUrl}/", subtitleCallback, callback)
-       } else if (bosMu.isNotEmpty()) {
-           document.select("td a[onclick]").map { onclick ->
-             val on = onclick.attr("onclick").substringAfter("('").substringBefore("'")
-               loadExtractor(on, "${mainUrl}/", subtitleCallback, callback)
-           }
-       }
-       else {
-           document.select("strong a.su-button").map { link ->
-               val gitLink = fixUrlNull(link.attr("href")).toString()
-
-               Log.d("kraptor_$name", "gitLink = ${gitLink}")
-
-               if (gitLink.contains("gamesontvtoday.com")){
-                   Log.d("kraptor_$name", "gitLink = ${gitLink}")
-
-                   val siteGit = app.get(gitLink).document
-
-                   val iframe = fixUrlNull(siteGit.selectFirst("iframe")?.attr("src")).toString()
-                   Log.d("kraptor_$name", "iframe = ${iframe}")
-                   loadExtractor(iframe, "${mainUrl}/", subtitleCallback, callback)
-               } else {
-                   loadExtractor(gitLink, "${mainUrl}/", subtitleCallback, callback)
-               }
-       }
-
-
-
-       }
-
-        return true
+                            iframes.mapIndexed { iindex, element ->
+                                val src = fixUrlNull(element.attr("src")).toString()
+                                if (src.isNotEmpty() && src != "null") {
+                                    Log.d("kraptor_$name", "embed[$bindex][$iindex] = $src")
+                                    loadExtractor(src, "$mainUrl/", subtitleCallback) { linkres ->
+                                        val finalname = if (totalparts > 1) "${linkres.name} - Part ${iindex + 1}" else linkres.name
+                                        launch {
+                                            callback(newExtractorLink(linkres.source, finalname, linkres.url, linkres.type) {
+                                                this.referer = linkres.referer
+                                                this.headers = linkres.headers
+                                                this.quality = linkres.quality
+                                            })
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+        true
     }
 }

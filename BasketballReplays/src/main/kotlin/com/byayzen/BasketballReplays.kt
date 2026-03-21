@@ -83,25 +83,20 @@ class BasketballReplays : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        Log.d("kraptor_$name", "data = $data")
         val anasayfa = app.get(data).document
-        val videolinki = anasayfa.selectFirst("div.h_post_desc a.su-button")?.attr("href")
 
-        if (videolinki.isNullOrEmpty()) {
-            return false
-        }
-
-        val videosayfasi = app.get(videolinki).document
-        val kaynaklar = videosayfasi.select("div.entry__article iframe").mapNotNull {
+        val kaynaklar = anasayfa.select("div.h_post_desc iframe").mapNotNull {
             it.attr("src").takeIf { src -> src.isNotEmpty() }
         }
 
-        if (kaynaklar.isEmpty()) {
-            return false
-        }
+        Log.d("kraptor_$name", "kaynaklar_sayisi = ${kaynaklar.size}")
+        if (kaynaklar.isEmpty()) return false
 
         for (url in kaynaklar) {
-            val link = if (url.startsWith("//")) "https:$url" else url
-            loadExtractor(link, videolinki, subtitleCallback, callback)
+            val temizlink = if (url.startsWith("//")) "https:$url" else url
+            Log.d("kraptor_$name", "isleniyor = $temizlink")
+            loadExtractor(temizlink, data, subtitleCallback, callback)
         }
 
         return true
