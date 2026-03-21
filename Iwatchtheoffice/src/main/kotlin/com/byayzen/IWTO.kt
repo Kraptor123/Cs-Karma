@@ -2,6 +2,7 @@
 
 package com.byayzen
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -12,8 +13,7 @@ class IWTO : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie)
-
+    override val supportedTypes = setOf(TvType.TvSeries, TvType.Movie)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/episodes" to "Episodes",
@@ -51,34 +51,66 @@ class IWTO : MainAPI() {
     private fun Element.toMainPageResult(): SearchResponse? {
         val title = selectFirst("h2")?.text() ?: return null
         val href = fixUrlNull(selectFirst("a.lnk-blk")?.attr("href")) ?: return null
-        return newMovieSearchResponse(title, href, TvType.TvSeries) {
-            this.posterUrl = getSrc()
+        val type = if (title.contains("Season", true)) TvType.TvSeries else TvType.Movie
+
+        return if (type == TvType.TvSeries) {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = fixUrlNull(selectFirst("img")?.attr("src")) }
+        } else {
+            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = fixUrlNull(selectFirst("img")?.attr("src")) }
         }
+    }
+
+    data class StaticSearchData(
+        @JsonProperty("name") val name: String,
+        @JsonProperty("url") val url: String,
+        @JsonProperty("poster") val poster: String
+    )
+
+    override suspend fun search(query: String): List<SearchResponse> {
+        val response = app.get("https://raw.githubusercontent.com/Kraptor123/Cs-Karma/refs/heads/master/IWTOSearch").text
+        val data = AppUtils.parseJson<List<StaticSearchData>>(response)
+
+        return data.filter { it.name.contains(query, ignoreCase = true) }.sortedBy { it.name }.map {
+                val isTv = it.name.contains("Season", true)
+                if (isTv) {
+                    newTvSeriesSearchResponse(it.name, it.url, TvType.TvSeries) { this.posterUrl = it.poster }
+                } else {
+                    newMovieSearchResponse(it.name, it.url, TvType.Movie) { this.posterUrl = it.poster }
+                }
+            }
     }
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val cleanUrl = url.removeSuffix("/")
+        val isTv = title.contains("Season", true)
 
-        val episodesElements = document.select("ul#episode_by_temp li")
-        val (current, others) = episodesElements.partition {
-            it.selectFirst("a.lnk-blk")?.attr("href")?.removeSuffix("/") == cleanUrl
-        }
-
-        val recommendations = others.mapNotNull { li ->
+        val recommendations = document.select("ul#episode_by_temp li").mapNotNull { li ->
             val epHref = li.selectFirst("a.lnk-blk")?.attr("href") ?: return@mapNotNull null
-            newMovieSearchResponse(li.selectFirst("h2")?.text() ?: "", epHref, TvType.Movie) {
-                this.posterUrl = li.getSrc()
+            val epTitle = li.selectFirst("h2")?.text() ?: ""
+            newMovieSearchResponse(epTitle, epHref, TvType.Movie) {
+                this.posterUrl = fixUrlNull(li.selectFirst("img")?.attr("src"))
             }
         }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.posterUrl =
-                current.firstOrNull()?.getSrc() ?: document.getSrc("meta[property='og:image']")
-            this.plot =
-                document.selectFirst("article.post-single-video div.description")?.text()?.trim()
-            this.recommendations = recommendations
+        return if (isTv) {
+            val episodes = document.select("ul#episode_by_temp li").mapNotNull { li ->
+                val epHref = li.selectFirst("a.lnk-blk")?.attr("href") ?: return@mapNotNull null
+                newEpisode(epHref) {
+                    this.name = li.selectFirst("h2")?.text()
+                    this.posterUrl = fixUrlNull(li.selectFirst("img")?.attr("src"))
+                }
+            }
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
+                this.plot = document.selectFirst("article.post-single-video div.description")?.text()?.trim()
+            }
+        } else {
+            newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
+                this.plot = document.selectFirst("article.post-single-video div.description")?.text()?.trim()
+                this.recommendations = recommendations
+            }
         }
     }
 
@@ -95,8 +127,4 @@ class IWTO : MainAPI() {
         }
         return true
     }
-
-
-    private fun Element.getSrc(selector: String = "img") =
-        fixUrlNull(this.selectFirst(selector)?.attr("src"))
 }
