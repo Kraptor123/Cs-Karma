@@ -9,6 +9,8 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.launch
 import org.jsoup.nodes.Document
 
 class Flixlatam : MainAPI() {
@@ -17,8 +19,7 @@ class Flixlatam : MainAPI() {
     override val hasMainPage = true
     override var lang = "mx"
     override val hasQuickSearch = false
-    override val supportedTypes =
-        setOf(TvType.Movie, TvType.TvSeries, TvType.AsianDrama, TvType.Anime)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.AsianDrama, TvType.Anime)
     private var dynamicCookies: Map<String, String> = emptyMap()
 
     private val protectionHeaders = mapOf(
@@ -36,56 +37,97 @@ class Flixlatam : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/pelicula/" to "Películas",
-        "${mainUrl}/genero/series/" to "Series",
-        "${mainUrl}/genero/anime/" to "Anime",
-        "${mainUrl}/genero/dibujo-animado/" to "Cartoons",
-        "${mainUrl}/lanzamiento/2025/" to "Estrenos 2025",
-        "${mainUrl}/genero/tv-asiatica/" to "Doramas",
-        "${mainUrl}/genero/tv-latina/" to "TV Latina"
+        "${mainUrl}/peliculas" to "Películas",
+        "${mainUrl}/peliculas/populares" to "Películas Populares",
+        "${mainUrl}/series" to "Series",
+        "${mainUrl}/series/populares" to "Series Populares",
+        "${mainUrl}/animes" to "Anime",
+        "${mainUrl}/animes/populares" to "Anime Populares",
+        "${mainUrl}/generos/dorama" to "Doramas",
+        "${mainUrl}/generos/accion" to "Acción",
+        "${mainUrl}/generos/animacion" to "Animación",
+        "${mainUrl}/generos/aventura" to "Aventura",
+        "${mainUrl}/generos/belica" to "Bélica",
+        "${mainUrl}/generos/ciencia-ficcion" to "Ciencia Ficción",
+        "${mainUrl}/generos/comedia" to "Comedia",
+        "${mainUrl}/generos/crimen" to "Crimen",
+        "${mainUrl}/generos/documental" to "Documental",
+        "${mainUrl}/generos/drama" to "Drama",
+        "${mainUrl}/generos/fantasia" to "Fantasía",
+        "${mainUrl}/generos/familia" to "Familia",
+        "${mainUrl}/generos/guerra" to "Guerra",
+        "${mainUrl}/generos/historia" to "Historia",
+        "${mainUrl}/generos/romance" to "Romance",
+        "${mainUrl}/generos/suspense" to "Suspense",
+        "${mainUrl}/generos/terror" to "Terror",
+        "${mainUrl}/generos/western" to "Western",
+        "${mainUrl}/generos/misterio" to "Misterio"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get(request.data).document
+        val url = if (page <= 1) {
+            request.data
+        } else {
+            val separator = if (request.data.contains("?")) "&" else "?"
+            "${request.data}${separator}page=$page"
+        }
+
+        val document = app.get(url).document
         val home = document.select("article.item").mapNotNull { it.toMainPageResult() }
-        return newHomePageResponse(request.name, home)
+
+        return newHomePageResponse(request.name, home, hasNext = true)
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
-        val title = this.selectFirst("div.data h3 a")?.text() ?: return null
-        val href = fixUrlNull(this.selectFirst("div.data h3 a")?.attr("href")) ?: return null
+        val linkElement = this.selectFirst("div.data h3 a") ?: this.selectFirst("div.poster a") ?: return null
+        val title = linkElement.text().ifEmpty { this.selectFirst("div.poster img")?.attr("alt") } ?: return null
+        val href = fixUrlNull(linkElement.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("div.poster img")?.attr("src"))
-        val isTvSeries = this.hasClass("tvshows") || href.contains("/series/")
+
+        val isTvSeries = href.contains("/series/") || href.contains("/animes/") || this.hasClass("tvshows")
         val type = if (isTvSeries) TvType.TvSeries else TvType.Movie
 
+        val ratingValue = this.selectFirst("div.rating")?.text()?.toDoubleOrNull()
+
         return if (isTvSeries) {
-            newTvSeriesSearchResponse(title, href, type) { this.posterUrl = posterUrl }
+            newTvSeriesSearchResponse(title, href, type) {
+                this.posterUrl = posterUrl
+                this.score = Score.from10(ratingValue)
+            }
         } else {
-            newMovieSearchResponse(title, href, type) { this.posterUrl = posterUrl }
+            newMovieSearchResponse(title, href, type) {
+                this.posterUrl = posterUrl
+                this.score = Score.from10(ratingValue)
+            }
         }
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val url = if (page <= 1) "$mainUrl/?s=$query" else "$mainUrl/page/$page/?s=$query"
+        val url = if (page <= 1) "$mainUrl/search?s=$query" else "$mainUrl/search/page/$page?s=$query"
         val document = app.get(url).document
 
-        val results = document.select(".result-item article").mapNotNull {
-            val titleElement = it.selectFirst(".title a") ?: return@mapNotNull null
-            val title = titleElement.text().trim()
-            val href = fixUrlNull(titleElement.attr("href")) ?: return@mapNotNull null
-            val poster = fixUrlNull(it.selectFirst(".image img")?.attr("src"))
-            val isTv = it.select(".image span.tvshows").isNotEmpty()
-            val year = it.selectFirst(".meta .year")?.text()?.trim()?.toIntOrNull()
+        val results = document.select("article.item").mapNotNull {
+            val linkElement = it.selectFirst(".data h3 a") ?: it.selectFirst(".poster a") ?: return@mapNotNull null
+            val title = linkElement.text().ifEmpty { it.selectFirst(".poster img")?.attr("alt") }?.replace("Ver ", "")?.replace(" online", "")?.trim() ?: return@mapNotNull null
+            val href = fixUrlNull(linkElement.attr("href")) ?: return@mapNotNull null
+            val poster = fixUrlNull(it.selectFirst(".poster img")?.attr("src"))
+            val isTv = href.contains("/serie/") || href.contains("/anime/")
+            val type = if (isTv) TvType.TvSeries else TvType.Movie
+
+            val year = it.selectFirst(".data span")?.text()?.trim()?.toIntOrNull()
+            val ratingValue = it.selectFirst(".rating")?.text()?.toDoubleOrNull()
 
             if (isTv) {
-                newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                newTvSeriesSearchResponse(title, href, type) {
                     this.posterUrl = poster
                     this.year = year
+                    this.score = Score.from10(ratingValue)
                 }
             } else {
-                newMovieSearchResponse(title, href, TvType.Movie) {
+                newMovieSearchResponse(title, href, type) {
                     this.posterUrl = poster
                     this.year = year
+                    this.score = Score.from10(ratingValue)
                 }
             }
         }
@@ -107,11 +149,6 @@ class Flixlatam : MainAPI() {
 
         val document = response.document
         val html = response.text
-
-        if (html.contains("Bot Verification") || html.contains("hcaptcha")) {
-            Log.e("ByAyzen", "⛔ Load Fonksiyonunda Bot Koruması Algılandı!")
-        }
-
         val title = document.selectFirst("meta[property=og:title]")?.attr("content")
             ?.replace(
                 Regex("(?i)▷? ?Ver | ?Audio Latino| ?Online| - Series Latinoamerica| - FlixLatam"),
@@ -208,59 +245,16 @@ class Flixlatam : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("ByAyzen", "LoadLinks: $data")
+        Log.d("Cloudstream", "Yüklüyo: $data")
 
-        val sayfayaniti = app.get(
-            data,
-            headers = protectionHeaders + ("Referer" to mainUrl),
-            cookies = dynamicCookies
-        ).also {
-            if (it.cookies.isNotEmpty()) dynamicCookies = it.cookies
-        }
+        val response = app.get(data, headers = mapOf("Referer" to mainUrl))
+        val iframeUrl = response.document.selectFirst("div.play iframe")?.attr("src")
+            ?: response.document.selectFirst("iframe[src*='embed69']")?.attr("src")
 
-        val icerikid = postIdBul(sayfayaniti.document, sayfayaniti.text) ?: return false
-        val iceriktipi = if (data.contains(Regex("episodio|/series/|/tv/"))) "tv" else "movie"
+        if (iframeUrl == null) return false
 
-        var bulundu = false
-        val islenenadresler = mutableSetOf<String>()
-
-        for (i in 1..6) {
-            val apiadresi = "$mainUrl/wp-json/dooplayer/v2/$icerikid/$iceriktipi/$i"
-            val sunucuyaniti = app.get(
-                apiadresi,
-                headers = protectionHeaders + mapOf(
-                    "Referer" to data,
-                    "X-Requested-With" to "XMLHttpRequest"
-                ),
-                cookies = dynamicCookies
-            ).text
-
-            if (sunucuyaniti.contains("server_error") || sunucuyaniti.trim() == "0") continue
-
-            val embedurl = AppUtils.parseJson<DooPlayerResponse>(sunucuyaniti).embedUrl?.let {
-                if (it.startsWith("//")) "https:$it" else it
-            } ?: continue
-
-            if (islenenadresler.add(embedurl)) {
-                Log.d("ByAyzen", "Server $i: $embedurl")
-                if (embedurl.contains(Regex("embed69|dintezuvio"))) {
-                    resolveEmbed69(embedurl, data, subtitleCallback, callback)
-                    bulundu = true
-                } else {
-                    if (loadExtractor(embedurl, data, subtitleCallback, callback)) bulundu = true
-                }
-            }
-            if (!bulundu && i >= 3) break
-        }
-        return bulundu
-    }
-
-    private fun postIdBul(dokuman: Document, htmlicerik: String): String? {
-        return dokuman.selectFirst("link[rel*='shortlink']")?.attr("href")
-            ?.let { Regex("""[?&]p=(\d+)""").find(it)?.groupValues?.get(1) }
-            ?: Regex(""""postId":\s*"(\d+)"""").find(htmlicerik)?.groupValues?.get(1)
-            ?: dokuman.selectFirst("input[name=postid]")?.attr("value")
-            ?: Regex("""postid-(\d+)""").find(dokuman.body().className())?.groupValues?.get(1)
+        val finalIframeUrl = if (iframeUrl.startsWith("//")) "https:$iframeUrl" else iframeUrl
+        return resolveEmbed69(finalIframeUrl, data, subtitleCallback, callback)
     }
 
     private suspend fun resolveEmbed69(
@@ -268,55 +262,79 @@ class Flixlatam : MainAPI() {
         referer: String,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ) {
+    ): Boolean {
         try {
-            val yanit = app.get(url, headers = mapOf("Referer" to referer))
+            val response = app.get(url, headers = mapOf("Referer" to referer))
+            val html = response.text
 
-            if (yanit.url != url && !yanit.url.contains(Regex("embed69|dintezuvio"))) {
-                loadExtractor(yanit.url, referer, subtitleCallback, callback)
-                return
-            }
+            val tokenlar = Regex("""eyJ[a-zA-Z0-9._-]+""")
+                .findAll(html)
+                .map { it.value }
+                .filter { it.length > 50 }
+                .distinct()
+                .toList()
 
-            val veriblogu = Regex("""let\s+dataLink\s*=\s*(\[\{.*?\}\]);""").find(yanit.text)?.groupValues?.get(1) ?: return
-            val diller = AppUtils.parseJson<List<Embed69Language>>(veriblogu)
+            if (tokenlar.isNotEmpty()) {
+                val host = java.net.URI(url).host ?: "embed69.org"
+                val decryptApi = "https://$host/api/decrypt"
 
-            val sifrelilinkler = diller.flatMap { dil ->
-                dil.sortedEmbeds?.mapNotNull { it.link ?: it.download } ?: emptyList()
-            }.distinct()
-
-            if (sifrelilinkler.isNotEmpty()) {
-                val cozmeyaniti = app.post(
-                    "https://embed69.org/api/decrypt",
+                val decryptResponse = app.post(
+                    decryptApi,
                     headers = mapOf(
-                        "X-Requested-With" to "XMLHttpRequest",
+                        "Content-Type" to "application/json",
                         "Referer" to url,
-                        "Origin" to "https://embed69.org"
+                        "Origin" to "https://$host",
+                        "X-Requested-With" to "XMLHttpRequest"
                     ),
-                    json = mapOf("links" to sifrelilinkler)
+                    json = mapOf("links" to tokenlar)
                 )
 
-                if (cozmeyaniti.code == 200) {
-                    AppUtils.parseJson<Embed69ApiResponse>(cozmeyaniti.text).links?.forEach { oge ->
-                        oge.link?.let { hamlink ->
-                            val temizlink = hamlink.replace("`", "").trim()
-                            val yonlendirilmislink = temizlink
-                                .replace("dintezuvio.com", "vidhide.com")
-                                .replace("hglink.to", "streamwish.to")
+                if (decryptResponse.code == 200) {
+                    val json = AppUtils.parseJson<Map<String, Any>>(decryptResponse.text)
+                    if (json["success"] == true) {
+                        val linkListesi = json["links"] as? List<*>
 
-                            Log.d("ByAyzen", "Extractor: $yonlendirilmislink")
-                            loadExtractor(yonlendirilmislink, url, subtitleCallback, callback)
+                        linkListesi?.forEach { item ->
+                            val hamLink = when (item) {
+                                is Map<*, *> -> item["link"] as? String
+                                is String -> item
+                                else -> null
+                            }
+
+                            hamLink?.let {
+                                val temizLink = it.replace("`", "").trim()
+
+                                if (temizLink.contains(Regex("embed69|dintezuvio"))) {
+                                    Log.d("Cloudstream", "Nested: $temizLink")
+                                    ioSafe { resolveEmbed69(temizLink, url, subtitleCallback, callback) }
+                                } else {
+                                    val fixedUrl = temizLink
+                                        .replace("dintezuvio.com", "vidhide.com")
+                                        .replace("hglink.to", "streamwish.to")
+                                        .replace("minochinos.com", "vidhide.com")
+                                        .replace("ghbrisk.com", "streamwish.to")
+
+                                    Log.d("Cloudstream", "Link: $fixedUrl")
+                                    loadExtractor(fixedUrl, url, subtitleCallback, callback)
+                                }
+                            }
                         }
+                        return true
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.d("ByAyzen", "Resolve Error: ${e.message}")
+            Log.d("Cloudstream", "Hata: ${e.message}")
         }
+        return false
     }
 
-    data class Embed69Language(val video_language: String?, val sortedEmbeds: List<Embed69Link>?)
-    data class Embed69Link(val link: String?, val download: String?)
-    data class DecryptedLink(val link: String?)
-    data class Embed69ApiResponse(val links: List<DecryptedLink>?)
-    data class DooPlayerResponse(@JsonProperty("embed_url") val embedUrl: String?)
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun ioSafe(block: suspend () -> Unit) {
+        try {
+            kotlinx.coroutines.GlobalScope.launch { block() }
+        } catch (e: Exception) {
+            Log.d("Cloudstream", "Coroutinehatası: ${e.message}")
+        }
+    }
 }
