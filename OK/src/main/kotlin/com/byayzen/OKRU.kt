@@ -10,9 +10,9 @@ class OKRU : MainAPI() {
     override var mainUrl = "https://ok.ru"
     override var name = "OKRu"
     override val hasMainPage = true
-    override var lang = "tr"
+    override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/video/showcase" to "Videos",

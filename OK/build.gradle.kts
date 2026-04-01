@@ -3,7 +3,7 @@ version = 1
 
 cloudstream {
     authors     = listOf("ByAyzen")
-    language    = "tr"
+    language    = "en"
     description = "OKRU Videos."
     status  = 1
     tvTypes = listOf("Movie", "TvSeries") //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
