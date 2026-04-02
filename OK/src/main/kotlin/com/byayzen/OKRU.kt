@@ -5,6 +5,8 @@ package com.byayzen
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class OKRU : MainAPI() {
     override var mainUrl = "https://ok.ru"
@@ -60,6 +62,31 @@ class OKRU : MainAPI() {
 
         val finalres = reslist.distinctBy { it.url }
         return newHomePageResponse(request.name, finalres, hasNext = finalres.isNotEmpty())
+    }
+
+    override suspend fun search(query: String, page: Int): SearchResponseList {
+        var searchdata: SearchData? = null
+
+        if (page == 1) {
+            val response = app.post("$mainUrl/video/search?st.cmd=video&st.psft=showcase&st.m=SEARCH&st.ft=search&st.fuvh=on&st.furl=%2Fvideo%2Fshowcase&cmd=VideoContentBlock", data = mapOf("st.v.sq" to query, "gwt.requested" to "9579ea2eT1774883610506")).document
+            val jsonstr = response.selectFirst("video-search-result")?.attr("data-props")
+            if (!jsonstr.isNullOrEmpty()) searchdata = AppUtils.parseJson<SearchData>(jsonstr)
+        } else {
+            val offset = (page - 1) * 30
+            val reqbodystring = """{"id": $page,"parameters": {"displayMode": "Movie","videosOffset": $offset,"channelsOffset": 0,"searchQuery": "$query","currentStateId": "video","durationType": "ANY","hd": false}}"""
+            val jsonstr = app.post("$mainUrl/web-api/v2/video/fetchSearchResult", headers = mapOf("Accept" to "application/json, text/javascript, */*; q=0.01", "ok-screen" to "anonymVideo", "x-client-flags" to "ms:0;dcss:0;mpv2:1;dz:0"), requestBody = reqbodystring.toRequestBody("text/plain;charset=UTF-8".toMediaTypeOrNull())).text
+            if (jsonstr.isNotEmpty()) searchdata = AppUtils.parseJson<ApiSearchResponse>(jsonstr).result
+        }
+
+        val results = searchdata?.videos?.list?.mapNotNull { item ->
+            val title = item.movie?.title ?: item.name ?: return@mapNotNull null
+            val id = item.movie?.id ?: return@mapNotNull null
+            val poster = item.movie?.thumbnail?.big ?: item.movie?.thumbnail?.small ?: item.imageUrl
+            newMovieSearchResponse(title, "$mainUrl/video/$id", TvType.Movie) {
+                this.posterUrl = fixUrlNull(poster) }
+        } ?: emptyList()
+
+        return newSearchResponseList(results, hasNext = searchdata?.videos?.hasMore == true)
     }
 
     private fun Element.tomainpageresult(): SearchResponse? {
@@ -150,7 +177,10 @@ class OKRU : MainAPI() {
         return true
     }
 
-    data class SearchItem(val name: String? = null, val imageUrl: String? = null, val movie: SearchMovie? = null)
-    data class SearchMovie(val id: String? = null, val title: String? = null, val thumbnail: SearchThumbnail? = null)
-    data class SearchThumbnail(val small: String? = null, val big: String? = null)
+data class SearchItem(val name: String? = null, val imageUrl: String? = null, val movie: SearchMovie? = null)
+data class SearchMovie(val id: String? = null, val title: String? = null, val thumbnail: SearchThumbnail? = null)
+data class SearchThumbnail(val small: String? = null, val big: String? = null)
+data class ApiSearchResponse(val result: SearchData? = null)
+data class SearchData(val videos: SearchVideos? = null)
+data class SearchVideos(val list: List<SearchItem>? = null, val hasMore: Boolean? = null)
 }
