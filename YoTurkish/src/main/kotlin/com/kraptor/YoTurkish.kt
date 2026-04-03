@@ -8,6 +8,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.network.WebViewResolver
 
 class YoTurkish : MainAPI() {
     override var mainUrl              = "https://yoturkish.to"
@@ -111,18 +112,93 @@ class YoTurkish : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        Log.d("kraptor_$name", "data = ${data}")
-        val text = app.get(data).text
+    override suspend fun loadLinks(
+        data: String,
+        iscasting: Boolean,
+        subtitlecallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        Log.d("Yoturkish", data)
 
-        val regex = Regex(pattern = "iframe width=\"100%\" height=\"100%\" src=\"([^\"]*)\"", options = setOf(RegexOption.IGNORE_CASE))
+        try {
+            val resolver = WebViewResolver(
+                interceptUrl = Regex("""yoturkish\.to/all_done"""),
+                additionalUrls = listOf(
+                    Regex("""engifuosi\.\w+"""),
+                    Regex("""rufiiguta\.\w+"""),
+                    Regex("""kitraskimisi\.\w+"""),
+                    Regex("""tukipasti\.\w+"""),
+                    Regex("""sssrr\.org/sora""")
+                ),
+                useOkhttp = false,
+                timeout = 30000,
+                script = """
+            (function() {
+                for (var i = 1; i <= 4; i++) {
+                    (function(idx) {
+                        setTimeout(function() {
+                            var btn = document.querySelector('.player_nav > ul > li:nth-child(' + idx + ') > div > a');
+                            if (btn) { btn.click(); }
+                        }, idx * 1500);
+                    })(i);
+                }
 
-        for (video in regex.findAll(text)) {
-            val videocuk = video.groupValues[1]
-            if (videocuk.contains("rufiiguta") || videocuk.contains("kitraskimisi")) continue // abyss boku
-            loadExtractor(videocuk, "${mainUrl}/", subtitleCallback, callback)
+                setTimeout(function() {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', 'https://yoturkish.to/all_done', true);
+                    xhr.send();
+                }, 12000);
+            })();
+        """.trimIndent()
+            )
+
+            val result = resolver.resolveUsingWebView(url = data)
+            val foundurls = mutableSetOf<String>()
+
+            result?.second?.forEach { req ->
+                val url = req.url.toString()
+
+                if (url.contains("/sora/") || url.contains(".m3u8")) {
+                    foundurls.add(url)
+                }
+                else if (url.contains("rufiiguta.com/?v=") || url.contains("engifuosi.com/f/")) {
+                    if (!url.contains(".js") && !url.contains(".css")) {
+                        foundurls.add(url)
+                    }
+                }
+            }
+
+            Log.d("Yoturkish", "${foundurls.size}")
+
+            foundurls.forEach { url ->
+                Log.d("Yoturkish", url)
+                try {
+                    if (url.contains("/sora/") || url.contains(".m3u8")) {
+                        callback.invoke(
+                            newExtractorLink(
+                                name = if(url.contains("sssrr")) "Rufiiguta (Sora)" else "Yoturkish Stream",
+                                source = "YoTurkish",
+                                url = url,
+                                type = ExtractorLinkType.M3U8,
+                                initializer = {
+                                    this.referer = "https://rufiiguta.com/"
+                                    this.headers = mapOf("Origin" to "https://rufiiguta.com")
+                                }
+                            )
+                        )
+                    } else {
+                        loadExtractor(url, data, subtitlecallback, callback)
+                    }
+                } catch (e: Exception) {
+                    Log.d("Yoturkish", "${e.message}")
+                }
+            }
+
+            return foundurls.isNotEmpty()
+
+        } catch (e: Exception) {
+            Log.d("Yoturkish", "${e.message}")
         }
-
-        return true
+        return false
     }
 }
