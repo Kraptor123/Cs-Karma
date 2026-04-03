@@ -2,14 +2,11 @@
 
 package com.byayzen
 
-import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.lagradost.cloudstream3.network.WebViewResolver
 import org.jsoup.Jsoup
 
 class JPFilms : MainAPI() {
@@ -19,77 +16,55 @@ class JPFilms : MainAPI() {
     override var lang = "en"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.AsianDrama)
-    //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/20/" to "Action",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/2659/" to "Action & Adventure",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/295/" to "Adventure",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/3015/" to "Animation",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/56/" to "Comedy",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/4/" to "Crime",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/1055/" to "Documentary",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/5/" to "Drama",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/920/" to "Family",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/894/" to "Fantasy",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/619/" to "History",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/258/" to "Horror",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/71/" to "Jidaigeki",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/1785/" to "Music",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/11/" to "Mystery",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/2464/" to "Pinku",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/281/" to "Romance",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/318/" to "Science Fiction",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/119/" to "Thriller",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/1657/" to "TV Movie",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/249/" to "War",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/1729/" to "Western",
-        "${mainUrl}/filter-movies/sort/formality/status/country/release/32/" to "Yakuza"
+        "${mainUrl}/movies?sortby=newest" to "Movies - Newest",
+        "${mainUrl}/movies?sortby=latest-update" to "Movies - Latest Update",
+        "${mainUrl}/movies?sortby=mostview" to "Movies - Most View",
+        "${mainUrl}/tv-series?sortby=newest" to "TV Series - Newest",
+        "${mainUrl}/tv-series?sortby=latest-update" to "TV Series - Latest Update",
+        "${mainUrl}/tv-series?sortby=mostview" to "TV Series - Most View"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) {
             request.data
         } else {
-            "${request.data.removeSuffix("/")}/page/$page"
+            val base = request.data.split("?").first().removeSuffix("/")
+            val query = request.data.split("?").getOrNull(1)
+            if (query != null) "$base/page/$page/?$query" else "$base/page/$page/"
         }
-
         val document = app.get(url).document
         val home = document.select("article.thumb.grid-item").mapNotNull {
             it.toSearchResult()
         }
 
-        return newHomePageResponse(request.name, home)
-    }
-
-    override suspend fun search(query: String, page: Int): SearchResponseList {
-        val url = if (page == 1) {
-            "$mainUrl/search/$query"
-        } else {
-            "$mainUrl/search/$query/page/$page"
-        }
-
-        val document = app.get(url).document
-        val searchResults = document.select("article.thumb.grid-item").mapNotNull {
-            it.toSearchResult()
-        }
-
-        val hasNext = document.selectFirst("ul.pagination li.active + li, a.next") != null
-
-        return newSearchResponseList(searchResults, hasNext = hasNext)
+        return newHomePageResponse(request.name, home, hasNext = true)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val title = this.selectFirst("h2.entry-title")?.text() ?: return null
-        val href = fixUrlNull(this.selectFirst("a.halim-thumb")?.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(
-            this.selectFirst("figure img")?.attr("data-src")
-                ?: this.selectFirst("figure img")?.attr("src")
-        )
+        val title = this.selectFirst(".entry-title")?.text() ?: return null
+        val href = this.selectFirst("a")?.attr("href") ?: return null
+        val posterurl = this.selectFirst("img")?.attr("data-src")
+            ?: this.selectFirst("img")?.attr("src")
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = posterUrl
+            this.posterUrl = posterurl
         }
+    }
+
+    override suspend fun search(query: String, page: Int): SearchResponseList {
+        val url = if (page <= 1) "$mainUrl/search/$query" else "$mainUrl/search/$query/page/$page"
+        val document = app.get(url).document
+        val searchresults = document.select("article.thumb.grid-item").mapNotNull {
+            it.toSearchResult()
+        }
+
+        val hasnext = document.select("ul.page-numbers li a").any {
+            it.text().contains((page + 1).toString()) || it.hasClass("next")
+        }
+
+        return newSearchResponseList(searchresults, hasnext)
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
@@ -97,61 +72,74 @@ class JPFilms : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        val rawTitle = document.selectFirst("h1.entry-title")?.text()?.trim() ?: return null
-        val title = rawTitle.replace(Regex("\\s*\\(\\d{4}\\)$"), "")
-        val poster = fixUrlNull(document.selectFirst(".movie-thumb")?.attr("src"))
-        var description = document.select("article.item-content").text().trim()
-
-        val year = document.selectFirst(".released a[href*='release']")?.text()?.trim()?.toIntOrNull()
-        val tags = document.select(".category a[href*='genres']").map { it.text() }
-
-        val ratingtxt = document.selectFirst(".halim_imdbrating .score")?.text()?.trim()?.toDoubleOrNull()
-        val score = ratingtxt?.times(2.0)
-
-        val durationtxt = document.select(".released").text()
-        val duration = Regex("""(\d+)\s*min""").find(durationtxt)?.groupValues?.get(1)?.toIntOrNull()
+        val title = document.selectFirst("h1.entry-title")?.text()?.replace(Regex("\\s*\\(\\d{4}\\)$"), "")?.trim() ?: return null
+        val poster = fixUrlNull(document.selectFirst(".movie-thumb img, .movie-thumb")?.attr("src"))
+        val tags = document.select(".category a").map { it.text() }
 
         val actors = document.select(".directors a").map { Actor(it.text(), "Director") } +
                 document.select(".actors a").map { Actor(it.text()) }
 
-        val episodes = mutableListOf<Episode>()
-        val freeornot = document.select(".nav-tabs li a").find { it.text().contains("Free", true) }
+        val ratingtxt = document.selectFirst(".imdb-icon")?.attr("data-rating")?.toDoubleOrNull()
+            ?: document.selectFirst(".halim_imdbrating .score")?.text()?.toDoubleOrNull()?.times(2.0)
 
-        if (freeornot != null) {
-            val targetId = freeornot.attr("href")
-            val episodeElements = document.select("$targetId .halim-list-eps li")
+        val duration = Regex("""(\d+)\s*min""").find(document.select("p.released").text())?.groupValues?.get(1)?.toIntOrNull()
+        val year = document.selectFirst("p.released a[href*='release']")?.text()?.toIntOrNull()
 
-            episodeElements.forEach { element ->
-                val linkElement = element.selectFirst("a")
-                val spanElement = element.selectFirst("span")
+        val allepisodes = mutableListOf<Episode>()
 
-                val href = fixUrlNull(linkElement?.attr("href")) ?: fixUrlNull(spanElement?.attr("data-href"))
-                val name = spanElement?.text()?.trim() ?: linkElement?.text()?.trim() ?: "Episode"
-
-                if (href != null) {
-                    val episodeNum = Regex("""\d+""").find(name)?.value?.toIntOrNull()
-                    episodes.add(
-                        newEpisode(href) {
-                            this.name = name
-                            this.episode = episodeNum
-                        }
-                    )
+        document.select("script").map { it.data() }.find { it.contains("var jsonEpisodes") }?.let { script ->
+            val jsonstr = script.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim()
+            Regex(""""postUrl":"([^"]+)".*?"episodeName":"([^"]+)"""").findAll(jsonstr).forEach { match ->
+                val name = match.groupValues[2]
+                if (name.contains("free", true) || !name.contains("vip", true)) {
+                    allepisodes.add(newEpisode(match.groupValues[1].replace("\\/", "/")) {
+                        this.name = name
+                        this.episode = Regex("""\d+""").find(name)?.value?.toIntOrNull()
+                    })
                 }
             }
-        } else {
-            description = "This content is only for paid users!"
         }
 
+        if (allepisodes.isEmpty()) {
+            document.select(".halim-server").forEach { server ->
+                val servername = server.selectFirst(".halim-server-name")?.text() ?: ""
+                if (servername.contains("free", true) || !servername.contains("vip", true)) {
+                    server.select(".halim-list-eps li").forEach { element ->
+                        val href = fixUrlNull(element.attr("data-href") ?: element.selectFirst("a")?.attr("href"))
+                        if (!href.isNullOrEmpty()) {
+                            allepisodes.add(newEpisode(href) {
+                                this.name = element.text().trim()
+                                this.episode = Regex("""\d+""").find(this.name ?: "")?.value?.toIntOrNull()
+                            })
+                        }
+                    }
+                }
+            }
+        }
 
+        val ispaid = allepisodes.isEmpty()
+        val plot = if (ispaid) "This content is only for paid users" else document.select("article.item-content").text().trim()
 
-        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
-            this.posterUrl = poster
-            this.plot = description
-            this.year = year
-            this.tags = tags
-            this.score = Score.from10(score)
-            this.duration = duration
-            addActors(actors)
+        return if (allepisodes.size <= 1) {
+            newMovieLoadResponse(title, url, TvType.AsianDrama, allepisodes.firstOrNull()?.data ?: url) {
+                this.posterUrl = poster
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.score = ratingtxt?.let { Score.from10(it) }
+                this.duration = duration
+                addActors(actors)
+            }
+        } else {
+            newTvSeriesLoadResponse(title, url, TvType.AsianDrama, allepisodes) {
+                this.posterUrl = poster
+                this.plot = plot
+                this.year = year
+                this.tags = tags
+                this.score = ratingtxt?.let { Score.from10(it) }
+                this.duration = duration
+                addActors(actors)
+            }
         }
     }
 
@@ -162,38 +150,42 @@ class JPFilms : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
+        val scripts = document.select("script").map { it.data() }
 
-        val freeornot = document.select(".nav-tabs li a").find { it.text().contains("Free", true) }
-        if (freeornot == null) return false
+        val scriptdata = scripts.find { it.contains("var jsonEpisodes") } ?: return false
+        val jsonstr = scriptdata.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim()
+        val currentslug = data.split("/").lastOrNull()?.replace(".html", "") ?: ""
 
-        val currentSlugMatch = Regex("""(ep-\d+)""").find(data)
-        val currentSlug = currentSlugMatch?.value
-        val targetId = freeornot.attr("href")
+        val matches = Regex("""\{"postId":(\d+),"postUrl":"(.*?)","serverId":(\d+),.*?"episodeSlug":"(.*?)","episodeName":"(.*?)".*?\}""").findAll(jsonstr)
 
-        document.select("$targetId .halim-list-eps .halim-btn").forEach { element ->
-            val slug = element.attr("data-episode-slug")
-            val serverId = element.attr("data-server")
-            val postId = element.attr("data-post-id")
+        matches.forEach { match ->
+            val postid = match.groupValues[1]
+            val posturl = match.groupValues[2].replace("\\/", "/")
+            val serverid = match.groupValues[3]
+            val slug = match.groupValues[4]
 
-            if (currentSlug == null || slug == currentSlug || slug.contains("movie", true)) {
-                val ajaxUrl = "$mainUrl/wp-content/themes/halimmovies/player.php?episode_slug=$slug&server_id=$serverId&post_id=$postId"
+            if (data == posturl || slug == currentslug || currentslug.contains(slug)) {
+                val ajaxurl = "$mainUrl/wp-content/themes/halimmovies/player.php?episode_slug=$slug&server_id=$serverid&post_id=$postid"
 
                 try {
-                    val responseText = app.get(
-                        ajaxUrl,
-                        headers = mapOf("x-requested-with" to "XMLHttpRequest")
+                    val response = app.get(
+                        ajaxurl,
+                        headers = mapOf(
+                            "x-requested-with" to "XMLHttpRequest",
+                            "referer" to data,
+                            "user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        )
                     ).text
 
-                    val json = AppUtils.parseJson<JpResponse>(responseText)
-                    val sourceHtml = json.data?.sources ?: return@forEach
-                    val m3u8Url = Jsoup.parse(sourceHtml).selectFirst("source")?.attr("src")
+                    val m3u8url = Regex("""<source[^>]+src=["']([^"']+)["']""").find(response)?.groupValues?.get(1)
+                        ?: Jsoup.parse(response).selectFirst("source")?.attr("src")
 
-                    if (m3u8Url != null) {
+                    if (m3u8url != null) {
                         callback.invoke(
                             newExtractorLink(
                                 name = "JPFilms",
                                 source = "JPFilms",
-                                url = m3u8Url,
+                                url = m3u8url,
                                 type = INFER_TYPE
                             ) {
                                 this.headers = mapOf(
@@ -203,21 +195,9 @@ class JPFilms : MainAPI() {
                             }
                         )
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                } catch (e: Exception) { }
             }
         }
         return true
     }
-
-
-    data class JpSourceData(
-        @JsonProperty("status") val status: Boolean? = null,
-        @JsonProperty("sources") val sources: String? = null
-    )
-
-    data class JpResponse(
-        @JsonProperty("data") val data: JpSourceData? = null
-    )
-    }
+}
