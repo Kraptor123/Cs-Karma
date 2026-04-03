@@ -32,7 +32,9 @@ class Full4kizle : MainAPI() {
         "$mainUrl/Kategori/passionflix-filmleri/" to "PassionFlix Filmleri",
         "$mainUrl/Kategori/spor/" to "Spor",
         "$mainUrl/Kategori/tur/" to "Türler / Yerli",
-        "$mainUrl/Kategori/yabanci-diziler/" to "Yabancı Diziler"
+        "$mainUrl/Kategori/yabanci-diziler/" to "Yabancı Diziler",
+        "$mainUrl/Kategori/tur/18-erotik-filmler/" to "Erotik"
+
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -55,29 +57,59 @@ class Full4kizle : MainAPI() {
         val titleElement = this.selectFirst(".movie-title a") ?: return null
         val title = titleElement.text().replace("(?i) izle".toRegex(), "").trim()
         val href = fixUrl(titleElement.attr("href"))
-        val posterUrl = this.selectFirst(".movie-poster img")?.attr("src")
+
+        val posterUrl = this.selectFirst(".movie-poster img")?.let { img ->
+            if (img.hasAttr("data-src")) img.attr("abs:data-src") else img.attr("abs:src")
+        }
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
-            val imgHeader =
-                "{\"referer\":\"https://izleonlineplus.cc/\",\"user-agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0\"}"
-            this.posterUrl = posterUrl?.let { "$it?headers=$imgHeader" }
+            this.posterUrl = posterUrl
         }
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val url = if (page == 1) {
-            "${mainUrl}/?s=${query}"
+            "$mainUrl/?s=$query"
         } else {
-            "${mainUrl}/page/$page/?s=${query}"
+            "$mainUrl/page/$page/?s=$query"
         }
 
         val document = app.get(url).document
 
-        val aramaCevap = document.select("div.movie-preview").mapNotNull {
-            it.toMainPageResult()
+        val searchResults = document.select(".v50-card").mapNotNull {
+            it.toSearchResult()
         }
 
-        return newSearchResponseList(aramaCevap, hasNext = true)
+        val hasNext = document.selectFirst(".v50-pagination a.next, .v50-pagination .current + a") != null
+
+        return newSearchResponseList(searchResults, hasNext)
+    }
+
+    private fun Element.toSearchResult(): SearchResponse? {
+        val titleElement = this.selectFirst("h3") ?: return null
+        val title = titleElement.text().replace("(?i)izle|altyazılı|dublaj".toRegex(), "").trim()
+        val href = this.selectFirst("a")?.attr("abs:href") ?: return null
+
+        val posterUrl = this.selectFirst(".v50-poster-box img")?.let { img ->
+            img.attr("abs:data-src").ifBlank { img.attr("abs:src") }
+        }
+
+        val typeText = this.selectFirst(".v50-details span")?.text()?.lowercase() ?: ""
+        val type = if (typeText.contains("dizi") || title.lowercase().contains("sezon")) {
+            TvType.TvSeries
+        } else {
+            TvType.Movie
+        }
+
+        return if (type == TvType.Movie) {
+            newMovieSearchResponse(title, href, TvType.Movie) {
+                this.posterUrl = posterUrl
+            }
+        } else {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
+                this.posterUrl = posterUrl
+            }
+        }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
@@ -86,28 +118,27 @@ class Full4kizle : MainAPI() {
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
 
-        val title = document.selectFirst("h1")?.text()
-            ?.replace("(?i)izle".toRegex(), "")
+        val title = document.selectFirst(".p-v12-main-title")?.text()
+            ?.replace("(?i)izle|altyazılı|dublaj|dizisi".toRegex(), "")
             ?.trim() ?: return null
 
-        val headerJson =
-            "{\"referer\":\"https://izleonlineplus.cc/\",\"user-agent\":\"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0\"}"
+        val poster = document.selectFirst(".p-v12-poster-main img")?.let { img ->
+            img.attr("abs:data-src").ifBlank { img.attr("abs:src") }
+        }
 
-        val posterRaw = document.selectFirst(".poster img")?.attr("src")
-        val poster = posterRaw?.let { "$it?headers=$headerJson" }
+        val description = document.selectFirst(".p-v12-story-content")?.text()?.trim()
+        val year = document.selectFirst(".p-v12-meta-info .meta-item")?.text()?.trim()?.toIntOrNull()
+        val rating = document.selectFirst(".p-v12-imdb-badge")?.text()?.replace("★", "")?.trim()?.toDoubleOrNull()
 
-        val description = document.selectFirst(".excerpt p")?.text()?.trim()
-
-        val year = document.selectFirst(".release a")?.text()?.trim()?.toIntOrNull()
-        val rating = document.selectFirst(".imdb-rating")?.text()?.replace("IMDB Puanı", "")?.trim()
-            ?.toDoubleOrNull()
+        val tags = document.select(".p-v12-meta-info a[rel='category tag']").map { it.text() }
 
         val recommendations = document.select("div.movie-preview").mapNotNull {
-            val linkElement = it.selectFirst(".movie-title a")
-            val recTitle = linkElement?.text()?.trim() ?: return@mapNotNull null
-            val recHref = linkElement.attr("href") ?: return@mapNotNull null
-            val recPosterRaw = it.selectFirst(".movie-poster img")?.attr("src")
-            val recPoster = recPosterRaw?.let { p -> "$p?headers=$headerJson" }
+            val linkElement = it.selectFirst(".movie-title a") ?: return@mapNotNull null
+            val recTitle = linkElement.text().trim()
+            val recHref = linkElement.attr("abs:href")
+            val recPoster = it.selectFirst(".movie-poster img")?.let { img ->
+                img.attr("abs:data-src").ifBlank { img.attr("abs:src") }
+            }
 
             newMovieSearchResponse(recTitle, recHref, TvType.Movie) {
                 this.posterUrl = recPoster
@@ -118,16 +149,11 @@ class Full4kizle : MainAPI() {
 
         return if (episodeElements.isNotEmpty()) {
             val episodes = episodeElements.mapIndexed { index, element ->
-                val epName =
-                    element.selectFirst(".part-name")?.text()?.trim() ?: "Bölüm ${index + 1}"
-                val epHref = element.attr("href")
-                    .ifBlank { url }
+                val epName = element.selectFirst(".part-name")?.text()?.trim() ?: "Bölüm ${index + 1}"
+                val epHref = element.attr("abs:href").ifBlank { url }
 
-
-                val seasonNum = epName.find { it.isDigit() }?.toString()?.toIntOrNull() ?: 1
-                val episodeNum =
-                    epName.substringAfter("Sezon").find { it.isDigit() }?.toString()?.toIntOrNull()
-                        ?: (index + 1)
+                val seasonNum = epName.substringBefore(".").filter { it.isDigit() }.toIntOrNull() ?: 1
+                val episodeNum = epName.substringAfter("Sezon").filter { it.isDigit() }.toIntOrNull() ?: (index + 1)
 
                 newEpisode(epHref) {
                     this.name = epName
@@ -141,15 +167,16 @@ class Full4kizle : MainAPI() {
                 this.plot = description
                 this.year = year
                 this.score = rating?.let { Score.from10(it) }
+                this.tags = tags
                 this.recommendations = recommendations
             }
         } else {
-            // MOVIE (Film) Yanıtı
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.plot = description
                 this.year = year
                 this.score = rating?.let { Score.from10(it) }
+                this.tags = tags
                 this.recommendations = recommendations
             }
         }
@@ -162,8 +189,7 @@ class Full4kizle : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val iframe = document.selectFirst(".center-container iframe")?.attr("src")
-            ?: document.selectFirst("iframe[src*='hotstream.club']")?.attr("src")
+        val iframe = document.selectFirst(".p-v12-video-frame iframe")?.attr("abs:src")
         if (iframe != null) {
             loadExtractor(iframe, data, subtitleCallback, callback)
         }

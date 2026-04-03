@@ -1,19 +1,19 @@
-package com.kraptor
+package com.byayzen
 
-import android.util.Log
-import com.fasterxml.jackson.module.kotlin.readValue
-import com.lagradost.cloudstream3.*
-import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.app
+import android.util.Base64
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-open class HotStreamExtractor : ExtractorApi() {
+class HotstreamExtractor : ExtractorApi() {
     override val name = "HotStream"
     override val mainUrl = "https://hotstream.club"
-    override val requiresReferer = false
+    override val requiresReferer = true
 
     override suspend fun getUrl(
         url: String,
@@ -21,88 +21,82 @@ open class HotStreamExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        Log.d("kraptor_HotStream","url = $url")
-        val document = app.get(url).document
+        val response = app.get(url, headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
+            "Referer" to (referer ?: "https://dizifilm.org/"),
+            "Sec-Fetch-Dest" to "iframe",
+            "Sec-Fetch-Mode" to "navigate",
+            "Sec-Fetch-Site" to "cross-site"
+        )).text
 
-        val script   = document.selectFirst("script:containsData(bePlayer)")?.data().toString()
+        val match = Regex("""bePlayer\s*\(\s*'([^']+)'\s*,\s*'([^']+)'""").find(response) ?: return
 
-        val bRegex = Regex(pattern = " bePlayer\\('([^']*)'", options = setOf(RegexOption.IGNORE_CASE))
+        try {
+            val password = match.groupValues[1]
+            val encryptedJsonRaw = match.groupValues[2].replace("\\/", "/")
 
-        val bKey   = bRegex.find(script)?.groupValues[1].toString()
+            val jsData = AppUtils.parseJson<JsData>(encryptedJsonRaw)
+            val decryptedJson = decryptAes(jsData, password)
+            val videoLocation = AppUtils.parseJson<DecryptedLocation>(decryptedJson).videoLocation
 
-        Log.d("kraptor_HotStream","bKey = $bKey")
-
-        val jsonAl = script.substringAfter(", '").substringBeforeLast("');")
-
-        Log.d("kraptor_HotStream","jsonAl = $jsonAl")
-
-        val jsoncu = mapper.readValue<Sifre>(jsonAl)
-
-        Log.d("kraptor_HotStream","ct = ${jsoncu.ct} iv = ${jsoncu.iv} s = ${jsoncu.s}")
-
-
-        val decrypted = decryptAES(jsoncu.ct, bKey, jsoncu.iv, jsoncu.s)
-        Log.d("kraptor_HotStream","decrypted = $decrypted")
-
-
-        val videoData = mapper.readValue<VideoData>(decrypted)
-
-        Log.d("kraptor_HotStream","video = ${videoData.video_location}")
-
-        callback.invoke(newExtractorLink(
-            this.name,
-            this.name,
-            videoData.video_location,
-            type = ExtractorLinkType.M3U8,
-            {
-                this.referer = url
-            }
-        ))
-
+            callback(
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = videoLocation,
+                    type = ExtractorLinkType.M3U8
+                ) {
+                    this.headers = mapOf(
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
+                        "Accept" to "*/*",
+                        "Referer" to url,
+                        "Sec-Fetch-Dest" to "empty",
+                        "Sec-Fetch-Mode" to "cors",
+                        "Sec-Fetch-Site" to "same-origin"
+                    )
+                    this.quality = Qualities.P1080.value
+                }
+            )
+        } catch (e: Exception) {}
     }
-}
 
-private fun decryptAES(ct: String, password: String, ivHex: String, saltHex: String): String {
-    val salt = hexToBytes(saltHex)
-    val passwordBytes = password.toByteArray(Charsets.UTF_8)
-    val md5_1 = MessageDigest.getInstance("MD5")
-    md5_1.update(passwordBytes)
-    md5_1.update(salt)
-    val d1 = md5_1.digest()
-    val md5_2 = MessageDigest.getInstance("MD5")
-    md5_2.update(d1)
-    md5_2.update(passwordBytes)
-    md5_2.update(salt)
-    val d2 = md5_2.digest()
-    val key = d1 + d2
-    val iv = hexToBytes(ivHex)
-    val ciphertext = base64DecodeArray(ct)
-    val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-    val keySpec = SecretKeySpec(key, "AES")
-    val ivSpec = IvParameterSpec(iv)
-    cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
+    private fun decryptAes(data: JsData, password: String): String {
+        val salt = hexToBytes(data.s)
+        val ciphertext = Base64.decode(data.ct, Base64.DEFAULT)
+        val keyIv = opensslKdf(password, salt)
 
-    val decrypted = cipher.doFinal(ciphertext)
-    return String(decrypted, Charsets.UTF_8)
-}
-
-private fun hexToBytes(hex: String): ByteArray {
-    val len = hex.length
-    val data = ByteArray(len / 2)
-    var i = 0
-    while (i < len) {
-        data[i / 2] = ((Character.digit(hex[i], 16) shl 4) + Character.digit(hex[i + 1], 16)).toByte()
-        i += 2
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(
+            Cipher.DECRYPT_MODE,
+            SecretKeySpec(keyIv.copyOfRange(0, 32), "AES"),
+            IvParameterSpec(keyIv.copyOfRange(32, 48))
+        )
+        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
     }
-    return data
+
+    private fun opensslKdf(password: String, salt: ByteArray): ByteArray {
+        val md5 = MessageDigest.getInstance("MD5")
+        val passBytes = password.toByteArray(Charsets.UTF_8)
+        var keyIv = byteArrayOf()
+        var prev = byteArrayOf()
+        while (keyIv.size < 48) {
+            prev = md5.digest(prev + passBytes + salt)
+            keyIv += prev
+        }
+        return keyIv
+    }
+
+    private fun hexToBytes(hex: String): ByteArray {
+        return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+    }
+
+    data class JsData(
+        @JsonProperty("ct") val ct: String,
+        @JsonProperty("iv") val iv: String,
+        @JsonProperty("s") val s: String
+    )
+
+    data class DecryptedLocation(
+        @JsonProperty("video_location") val videoLocation: String
+    )
 }
-
-data class Sifre(
-    val ct: String,
-    val iv: String,
-    val s: String,
-)
-
-data class VideoData(
-    val video_location: String,
-)
