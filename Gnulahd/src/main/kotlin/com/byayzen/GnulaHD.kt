@@ -1,5 +1,6 @@
 package com.byayzen
 
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
@@ -96,7 +97,11 @@ class GnulaHD : MainAPI() {
 
         if (href.contains("/blog/")) return null
 
-        if (title.contains("Mejores", ignoreCase = true) || title.contains("Cronología", ignoreCase = true)) {
+        if (title.contains("Mejores", ignoreCase = true) || title.contains(
+                "Cronología",
+                ignoreCase = true
+            )
+        ) {
             return null
         }
 
@@ -114,9 +119,11 @@ class GnulaHD : MainAPI() {
             TvType.TvSeries -> newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
                 this.posterUrl = fixUrlNull(posterUrl)
             }
+
             TvType.Anime -> newAnimeSearchResponse(title, href, TvType.Anime) {
                 this.posterUrl = fixUrlNull(posterUrl)
             }
+
             else -> newMovieSearchResponse(title, href, TvType.Movie) {
                 this.posterUrl = fixUrlNull(posterUrl)
             }
@@ -221,69 +228,76 @@ class GnulaHD : MainAPI() {
     }
 
 
-
-
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val visited = ConcurrentHashMap.newKeySet<String>()
+        Log.d("Gnulahd", "$data")
 
-        supervisorScope {
-            LinkHalledici(data, data, subtitleCallback, callback, visited)
+        val documentText = app.get(data).text
+        val iframeMatch = Regex("""<iframe[^>]+src=["']([^"']*embed\.php[^"']*)["']""").find(documentText)
+
+        if (iframeMatch != null) {
+            val iframeSrc = iframeMatch.groupValues[1]
+            val fixedIframeUrl = fixUrl(iframeSrc)
+            Log.d("Gnulahd", "$fixedIframeUrl")
+
+            val embedText = app.get(fixedIframeUrl, referer = data).text
+
+            val categories = mapOf(
+                "Original" to Regex("""var\s+videosOriginal\s*=\s*(\[.*?\]);"""),
+                "Latino" to Regex("""var\s+videosLatino\s*=\s*(\[.*?\]);"""),
+                "Subtitulado" to Regex("""var\s+videosSubtitulado\s*=\s*(\[.*?\]);""")
+            )
+
+            categories.forEach { (lang, regex) ->
+                val match = regex.find(embedText)
+                if (match != null) {
+                    val jsonRaw = match.groupValues[1]
+                    try {
+                        AppUtils.parseJson<List<List<String>>>(jsonRaw).forEach { entry ->
+                            val link = entry.getOrNull(1)
+                            if (link != null) {
+                                val cleanLink = link.replace("\\/", "/")
+                                Log.d("Gnulahd", "$lang | $cleanLink")
+                                loadCustomExtractor(lang, cleanLink, fixedIframeUrl, subtitleCallback, callback)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d("Gnulahd", "${e.message}")
+                    }
+                }
+            }
         }
         return true
     }
 
-
-
-    private suspend fun CoroutineScope.LinkHalledici(
+    private suspend fun loadCustomExtractor(
+        lang: String,
         url: String,
-        referer: String,
-        subCb: (SubtitleFile) -> Unit,
-        cb: (ExtractorLink) -> Unit,
-        visited: MutableSet<String>
+        referer: String? = null,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+        quality: Int? = null,
     ) {
-        if (!visited.add(url)) return
-
-        try {
-            val text = app.get(url, referer = referer).text
-
-            directUrlRegex.find(text)?.groupValues?.get(1)?.let { link ->
-                loadExtractor(link, referer, subCb, cb)
+        loadExtractor(url, referer, subtitleCallback) { link ->
+            CoroutineScope(Dispatchers.IO).launch {
+                callback.invoke(
+                    newExtractorLink(
+                        source = "${link.source} - $lang",
+                        name = "${link.name} - $lang",
+                        url = link.url,
+                        type = link.type
+                    ) {
+                        this.quality = quality ?: link.quality
+                        this.referer = link.referer
+                        this.headers = link.headers
+                        this.extractorData = link.extractorData
+                    }
+                )
             }
-
-            iframeRegex.findAll(text).forEach { match ->
-                val src = match.groupValues[1]
-                if (src.contains("embed.php") || src.contains("player.php")) {
-                    launch { LinkHalledici(fixUrl(src), url, subCb, cb, visited) }
-                } else {
-                    loadExtractor(src, referer, subCb, cb)
-                }
-            }
-
-            jsonListRegex.findAll(text).forEach { match ->
-                launch {
-                    try {
-                        AppUtils.parseJson<List<List<String>>>(match.groupValues[1]).forEach { entry ->
-                            entry.getOrNull(1)?.let { link ->
-                                if (link != url) {
-                                    launch { LinkHalledici(link, url, subCb, cb, visited) }
-                                }
-                            }
-                        }
-                    } catch (_: Exception) { }
-                }
-            }
-
-        } catch (e: Exception) {
         }
     }
-}
-
-private val directUrlRegex = Regex("""var\s+(?:url|mainVideoUrl)\s*=\s*['"]([^'"]+)['"]""")
-private val iframeRegex = Regex("""<iframe[^>]+src="([^"]+)"""")
-private val jsonListRegex = Regex("""var\s+videos(?:Latino|Castellano|Subtitulado|Original)\s*=\s*(\[.*?\]);""")
+    }
