@@ -20,7 +20,7 @@ class F1Fullraces : MainAPI() {
     override val supportedTypes = setOf(TvType.Live)
 
     override val mainPage = mainPageOf(
-           mainUrl                                                 to "Latest",
+        mainUrl to "Latest",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2025/" to "2025",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2024/" to "2024",
         "${mainUrl}/watch-f1-free/category/full-races/2020s/2023/" to "2023",
@@ -40,8 +40,10 @@ class F1Fullraces : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val url = if (page <= 1) "${request.data.trimEnd('/')}/" else "${request.data.trimEnd('/')}/page/$page/"
-        val home = app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
+        val url =
+            if (page <= 1) "${request.data.trimEnd('/')}/" else "${request.data.trimEnd('/')}/page/$page/"
+        val home =
+            app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
 
         return newHomePageResponse(
             list = HomePageList(request.name, home, isHorizontalImages = true),
@@ -63,7 +65,8 @@ class F1Fullraces : MainAPI() {
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val url = if (page <= 1) "$mainUrl/?s=$query" else "$mainUrl/page/$page/?s=$query"
-        val results = app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
+        val results =
+            app.get(url).document.select("div#masonry article").mapNotNull { it.toMainPageResult() }
 
         return newSearchResponseList(results, hasNext = results.isNotEmpty())
     }
@@ -84,102 +87,83 @@ class F1Fullraces : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
+        Log.d("f1fullraces", data)
         val document = app.get(data).document
         val jobs = mutableListOf<Job>()
-        val luluvidMainUrl = "https://luluvid.com"
 
-        document.selectFirst("div#netu > iframe[src*='luluvid.com']")?.let {
-            jobs += launch {
-                processLuluvidLink(it.attr("src"), "Pre-Race Build Up", data, luluvidMainUrl, callback)
+        document.select("div#netu iframe[src*='lulu']").forEach { iframe ->
+            val src = iframe.attr("src")
+            val rawText = iframe.parent()?.ownText()?.trim() ?: ""
+            val name = when {
+                rawText.contains("Pre-Race", true) -> "Yarış Öncesi Analiz"
+                rawText.contains("Race Session", true) -> "Yarış Seansı"
+                rawText.contains("Post-Race", true) -> "Yarış Sonrası Analiz"
+                else -> "Yarış Seansı"
             }
-        }
-
-        document.select("div#netu p:has(iframe[src*='luluvid.com'])").forEach { pElement ->
-            val name = pElement.ownText().trim()
-            val src = pElement.selectFirst("iframe")?.attr("src")
-            if (!src.isNullOrBlank()) {
-                jobs += launch {
-                    processLuluvidLink(src, name, data, luluvidMainUrl, callback)
-                }
+            Log.d("f1fullraces", src)
+            jobs += launch {
+                loadCustomExtractor(src, data, name, subtitleCallback, callback)
             }
         }
 
         document.select("div#mixdrop div[id^=07b022]").forEach { div ->
             val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
             if (decodedId.isNotBlank()) {
+                val url = "https://mixdrop.co/f/$decodedId"
+                Log.d("f1fullraces", url)
                 jobs += launch {
-                    loadExtractor("https://mixdrop.co/f/$decodedId", data, subtitleCallback, callback)
+                    loadCustomExtractor(url, data, "Yarış Seansı", subtitleCallback, callback)
                 }
             }
         }
 
-        document.select("div#drive a[href], div#gofile a[href]").forEach { link ->
+        document.select("div#drive a[href], div#gofile a[href], div#mega a[href]").forEach { link ->
             val href = link.attr("href")
             if (href.isNotBlank()) {
+                Log.d("f1fullraces", href)
                 jobs += launch {
-                    loadExtractor(href, data, subtitleCallback, callback)
+                    loadCustomExtractor(href, data, "Yarış Seansı", subtitleCallback, callback)
                 }
             }
         }
 
         jobs.joinAll()
-        true
+        return@coroutineScope true
     }
 
-    private suspend fun processLuluvidLink(
-        src: String,
-        name: String,
+    private suspend fun loadCustomExtractor(
+        url: String,
         referer: String,
-        mainUrl: String,
+        customName: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
-    ) {
-        val turkishName = when (name) {
-            "Pre-Race Build Up" -> "Yarış Öncesi Analiz"
-            "Race Session" -> "Yarış Seansı"
-            "Post-Race Analysis" -> "Yarış Sonrası Analiz"
-            else -> name
-        }
-        try {
-            val filecode = src.substringAfterLast("/")
-            val postUrl = "$mainUrl/dl"
-            val post = app.post(
-                postUrl,
-                data = mapOf(
-                    "op" to "embed",
-                    "file_code" to filecode,
-                    "auto" to "1",
-                    "referer" to referer
+    ) = coroutineScope {
+        loadExtractor(url, referer, subtitleCallback) { link ->
+            launch {
+                Log.d("f1fullraces", link.url)
+                callback.invoke(
+                    newExtractorLink(
+                        source = link.source,
+                        name = "${link.source}-$customName",
+                        url = link.url,
+                        type = link.type,
+                        initializer = {
+                            this.referer = link.referer
+                            this.headers = link.headers
+                        }
+                    )
                 )
-            ).document
-
-            post.selectFirst("script:containsData(vplayer)")?.data()
-                ?.let { script ->
-                    Regex("file:\"(.*?)\"").find(script)?.groupValues?.get(1)?.let { link ->
-                        callback(
-                            newExtractorLink(
-                                source = "Luluvid",
-                                name = turkishName,
-                                url = link,
-                            ) {
-                                this.referer = mainUrl
-                                this.quality = Qualities.P1080.value
-                            }
-                        )
-                    }
-                }
-        } catch (_: Exception) {
+            }
         }
     }
 
     private fun mixdropIdCoz(encodedId: String): String {
         return try {
-            val cleanedId =
-                encodedId.removePrefix("07b022").removeSuffix("07d").replace("02203a022", "")
-            val charCodes = cleanedId.chunked(3)
-            val decodedChars = charCodes.map { it.toInt(16).toChar() }
+            val cleanedId = encodedId.removePrefix("07b022").removeSuffix("07d").replace("02203a022", "")
+            val decodedChars = cleanedId.chunked(3).map { it.toInt(16).toChar() }
             decodedChars.joinToString("")
-        } catch (_: Exception) {
-
+        } catch (e: Exception) {
+            Log.d("f1fullraces", "${e.message}")
             ""
         }
     }
