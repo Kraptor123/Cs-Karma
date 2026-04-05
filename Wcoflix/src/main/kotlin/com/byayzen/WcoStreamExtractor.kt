@@ -71,8 +71,6 @@ open class WcoStreamExtractor : ExtractorApi() {
 
         var baseHost = (mapper.server ?: mapper.cdn ?: "").replace("\\", "").trim()
         if (baseHost.isNotEmpty() && !baseHost.endsWith("/")) baseHost += "/"
-
-        // Kalite etiketleri ile birlikte eşleştirme yapıldı
         val videoIstek = listOfNotNull(
             mapper.fullhd?.let { if (it.isNotEmpty()) Pair("${baseHost}getvid?evid=${it.removePrefix("/")}&json", "FHD") else null },
             mapper.hd?.let { if (it.isNotEmpty()) Pair("${baseHost}getvid?evid=${it.removePrefix("/")}&json", "HD") else null },
@@ -99,7 +97,7 @@ open class WcoStreamExtractor : ExtractorApi() {
                     callback.invoke(
                         newExtractorLink(
                             source = this.name,
-                            name = "${this.name} $kalite", // SD, HD, FHD eklemesi burada yapıldı
+                            name = "${this.name} $kalite",
                             url = videomuz,
                             type = INFER_TYPE
                         ) {
