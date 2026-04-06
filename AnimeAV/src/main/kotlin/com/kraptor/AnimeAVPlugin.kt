@@ -1,6 +1,7 @@
 // ! Bu araç @Kraptor123 tarafından | @kekikanime için yazılmıştır.
 package com.kraptor
 
+import com.lagradost.cloudstream3.extractors.PixelDrain
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
@@ -11,5 +12,6 @@ class AnimeAVPlugin: Plugin() {
         registerExtractorAPI(Mp4Upload())
         registerExtractorAPI(PixelDrain())
         registerExtractorAPI(PlayerZilla())
+        registerExtractorAPI(AnimeavUPNS())
     }
 }
