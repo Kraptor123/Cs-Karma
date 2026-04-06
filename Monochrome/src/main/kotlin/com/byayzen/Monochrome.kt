@@ -15,9 +15,9 @@ class Monochrome : MainAPI() {
     override val supportedTypes = setOf(TvType.Music, TvType.Others)
 
     override val mainPage = mainPageOf(
-        "editors-picks.json"                                                   to "Editörün Seçtikleri",
-        "album/similar/?id=5943890"                                            to "Benzer Albümler",
-        "v1/artists/35937/albums?countryCode=US&limit=50&filter=EPSANDSINGLES" to "EP ve Single'lar"
+        "editors-picks.json"                                                   to "Editors Choice",
+        "album/similar/?id=5943890"                                            to "Similar Albums",
+        "v1/artists/35937/albums?countryCode=US&limit=50&filter=EPSANDSINGLES" to "Singles"
     )
 
     private var tidaltoken: String? = null
