@@ -29,8 +29,8 @@ class Tokybook : MainAPI() {
     )
 
     override val mainPage = mainPageOf(
-        "https://tokybook.com/api/v1/search/audiobooks" to "All Audiobooks",
-        "https://tokybook.com/api/v1/home/new-books-monthly" to "New Books Monthly"
+        "$mainUrl/api/v1/search/audiobooks" to "All Audiobooks",
+        "$mainUrl/api/v1/home/new-books-monthly" to "New Books Monthly"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -44,8 +44,8 @@ class Tokybook : MainAPI() {
                 url = request.data,
                 headers = commonHeaders + mapOf(
                     "Content-Type" to "application/json",
-                    "Origin" to "https://tokybook.com",
-                    "Referer" to "https://tokybook.com/audiobooks",
+                    "Origin" to "$mainUrl",
+                    "Referer" to "$mainUrl/audiobooks",
                     "X-Requested-With" to "XMLHttpRequest"
                 ),
                 requestBody = body.toRequestBody("application/json".toMediaTypeOrNull())
@@ -54,7 +54,7 @@ class Tokybook : MainAPI() {
             if (page > 1) return newHomePageResponse(request.name, emptyList(), false)
             app.get(
                 url = request.data,
-                headers = commonHeaders + mapOf("Referer" to "https://tokybook.com/")
+                headers = commonHeaders + mapOf("Referer" to "$mainUrl/")
             )
         }
 
@@ -83,11 +83,11 @@ class Tokybook : MainAPI() {
         val body = """{"query":"${query.trim()}","limit":$limit,"offset":$offset}"""
 
         val response = app.post(
-            url = "https://tokybook.com/api/v1/search/instant",
+            url = "$mainUrl/api/v1/search/instant",
             headers = commonHeaders + mapOf(
                 "Content-Type" to "application/json",
-                "Origin" to "https://tokybook.com",
-                "Referer" to "https://tokybook.com/search?q=${query.trim()}",
+                "Origin" to mainUrl,
+                "Referer" to "$mainUrl/search?q=${query.trim()}",
                 "X-Requested-With" to "XMLHttpRequest"
             ),
             requestBody = body.toRequestBody("application/json".toMediaTypeOrNull())
@@ -118,7 +118,7 @@ class Tokybook : MainAPI() {
         val slug = url.substringAfterLast("/")
 
         val postData = app.post(
-            "https://tokybook.com/api/v1/search/post-details",
+            "$mainUrl/api/v1/search/post-details",
             headers = commonHeaders + mapOf("Content-Type" to "application/json"),
             json = mapOf("dynamicSlugId" to slug)
         ).parsedSafe<Map<String, Any>>() ?: return null
@@ -128,7 +128,7 @@ class Tokybook : MainAPI() {
         val detailToken = postData["postDetailToken"] as? String ?: ""
 
         val playlistData = app.post(
-            "https://tokybook.com/api/v1/playlist",
+            "$mainUrl/api/v1/playlist",
             headers = commonHeaders + mapOf("Content-Type" to "application/json"),
             json = mapOf("audioBookId" to rawId, "postDetailToken" to detailToken)
         ).parsedSafe<Map<String, Any>>()

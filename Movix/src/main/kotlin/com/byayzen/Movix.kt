@@ -173,105 +173,86 @@ class Movix : MainAPI() {
         val type = if (path.contains("movie")) "movie" else "tv"
         val season = parts.getOrNull(1)
         val episode = parts.getOrNull(2)
-        val idstr = path.split("/").last()
-        val query =
-            if (type == "tv" && season != null && episode != null) "?season=$season&episode=$episode" else ""
+        val query = if (type == "tv" && season != null && episode != null) "?season=$season&episode=$episode" else ""
 
         val apiheaders = mapOf(
-            "Origin" to mainUrl,
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0"
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0",
+            "Origin" to mainUrl
         )
 
         val requests = mutableListOf(
             listOf("Movix", "$apibase/links/$path$query"),
             listOf("Movix", "$apibase/tmdb/$path$query")
-        )
-        if (type == "movie") requests.addAll(
-            listOf(
-                listOf("FStream", "$apibase/fstream/$path"),
-                listOf("Wiflix", "$apibase/wiflix/$path"),
-                listOf("Cpasmal", "$apibase/cpasmal/$path"),
-                listOf("Movix", "$apibase/movies/download/$idstr")
-            )
-        )
-        else requests.addAll(
-            listOf(
-                listOf("FStream", "$apibase/fstream/$path/season/$season"),
-                listOf("Wiflix", "$apibase/wiflix/$path/$season"),
-                listOf("Cpasmal", "$apibase/cpasmal/$path/season/$season/episode/$episode"),
-                listOf("Movix", "$apibase/series/download/$idstr/season/$season/episode/$episode")
-            )
-        )
+        ).apply {
+            if (type == "movie") {
+                addAll(listOf(listOf("FStream", "$apibase/fstream/$path"), listOf("Wiflix", "$apibase/wiflix/$path"), listOf("Cpasmal", "$apibase/cpasmal/$path")))
+            } else {
+                addAll(listOf(listOf("FStream", "$apibase/fstream/$path/season/$season"), listOf("Wiflix", "$apibase/wiflix/$path/$season"), listOf("Cpasmal", "$apibase/cpasmal/$path/season/$season/episode/$episode")))
+            }
+        }
 
-        requests.map { req ->
+        requests.map { (brandName, targetUrl) ->
             launch {
                 try {
-                    val brand = req[0]
-                    val url = req[1]
-                    val response = app.get(url, headers = apiheaders, timeout = 15).text
-                    val foundlinks = mutableListOf<String>()
-
-                    if (response.contains("player_links")) {
-                        val res = AppUtils.tryParseJson<MovixTmdbResponse>(response)
-                        res?.player_links?.forEach { it.decoded_url?.let { u -> foundlinks.add(u) } }
-                        res?.current_episode?.player_links?.forEach {
-                            it.decoded_url?.let { u ->
-                                foundlinks.add(
-                                    u
-                                )
-                            }
-                        }
-                    }
-
-                    when {
-                        url.contains("/api/links/") -> {
-                            if (type == "movie") AppUtils.tryParseJson<MovixMovieLinksResponse>(
-                                response
-                            )?.data?.links?.let { foundlinks.addAll(it) }
-                            else AppUtils.tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach {
-                                it.links?.let { l ->
-                                    foundlinks.addAll(
-                                        l
-                                    )
-                                }
-                            }
-                        }
-
-                        url.contains("/api/wiflix/") && type == "tv" -> {
-                            AppUtils.tryParseJson<WiflixTvResponse>(response)?.episodes?.get(episode.toString())?.values?.flatten()
-                                ?.forEach { it.url?.let { u -> foundlinks.add(u) } }
-                        }
-
-                        url.contains("/api/fstream/") || url.contains("/api/cpasmal/") || (url.contains(
-                            "/api/wiflix/"
-                        ) && type == "movie") -> {
-                            AppUtils.tryParseJson<CpasmalRes>(response)?.links?.values?.flatten()
-                                ?.forEach { it.url?.let { u -> foundlinks.add(u) } }
-                        }
-
-                        url.contains("/download/") -> {
-                            AppUtils.tryParseJson<DownloadRes>(response)?.sources?.forEach {
-                                it.m3u8?.let { u ->
-                                    foundlinks.add(
-                                        u
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    foundlinks.distinct().filter { it.isNotBlank() }.map { link ->
-                        Log.d("MOVIX", "Embed: $link")
-                        launch {
-                            loadCustomExtractor(brand, link, mainUrl, subtitleCallback, callback)
-                        }
-                    }.joinAll()
+                    val response = app.get(targetUrl, headers = apiheaders, timeout = 15).text
+                    val links = extractLinksFromRaw(response, targetUrl, type)
+                    processLinks(brandName, links, subtitleCallback, callback)
                 } catch (e: Exception) {
-                    Log.e("MOVIX", " ${e.message}")
+                    Log.d("MOVIX", "Error: ${e.message}")
                 }
             }
         }.joinAll()
         true
+    }
+
+    private fun extractLinksFromRaw(response: String, url: String, type: String): List<String> {
+        val extracted = mutableListOf<String>()
+
+        if (response.contains("player_links") || response.contains("iframe_src")) {
+            val res = AppUtils.tryParseJson<MovixTmdbResponse>(response)
+            res?.player_links?.forEach { it.decoded_url?.let { u -> extracted.add(u) } }
+            res?.current_episode?.player_links?.forEach { it.decoded_url?.let { u -> extracted.add(u) } }
+            res?.iframe_src?.let { extracted.add(it) }
+            res?.current_episode?.iframe_src?.let { extracted.add(it) }
+        }
+
+        when {
+            url.contains("/api/links/") -> {
+                if (type == "movie") {
+                    AppUtils.tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let { extracted.addAll(it) }
+                } else {
+                    AppUtils.tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach { it.links?.let { l -> extracted.addAll(l) } }
+                }
+            }
+            response.contains("\"players\":") || url.contains("/api/cpasmal/") -> {
+                val res = AppUtils.tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))
+                res?.links?.values?.flatten()?.forEach { it.url?.let { u -> extracted.add(u) } }
+            }
+        }
+        return extracted.distinct().filter { it.isNotBlank() }
+    }
+
+    private suspend fun processLinks(
+        brand: String,
+        links: List<String>,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        if (links.isEmpty()) return
+        Log.d("MOVIX", "Brand: $brand | Found: ${links.size} links")
+
+        links.forEach { link ->
+            Log.d("MOVIX", "Link: $link")
+            val cleanBrand = if (brand.contains("Movix")) "Movix" else brand
+
+            if (link.contains("kokoflix.lol")) {
+                val redirectedUrl = app.get(link, referer = mainUrl, timeout = 10).url
+                Log.d("MOVIX", "Kokoflix: $redirectedUrl")
+                loadCustomExtractor(cleanBrand, redirectedUrl, link, subtitleCallback, callback)
+            } else {
+                loadCustomExtractor(cleanBrand, link, mainUrl, subtitleCallback, callback)
+            }
+        }
     }
 
     private suspend fun loadCustomExtractor(
@@ -312,6 +293,7 @@ class Movix : MainAPI() {
                 }
             }
         } catch (e: Exception) {
+            Log.e("MOVIXG", "Extractor boku yedi: ${e.message}")
         }
     }
 }
