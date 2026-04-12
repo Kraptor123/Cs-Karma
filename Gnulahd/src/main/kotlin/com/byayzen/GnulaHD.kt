@@ -130,103 +130,101 @@ class GnulaHD : MainAPI() {
         }
     }
 
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
+    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
         val response = app.get(url, timeout = 60)
         val document = response.document
 
-        val title = document.selectFirst("h1.entry-title")?.text()?.trim() ?: return null
+        val title = document.selectFirst("h1.gnpv-title")?.text()?.trim() ?: return null
 
-        val poster = document.selectFirst("div.thumbook div.thumb img")?.attr("src")
-            ?: document.selectFirst("img.ts-post-image")?.attr("src")
+        val poster = document.selectFirst("div.gnpv-poster img")?.attr("src")
             ?: document.selectFirst("meta[property=og:image]")?.attr("content")
 
-        val posterUrl = fixUrlNull(poster?.substringBefore("?"))
+        val posterurl = fixUrlNull(poster?.substringBefore("?"))
 
-        val description = document.selectFirst("div.mindesc")?.text()?.trim()
+        val description = document.selectFirst("div.gnpv-syn-text")?.text()?.trim()
             ?: document.selectFirst("meta[property=og:description]")?.attr("content")
 
-        val infoBox = document.select("div.infox div.spe span")
+        val badge = document.selectFirst("div.gnpv-badge")?.text() ?: ""
+        val year = Regex("\\d{4}").find(badge)?.value?.toIntOrNull()
 
-        val yearText = infoBox.find { it.text().contains("Estreno", true) }?.text()
-        val year = Regex("\\d{4}").find(yearText ?: "")?.value?.toIntOrNull()
+        val durationtext = document.selectFirst("span.gnpv-pill:contains(hr), span.gnpv-pill:contains(min)")?.text()
+        val duration = durationtext?.replace(Regex("\\D"), "")?.toIntOrNull()
 
-        val durationText = infoBox.find { it.text().contains("Duracion", true) }?.text()
-        val duration = durationText?.replace(Regex("\\D"), "")?.toIntOrNull()
+        val actors = document.select("div.gnpv-mb-item:contains(Reparto) a").map { it.text() }
+        val tags = document.select("div.gnpv-genres a").map { it.text() }
 
-        val actors = infoBox.find { it.text().contains("Casts", true) }
-            ?.select("a")?.map { ActorData(Actor(it.text())) } ?: emptyList()
+        val isanime = tags.any { it.contains("Anime", true) }
+        val isseries = badge.contains("Serie", true) || isanime || document.selectFirst("div.eplister") != null
 
-        val tags = document.select("div.genxed a").map { it.text() }
+        val tvtype = if (isanime) TvType.Anime else if (isseries) TvType.TvSeries else TvType.Movie
 
-        val typeText = infoBox.find { it.text().contains("Tipo", true) }?.text() ?: ""
-        val isAnime = typeText.contains("Anime", true)
-        val isSeries = typeText.contains("Serie", true) || isAnime
+        val scoretext = document.selectFirst("span.gnpv-rating")?.text()?.replace("★", "")?.trim()
+        val scoreval = scoretext?.toDoubleOrNull()
 
-        val tvType = if (isAnime) TvType.Anime else if (isSeries) TvType.TvSeries else TvType.Movie
+        val recommendations = document.select("a.gnpv-related-card").mapNotNull {
+            val rectitle = it.selectFirst("span.gnpv-related-title")?.text() ?: return@mapNotNull null
+            val rechref = fixUrl(it.attr("href"))
+            val recposter = it.selectFirst("img")?.attr("src")
 
-        val recommendations = document.select("div.postbody div.listupd article.bs").mapNotNull {
-            it.toSearchResult()
+            newMovieSearchResponse(rectitle, rechref, TvType.Movie) {
+                this.posterUrl = recposter
+            }
         }
 
-        if (isSeries) {
-            val episodes = document.select("div.eplister ul li a").mapNotNull {
-                val href = fixUrl(it.attr("href"))
-                val epTitle = it.selectFirst("div.epl-title")?.text()?.trim()
-                val epNumText = it.selectFirst("div.epl-num")?.text()?.trim() ?: ""
+        if (isseries) {
+            val episodes = document.select("div.eplister ul li").mapNotNull { li ->
+                val a = li.selectFirst("a") ?: return@mapNotNull null
+                val href = fixUrl(a.attr("href"))
+                val epnumtext = a.selectFirst("div.epl-num")?.text()?.trim() ?: ""
+                val eptitle = a.selectFirst("div.epl-title")?.text()?.trim()
 
-                val seasonEpRegex = Regex("(\\d+)x(\\d+)")
-                val match = seasonEpRegex.find(epNumText)
+                val regex = Regex("(\\d+)x(\\d+)")
+                val match = regex.find(epnumtext)
 
                 if (match != null) {
-                    val season = match.groupValues[1].toIntOrNull()
-                    val episode = match.groupValues[2].toIntOrNull()
+                    val s = match.groupValues[1].toIntOrNull()
+                    val e = match.groupValues[2].toIntOrNull()
 
                     newEpisode(href) {
-                        this.name = epTitle
-                        this.season = season
-                        this.episode = episode
-                        this.posterUrl = posterUrl
+                        this.name = eptitle
+                        this.season = s
+                        this.episode = e
+                        this.posterUrl = posterurl
                     }
                 } else {
                     newEpisode(href) {
-                        this.name = epTitle ?: epNumText
+                        this.name = eptitle ?: epnumtext
                         this.season = 1
-                        this.posterUrl = posterUrl
+                        this.posterUrl = posterurl
                     }
                 }
             }.reversed()
 
-            return newTvSeriesLoadResponse(title, url, tvType, episodes) {
-                this.posterUrl = posterUrl
+            return newTvSeriesLoadResponse(title, url, tvtype, episodes) {
+                this.posterUrl = posterurl
                 this.plot = description
                 this.year = year
-                this.tags = tags
                 this.duration = duration
+                this.score = Score.from(scoreval, 10)
+                this.tags = tags
                 this.recommendations = recommendations
-                this.addActors(actors.map { it.actor.name })
+                this.addActors(actors)
             }
         } else {
-            val watchUrlElement = document.selectFirst("div.eplister ul li a")
-            val realMovieUrl = if (watchUrlElement != null) {
-                fixUrl(watchUrlElement.attr("href"))
-            } else {
-                url
-            }
-
-            return newMovieLoadResponse(title, url, TvType.Movie, realMovieUrl) {
-                this.posterUrl = posterUrl
+            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl = posterurl
                 this.plot = description
                 this.year = year
-                this.tags = tags
                 this.duration = duration
+                this.score = Score.from(scoreval, 10)
+                this.tags = tags
                 this.recommendations = recommendations
-                this.addActors(actors.map { it.actor.name })
+                this.addActors(actors)
             }
         }
     }
-
 
     override suspend fun loadLinks(
         data: String,
@@ -234,70 +232,70 @@ class GnulaHD : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("Gnulahd", "$data")
+        Log.d("Gnulahd", data)
 
-        val documentText = app.get(data).text
-        val iframeMatch = Regex("""<iframe[^>]+src=["']([^"']*embed\.php[^"']*)["']""").find(documentText)
+        val res = app.get(data).text
+        val regex = Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""")
+        val match = regex.find(res)
 
-        if (iframeMatch != null) {
-            val iframeSrc = iframeMatch.groupValues[1]
-            val fixedIframeUrl = fixUrl(iframeSrc)
-            Log.d("Gnulahd", "$fixedIframeUrl")
+        if (match != null) {
+            val json = match.groupValues[2]
+            try {
+                val langs = AppUtils.parseJson<List<GnulaLang>>(json)
 
-            val embedText = app.get(fixedIframeUrl, referer = data).text
-
-            val categories = mapOf(
-                "Original" to Regex("""var\s+videosOriginal\s*=\s*(\[.*?\]);"""),
-                "Latino" to Regex("""var\s+videosLatino\s*=\s*(\[.*?\]);"""),
-                "Subtitulado" to Regex("""var\s+videosSubtitulado\s*=\s*(\[.*?\]);""")
-            )
-
-            categories.forEach { (lang, regex) ->
-                val match = regex.find(embedText)
-                if (match != null) {
-                    val jsonRaw = match.groupValues[1]
-                    try {
-                        AppUtils.parseJson<List<List<String>>>(jsonRaw).forEach { entry ->
-                            val link = entry.getOrNull(1)
-                            if (link != null) {
-                                val cleanLink = link.replace("\\/", "/")
-                                Log.d("Gnulahd", "$lang | $cleanLink")
-                                loadCustomExtractor(lang, cleanLink, fixedIframeUrl, subtitleCallback, callback)
-                            }
+                langs.forEach { langobj ->
+                    val label = langobj.label
+                    langobj.servers.forEach { srv ->
+                        val src = srv.src
+                        if (src.isNotBlank()) {
+                            val cleanurl = src.replace("\\/", "/")
+                            Log.d("Gnulahd", "$label | $cleanurl")
+                            loadCustomExtractor(label, cleanurl, data, subtitleCallback, callback)
                         }
-                    } catch (e: Exception) {
-                        Log.d("Gnulahd", "${e.message}")
                     }
                 }
+            } catch (e: Exception) {
+                Log.d("Gnulahd", "JSON Error: ${e.message}")
             }
         }
         return true
     }
 
     private suspend fun loadCustomExtractor(
-        lang: String,
+        label: String,
         url: String,
         referer: String? = null,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
         quality: Int? = null,
     ) {
-        loadExtractor(url, referer, subtitleCallback) { link ->
+        loadExtractor(url, referer, subtitleCallback) { ex ->
             CoroutineScope(Dispatchers.IO).launch {
                 callback.invoke(
                     newExtractorLink(
-                        source = "${link.source} - $lang",
-                        name = "${link.name} - $lang",
-                        url = link.url,
-                        type = link.type
+                        source = "${ex.source} - $label",
+                        name = "${ex.name} - $label",
+                        url = ex.url,
+                        type = ex.type
                     ) {
-                        this.quality = quality ?: link.quality
-                        this.referer = link.referer
-                        this.headers = link.headers
-                        this.extractorData = link.extractorData
+                        this.quality = quality ?: ex.quality
+                        this.referer = ex.referer
+                        this.headers = ex.headers
+                        this.extractorData = ex.extractorData
                     }
                 )
             }
         }
     }
     }
+
+
+data class GnulaLang(
+    val label: String,
+    val servers: List<GnulaServer>
+)
+
+data class GnulaServer(
+    val title: String,
+    val src: String
+)
