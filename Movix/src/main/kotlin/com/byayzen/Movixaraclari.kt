@@ -16,10 +16,7 @@ data class DownloadRes(
     val sources: List<DownloadSource>?
 )
 
-data class DownloadSource(
-    val src  : String?,
-    val m3u8 : String?
-)
+data class DownloadSource(val src: String?, val quality: String?, val language: String?, val m3u8: String?)
 
 data class GenericSource(
     val url: String?
@@ -33,10 +30,7 @@ data class FstreamTvRes(
     val episodes: Map<String, FstreamEpisode>?
 )
 
-data class FstreamEpisode(
-    val languages: Map<String, List<GenericSource>>?
-)
-
+data class FstreamEpisode(val languages: Map<String, List<FstreamLink>>?)
 data class MovixMovieLinksResponse(
     val data: MovixLinkData?
 )
@@ -159,3 +153,20 @@ data class TmdbSeason(
     val name          : String?,
     val poster_path   : String?
 )
+
+data class MovixDownloadResponse(val sources: List<DownloadSource>?)
+
+
+data class MovixImdbResponse(val series: List<ImdbSeries>?)
+data class ImdbSeries(val seasons: List<ImdbSeason>?)
+data class ImdbSeason(val episodes: List<ImdbEpisode>?)
+data class ImdbEpisode(val number: String?, val versions: Map<String, ImdbVersion>?)
+data class ImdbVersion(val players: List<ImdbPlayer>?)
+data class ImdbPlayer(val link: String?)
+
+data class MovixFstreamResponse(val links: Map<String, List<FstreamLink>>?, val episodes: Map<String, FstreamEpisode>?)
+
+data class FstreamLink(val url: String?)
+
+data class MovixPurstreamResponse(val sources: List<PurstreamSource>?)
+data class PurstreamSource(val url: String?, val name: String?, val format: String?)

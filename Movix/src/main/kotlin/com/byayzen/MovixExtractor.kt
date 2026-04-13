@@ -369,3 +369,5 @@ open class VeevToExtractor : ExtractorApi() {
 
 class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
+class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
+

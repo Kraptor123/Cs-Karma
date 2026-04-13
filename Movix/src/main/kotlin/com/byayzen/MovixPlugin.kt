@@ -35,5 +35,6 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Vidzy())
         registerExtractorAPI(Coflix())
         registerExtractorAPI(VeevToExtractor())
+        registerExtractorAPI(Embedseek())
     }
 }
