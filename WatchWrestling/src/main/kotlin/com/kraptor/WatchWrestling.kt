@@ -94,7 +94,6 @@ class WatchWrestling : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
-        Log.d("kraptor_$name", "loadLinks basladi: $data")
         val document = app.get(data).document
         val jobs = mutableListOf<kotlinx.coroutines.Job>()
 
@@ -111,16 +110,12 @@ class WatchWrestling : MainAPI() {
             }
         }
 
-        if (hiddenHtml.isEmpty()) {
-            Log.d("kraptor_$name", "HATA: Gizli HTML bulunamadi!")
-            return@coroutineScope false
-        }
+        if (hiddenHtml.isEmpty()) return@coroutineScope false
 
         val innerDoc = org.jsoup.Jsoup.parse(hiddenHtml)
         val repeaters = innerDoc.select("div.episodeRepeater")
 
         repeaters.forEach { block ->
-            // "Watch Dailymotion HD 720P" -> "Dailymotion"
             val hostTitle = block.selectFirst("h1")?.text()
                 ?.replace("Watch ", "", ignoreCase = true)
                 ?.replace("HD", "", ignoreCase = true)
@@ -130,10 +125,14 @@ class WatchWrestling : MainAPI() {
             val links = block.select("a")
 
             links.forEach { linkElement ->
-                val videoUrl = linkElement.attr("href")
+                var videoUrl = linkElement.attr("href")
                 val partLabel = linkElement.text().trim()
 
-                if (videoUrl.isNotEmpty()) {
+                if (videoUrl.isNotBlank()) {
+                    if (videoUrl.startsWith("//")) {
+                        videoUrl = "https:$videoUrl"
+                    }
+
                     val job = launch {
                         try {
                             loadCustomExtractor(
@@ -144,7 +143,6 @@ class WatchWrestling : MainAPI() {
                                 callback = callback
                             )
                         } catch (e: Exception) {
-                            Log.d("kraptor_$name", "Extractor Hatasi: ${e.message}")
                         }
                     }
                     jobs.add(job)
@@ -153,7 +151,6 @@ class WatchWrestling : MainAPI() {
         }
 
         jobs.joinAll()
-        Log.d("kraptor_$name", "loadLinks bitti. Toplam is: ${jobs.size}")
         true
     }
 
@@ -166,20 +163,22 @@ class WatchWrestling : MainAPI() {
         quality: Int? = null,
     ) {
         loadExtractor(url, referer, subtitleCallback) { link ->
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                callback.invoke(
-                    newExtractorLink(
-                        source = name ?: link.source,
-                        name = name ?: link.name,
-                        url = link.url,
-                    ) {
-                        this.quality = quality ?: link.quality
-                        this.type = link.type
-                        this.referer = link.referer
-                        this.headers = link.headers
-                        this.extractorData = link.extractorData
-                    }
-                )
+            if (link.url.isNotBlank() && (link.url.startsWith("http") || link.url.startsWith("https"))) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = name ?: link.source,
+                            name = name ?: link.name,
+                            url = link.url,
+                        ) {
+                            this.quality = quality ?: link.quality
+                            this.type = link.type
+                            this.referer = link.referer
+                            this.headers = link.headers
+                            this.extractorData = link.extractorData
+                        }
+                    )
+                }
             }
         }
     }

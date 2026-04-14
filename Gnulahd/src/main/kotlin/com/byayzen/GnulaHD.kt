@@ -232,8 +232,6 @@ class GnulaHD : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("Gnulahd", data)
-
         val res = app.get(data).text
         val regex = Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""")
         val match = regex.find(res)
@@ -248,14 +246,15 @@ class GnulaHD : MainAPI() {
                     langobj.servers.forEach { srv ->
                         val src = srv.src
                         if (src.isNotBlank()) {
-                            val cleanurl = src.replace("\\/", "/")
-                            Log.d("Gnulahd", "$label | $cleanurl")
+                            var cleanurl = src.replace("\\/", "/")
+                            if (cleanurl.startsWith("//")) {
+                                cleanurl = "https:$cleanurl"
+                            }
                             loadCustomExtractor(label, cleanurl, data, subtitleCallback, callback)
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.d("Gnulahd", "JSON Error: ${e.message}")
             }
         }
         return true
@@ -270,20 +269,22 @@ class GnulaHD : MainAPI() {
         quality: Int? = null,
     ) {
         loadExtractor(url, referer, subtitleCallback) { ex ->
-            CoroutineScope(Dispatchers.IO).launch {
-                callback.invoke(
-                    newExtractorLink(
-                        source = "${ex.source} - $label",
-                        name = "${ex.name} - $label",
-                        url = ex.url,
-                        type = ex.type
-                    ) {
-                        this.quality = quality ?: ex.quality
-                        this.referer = ex.referer
-                        this.headers = ex.headers
-                        this.extractorData = ex.extractorData
-                    }
-                )
+            if (ex.url.isNotBlank() && (ex.url.startsWith("http") || ex.url.startsWith("https"))) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = "${ex.source} - $label",
+                            name = "${ex.name} - $label",
+                            url = ex.url,
+                            type = ex.type
+                        ) {
+                            this.quality = quality ?: ex.quality
+                            this.referer = ex.referer
+                            this.headers = ex.headers
+                            this.extractorData = ex.extractorData
+                        }
+                    )
+                }
             }
         }
     }

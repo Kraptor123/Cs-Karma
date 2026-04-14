@@ -21,11 +21,6 @@ class Movix : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    private val apiheaders = mapOf(
-        "Origin" to mainUrl,
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0"
-    )
-
     override val mainPage = mainPageOf(
         "movie/28" to "Action", "movie/12" to "Aventure", "movie/16" to "Animation",
         "movie/35" to "Comédie", "movie/80" to "Crime", "movie/99" to "Documentaire",

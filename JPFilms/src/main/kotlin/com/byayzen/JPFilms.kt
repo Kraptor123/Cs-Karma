@@ -3,10 +3,12 @@
 package com.byayzen
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
+import org.json.JSONArray
 import org.jsoup.Jsoup
 
 class JPFilms : MainAPI() {
@@ -45,11 +47,13 @@ class JPFilms : MainAPI() {
     private fun Element.toSearchResult(): SearchResponse? {
         val title = this.selectFirst(".entry-title")?.text() ?: return null
         val href = this.selectFirst("a")?.attr("href") ?: return null
-        val posterurl = this.selectFirst("img")?.attr("data-src")
-            ?: this.selectFirst("img")?.attr("src")
+        val poster = this.selectFirst("img")?.let { img ->
+            val url = img.attr("data-src").ifEmpty { img.attr("src") }
+            fixUrlNull(url)
+        }
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = posterurl
+            this.posterUrl = poster?.toString()
         }
     }
 
@@ -70,14 +74,20 @@ class JPFilms : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val response = app.get(url)
+        val document = response.document
 
         val title = document.selectFirst("h1.entry-title")?.text()?.replace(Regex("\\s*\\(\\d{4}\\)$"), "")?.trim() ?: return null
-        val poster = fixUrlNull(document.selectFirst(".movie-thumb img, .movie-thumb")?.attr("src"))
-        val tags = document.select(".category a").map { it.text() }
+
+        val posterraw = document.selectFirst("img.movie-thumb")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
+            ?: document.selectFirst(".movie-poster img")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
+        val poster = fixUrlNull(posterraw)
+
+        val country = document.select("p.actors:contains(Country:) a").map { it.text() }
+        val tags = document.select(".category a").map { it.text() } + country
 
         val actors = document.select(".directors a").map { Actor(it.text(), "Director") } +
-                document.select(".actors a").map { Actor(it.text()) }
+                document.select(".actors a").filter { it.parent()?.text()?.contains("Country:") == false }.map { Actor(it.text()) }
 
         val ratingtxt = document.selectFirst(".imdb-icon")?.attr("data-rating")?.toDoubleOrNull()
             ?: document.selectFirst(".halim_imdbrating .score")?.text()?.toDoubleOrNull()?.times(2.0)
@@ -87,57 +97,55 @@ class JPFilms : MainAPI() {
 
         val allepisodes = mutableListOf<Episode>()
 
-        document.select("script").map { it.data() }.find { it.contains("var jsonEpisodes") }?.let { script ->
-            val jsonstr = script.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim()
-            Regex(""""postUrl":"([^"]+)".*?"episodeName":"([^"]+)"""").findAll(jsonstr).forEach { match ->
-                val name = match.groupValues[2]
-                if (name.contains("free", true) || !name.contains("vip", true)) {
-                    allepisodes.add(newEpisode(match.groupValues[1].replace("\\/", "/")) {
-                        this.name = name
-                        this.episode = Regex("""\d+""").find(name)?.value?.toIntOrNull()
-                    })
-                }
-            }
-        }
-
-        if (allepisodes.isEmpty()) {
-            document.select(".halim-server").forEach { server ->
-                val servername = server.selectFirst(".halim-server-name")?.text() ?: ""
-                if (servername.contains("free", true) || !servername.contains("vip", true)) {
-                    server.select(".halim-list-eps li").forEach { element ->
-                        val href = fixUrlNull(element.attr("data-href") ?: element.selectFirst("a")?.attr("href"))
-                        if (!href.isNullOrEmpty()) {
-                            allepisodes.add(newEpisode(href) {
-                                this.name = element.text().trim()
-                                this.episode = Regex("""\d+""").find(this.name ?: "")?.value?.toIntOrNull()
+        val scriptdata = document.select("script").map { it.data() }.find { it.contains("var jsonEpisodes") }
+        if (scriptdata != null) {
+            val jsonstr = scriptdata.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim().removeSuffix(";")
+            try {
+                val outerarray = JSONArray(jsonstr)
+                for (i in 0 until outerarray.length()) {
+                    val innerarray = outerarray.getJSONArray(i)
+                    for (j in 0 until innerarray.length()) {
+                        val epobj = innerarray.getJSONObject(j)
+                        val sid = epobj.optInt("serverId")
+                        if (sid == 2) {
+                            val epurl = epobj.getString("postUrl").replace("\\/", "/")
+                            val epname = epobj.optString("episodeName")
+                            allepisodes.add(newEpisode(epurl) {
+                                this.name = epname
+                                this.episode = Regex("""\d+""").find(epname)?.value?.toIntOrNull()
                             })
                         }
                     }
                 }
-            }
+            } catch (e: Exception) { }
         }
 
-        val ispaid = allepisodes.isEmpty()
-        val plot = if (ispaid) "This content is only for paid users" else document.select("article.item-content").text().trim()
+        val recommendations = document.select(".related-film article.thumb").mapNotNull {
+            it.toSearchResult()
+        }
+
+        val plot = document.select("article.item-content p").text().trim()
 
         return if (allepisodes.size <= 1) {
-            newMovieLoadResponse(title, url, TvType.AsianDrama, allepisodes.firstOrNull()?.data ?: url) {
+            newMovieLoadResponse(title, url, TvType.Movie, allepisodes.firstOrNull()?.data ?: url) {
                 this.posterUrl = poster
                 this.plot = plot
                 this.year = year
                 this.tags = tags
                 this.score = ratingtxt?.let { Score.from10(it) }
                 this.duration = duration
+                this.recommendations = recommendations
                 addActors(actors)
             }
         } else {
-            newTvSeriesLoadResponse(title, url, TvType.AsianDrama, allepisodes) {
+            newTvSeriesLoadResponse(title, url, TvType.Movie, allepisodes) {
                 this.posterUrl = poster
                 this.plot = plot
                 this.year = year
                 this.tags = tags
                 this.score = ratingtxt?.let { Score.from10(it) }
                 this.duration = duration
+                this.recommendations = recommendations
                 addActors(actors)
             }
         }

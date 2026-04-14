@@ -179,7 +179,9 @@ class AnimeYTX : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         try {
-            app.get(data).document.select("select.mirror option").forEach { option ->
+            Log.d("animeytx", data)
+            val response = app.get(data)
+            response.document.select("select.mirror option").forEach { option ->
                 val encodedValue = option.attr("value").takeIf { it.isNotBlank() } ?: return@forEach
                 val serverName = option.text()
 
@@ -189,70 +191,61 @@ class AnimeYTX : MainAPI() {
 
                 if (iframeUrl.contains("vipbanner") || serverName.contains("VIP", true)) return@forEach
 
-                if (iframeUrl.contains("mytsumi.com/multiplayer") || iframeUrl.contains("/options.php")) {
-                    val containerLink = app.get(iframeUrl, referer = data).document.select("div.play a").attr("href")
-                    if (containerLink.isBlank()) return@forEach
+                if (iframeUrl.contains("mytsumi.com")) {
+                    Log.d("animeytx", iframeUrl)
 
-                    val pageText = app.get(containerLink, referer = iframeUrl).text
-                    Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""", RegexOption.DOT_MATCHES_ALL).find(pageText)?.groupValues?.get(1)?.let { json ->
-                        val jsonArray = JSONArray(json)
-                        for (i in 0 until jsonArray.length()) {
-                            val tab = jsonArray.getJSONObject(i)
-                            val url = tab.getString("url").replace("\\/", "/")
+                    val initialRes = app.get(iframeUrl, referer = data)
 
-                            if (url.isNotBlank() && url != "about:blank") {
-                                if (url.contains("mytsumiplay/player.php")) {
-                                    val rawUrl = app.get(url, referer = containerLink).document.select("source").attr("src")
-                                    if (rawUrl.isNotEmpty()) {
-                                        callback(
-                                            newExtractorLink(
-                                                source = "Mytsumi - Raw",
-                                                name = "Mytsumi - Raw",
-                                                url = rawUrl,
-                                                type = ExtractorLinkType.VIDEO
-                                            ) {
-                                                this.referer = url
-                                                this.quality = Qualities.Unknown.value
-                                            }
-                                        )
-                                    }
-                                } else {
-                                    loadExtractor(url, containerLink, subtitleCallback, callback)
+                    val playLink = initialRes.document.select("div.play a").attr("href")
+                    val targetUrl = if (playLink.isNotBlank()) {
+                        Log.d("animeytx", playLink)
+                        playLink
+                    } else {
+                        iframeUrl
+                    }
+
+                    val pageText = app.get(targetUrl, referer = iframeUrl).text
+
+                    Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""").find(pageText)?.groupValues?.get(1)?.let { json ->
+                        try {
+                            val jsonArray = JSONArray(json)
+                            for (i in 0 until jsonArray.length()) {
+                                val tab = jsonArray.getJSONObject(i)
+                                val url = tab.getString("url").replace("\\/", "/")
+
+                                if (url.isNotBlank() && url != "about:blank") {
+                                    Log.d("animeytx", "Tab Extractor: $url")
+                                    loadExtractor(url, targetUrl, subtitleCallback, callback)
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.d("animeytx", "${e.message}")
                         }
                     }
 
-                    Regex("""const\s+downloadsByQuality\s*=\s*(\{.*?\});""", RegexOption.DOT_MATCHES_ALL).find(pageText)?.groupValues?.get(1)?.let { json ->
-                        val dlJson = JSONObject(json)
-                        dlJson.keys().forEach { quality ->
-                            val items = dlJson.getJSONArray(quality)
-                            for (i in 0 until items.length()) {
-                                val item = items.getJSONObject(i)
-                                val dlUrl = item.getString("download_url").replace("\\/", "/")
-                                if (!dlUrl.contains("fireload.com") && !item.getString("server_name").contains("FireLoad")) {
-                                    loadExtractor(dlUrl, containerLink, subtitleCallback, callback)
+                    Regex("""const\s+downloadsByQuality\s*=\s*(\{.*?\});""").find(pageText)?.groupValues?.get(1)?.let { json ->
+                        try {
+                            val dlJson = JSONObject(json)
+                            dlJson.keys().forEach { quality ->
+                                val items = dlJson.getJSONArray(quality)
+                                for (i in 0 until items.length()) {
+                                    val item = items.getJSONObject(i)
+                                    val dlUrl = item.getString("download_url").replace("\\/", "/")
+                                    Log.d("animeytx", "Loading Download Link: $dlUrl")
+                                    loadExtractor(dlUrl, targetUrl, subtitleCallback, callback)
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.d("animeytx", "${e.message}")
                         }
                     }
-                }
-                else {
-                    callback(
-                        newExtractorLink(
-                            source = serverName,
-                            name = serverName,
-                            url = iframeUrl,
-                            type = if (iframeUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                        ) {
-                            this.referer = data
-                            this.quality = Qualities.Unknown.value
-                        }
-                    )
+
+                } else {
+                    loadExtractor(iframeUrl, data, subtitleCallback, callback)
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.d("animeytx", "${e.message}")
             return false
         }
         return true
