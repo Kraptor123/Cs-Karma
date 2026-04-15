@@ -12,6 +12,11 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.StringUtils.decodeUri
 import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlin.io.encoding.Base64
 
 
@@ -100,40 +105,89 @@ class Soccerfullmatch : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("kraptor_$name", "loadLinks Başladı")
+        Log.d("kraptor_$name", data)
         val document = app.get(data).document
-
         val videolar = document.select("a[href*=em=], a[href*=\"dl=\"]")
 
-        videolar.mapNotNull { video ->
+        Log.d("kraptor_$name", videolar.size.toString())
+
+        videolar.forEach { video ->
             val href = video.attr("href")
+            Log.d("kraptor_$name", href)
+
+            val part = Regex("pt=([^&]+)").find(href)?.groupValues?.get(1)?.replace("%20", " ") ?: ""
+            val channel = Regex("ch=([^&]+)").find(href)?.groupValues?.get(1)?.replace("%20", " ") ?: ""
 
             val sifreliKisim = href.substringAfter("=").substringBefore("&")
 
-            val sifreliKisimPadded = sifreliKisim.let { encoded ->
-                val paddingNeeded = (4 - (encoded.length % 4)) % 4
-                encoded + "=".repeat(paddingNeeded)
+            val sifreliKisimDevam = sifreliKisim.let { encoded ->
+                val sifrecozen = (4 - (encoded.length % 4)) % 4
+                encoded + "=".repeat(sifrecozen)
             }
 
             try {
-                val sifreCoz = base64Decode(sifreliKisimPadded)
+                val sifreCoz = base64Decode(sifreliKisimDevam)
+                Log.d("kraptor_$name", sifreCoz)
 
-                if (sifreCoz.contains("mp4") || sifreCoz.contains("m3u8")){
-                    callback.invoke(newExtractorLink(
-                        sifreCoz.split("/")[2].uppercase(),
-                        sifreCoz.split("/")[2].uppercase(),
-                        sifreCoz,
-                        type = INFER_TYPE
-                    ) {
-                        this.referer = sifreCoz
-                    })
+                if (sifreCoz.contains("mp4") || sifreCoz.contains("m3u8")) {
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val sourceName = sifreCoz.split("/")[2].uppercase()
+                        Log.d("kraptor_$name", sourceName)
+
+                        val linkName = listOf(part, sourceName, channel).filter { it.isNotBlank() }.joinToString(" - ")
+
+                        callback.invoke(
+                            newExtractorLink(
+                                source = sourceName,
+                                name = linkName,
+                                url = sifreCoz,
+                                type = INFER_TYPE
+                            ) {
+                                this.referer = sifreCoz
+                            }
+                        )
+                    }
                 } else {
-                    loadExtractor(sifreCoz, subtitleCallback, callback)
+                    loadCustomExtractor(sifreCoz, data, part, channel, subtitleCallback, callback)
                 }
             } catch (e: Exception) {
-                null
+                Log.d("kraptor_$name", e.message.toString())
             }
         }
         return true
+    }
+
+    private suspend fun loadCustomExtractor(
+        url: String,
+        referer: String? = null,
+        part: String,
+        channel: String,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit,
+        quality: Int? = null,
+    ) {
+        Log.d("kraptor_$name", url)
+        loadExtractor(url, referer, subtitleCallback) { ex ->
+            if (ex.url.isNotBlank() && (ex.url.startsWith("http") || ex.url.startsWith("https"))) {
+                Log.d("kraptor_$name", ex.url)
+                CoroutineScope(Dispatchers.IO).launch {
+                    val linkName = listOf(part, ex.source, channel).filter { it.isNotBlank() }.joinToString(" - ")
+
+                    callback.invoke(
+                        newExtractorLink(
+                            source = ex.source,
+                            name = linkName,
+                            url = ex.url,
+                            type = ex.type
+                        ) {
+                            this.quality = quality ?: ex.quality
+                            this.referer = ex.referer
+                            this.headers = ex.headers
+                            this.extractorData = ex.extractorData
+                        }
+                    )
+                }
+            }
+        }
     }
 }
