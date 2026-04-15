@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.joinAll
 
 class Movix : MainAPI() {
-    override var mainUrl = "https://movix.rodeo"
+    override var mainUrl = "https://movix.llc"
     override var name = "Movix"
     override val hasMainPage = true
     override var lang = "fr"
