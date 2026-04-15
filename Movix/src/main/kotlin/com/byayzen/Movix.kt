@@ -145,7 +145,8 @@ class Movix : MainAPI() {
             newTvSeriesLoadResponse(titleText, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster; this.backgroundPosterUrl = bg; this.logoUrl = logo
                 this.showStatus = when (res.status) {
-                    "Returning Series", "In Production", "Planned" -> ShowStatus.Ongoing; "Canceled", "Ended" -> ShowStatus.Completed; else -> null
+                    "Returning Series", "In Production", "Planned" -> ShowStatus.Ongoing;
+                    "Canceled", "Ended" -> ShowStatus.Completed; else -> null
                 }
                 this.plot = res.overview; this.year = yearText
                 this.tags = res.genres?.mapNotNull { it.name }
@@ -163,6 +164,9 @@ class Movix : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
+        val domainsilici = mainUrl.removePrefix("https://").removePrefix("http://").removeSuffix("/")
+        val apibase = "https://api.$domainsilici/api"
+
         val parts = data.split("-")
         val rawpath = parts[0]
         val id = rawpath.substringAfterLast("/")
@@ -351,7 +355,6 @@ class Movix : MainAPI() {
             }
         }
     }
-
 
     private suspend fun loadCustomExtractor(
         brand: String,
