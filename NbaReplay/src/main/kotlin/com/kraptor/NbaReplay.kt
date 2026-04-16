@@ -2,9 +2,12 @@
 
 package com.kraptor
 
+import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 class NbaReplay : MainAPI() {
     override var mainUrl              = "https://www.nba-replay.org"
@@ -118,18 +121,77 @@ class NbaReplay : MainAPI() {
         return newMovieSearchResponse(title, "$href|$posterUrl", TvType.Movie) { this.posterUrl = posterUrl }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-//        Log.d("kraptor_$name", "data = ${data}")
-        val document = app.get(data, referer ="${mainUrl}/").document
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean = coroutineScope {
+        val document = app.get(data, referer = "$mainUrl/").document
+        val links = mutableListOf<String>()
+        val embedlinki = document.selectFirst("tr:contains(Full Game Footage) a")?.attr("href")
 
-        val links = document.select("td a").map { it.attr("href") }.toMutableList()
-        document.selectFirst("iframe")?.attr("src")?.let { links.add(it) }
-
-        links.forEach { url ->
-//            Log.d("kraptor_$name", "url = ${url}")
-            loadExtractor(url, "${mainUrl}/", subtitleCallback, callback)
+        if (!embedlinki.isNullOrBlank()) {
+            app.get(embedlinki,
+                referer = "$mainUrl/").
+                document.select("iframe").forEach {
+                val src = it.attr("src")
+                if (src.isNotBlank()) links.add(src)
+            }
+        } else {
+            links.addAll(document.select("td a").map { it.attr("href") })
+            document.selectFirst("iframe")?.attr("src")?.let { links.add(it) }
         }
 
-        return true
+        val gruplulinkler = mutableMapOf<String, MutableList<String>>()
+        links.distinct().forEach { url ->
+            try {
+                val host = url.substringAfter("://").substringBefore("/")
+                val kaynakadi = host.removePrefix("www.").substringBeforeLast(".").replaceFirstChar { it.uppercase() }
+                gruplulinkler.getOrPut(kaynakadi) { mutableListOf() }.add(url)
+            } catch (e: Exception) {
+                gruplulinkler.getOrPut("Unknown") { mutableListOf() }.add(url)
+            }
+        }
+
+        val partadlari = listOf("First Part", "Second Part", "Third Part", "Fourth Part", "Fifth Part")
+        gruplulinkler.forEach { (brand, brandlinks) ->
+            val tekpartmi = brandlinks.size == 1
+            brandlinks.forEachIndexed { index, url ->
+                launch {
+                    val partismi = if (tekpartmi) "Full Video" else partadlari.getOrNull(index) ?: "Part ${index + 1}"
+                    val sonisim = "$brand - $partismi"
+                    Log.d("kraptor_$name", "url = $url | name = $sonisim")
+                    loadcustomextractor(sonisim, url, "$mainUrl/", subtitleCallback, callback)
+                }
+            }
+        }
+        true
+    }
+
+    private suspend fun loadcustomextractor(
+        name: String,
+        url: String,
+        referer: String,
+        subtitlecallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) = coroutineScope {
+        try {
+            loadExtractor(url, referer, subtitlecallback) { link ->
+                launch {
+                    callback.invoke(
+                        newExtractorLink(source = name, name = name, url = link.url) {
+                            this.quality = link.quality
+                            this.type = link.type
+                            this.referer = link.referer
+                            this.headers = link.headers
+                            this.extractorData = link.extractorData
+                        }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("kraptor", e.message.toString())
+        }
     }
 }
