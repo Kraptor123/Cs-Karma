@@ -166,7 +166,6 @@ class Movix : MainAPI() {
     ): Boolean = coroutineScope {
         val domainsilici = mainUrl.removePrefix("https://").removePrefix("http://").removeSuffix("/")
         val apibase = "https://api.$domainsilici/api"
-
         val parts = data.split("-")
         val rawpath = parts[0]
         val id = rawpath.substringAfterLast("/")
@@ -191,14 +190,12 @@ class Movix : MainAPI() {
         if (type == "movie") {
             requests.add("FStream" to "$apibase/fstream/$type/$id")
             requests.add("Wiflix" to "$apibase/wiflix/$id")
-            requests.add("Cpasmal" to "$apibase/cpasmal/$id")
-            requests.add("Download" to "$apibase/movie/download/$id")
+            requests.add("Cpasmal" to "$apibase/cpasmal/$type/$id")
             requests.add("Purstream" to "$apibase/purstream/movie/$id/stream")
         } else {
             requests.add("FStream" to "$apibase/fstream/$type/$id/season/$season")
             requests.add("Wiflix" to "$apibase/wiflix/$id/$season")
-            requests.add("Cpasmal" to "$apibase/cpasmal/$id/season/$season/episode/$episode")
-            requests.add("Download" to "$apibase/series/download/$id/season/$season/episode/$episode")
+            requests.add("Cpasmal" to "$apibase/cpasmal/$type/$id/season/$season/episode/$episode")
             requests.add("Purstream" to "$apibase/purstream/tv/$id/stream$query")
         }
 
@@ -208,55 +205,12 @@ class Movix : MainAPI() {
                     Log.d("Movix", targeturl)
                     val response = app.get(targeturl, headers = apiheaders, timeout = 15).text
 
-                    if (response.contains("\"success\":true") || response.contains("player_links") || response.contains("iframe_src") || response.contains("\"series\":") || response.contains("\"sources\":")) {
-
-                        when (brandname) {
-                            "Download" -> {
-                                val downloadres = AppUtils.tryParseJson<MovixDownloadResponse>(response)
-                                downloadres?.sources?.forEach { source ->
-                                    val link = source.m3u8 ?: source.src
-                                    if (!link.isNullOrBlank()) {
-                                        val ism3u8 = link.contains(".m3u8")
-                                        val qualname = source.quality ?: ""
-                                        val langname = source.language ?: ""
-                                        val extra = listOf(langname, qualname).filter { it.isNotBlank() }.joinToString(" | ")
-                                        val finalname = if (extra.isNotBlank()) "Movix - $extra" else "Movix Direct"
-
-                                        callback(
-                                            newExtractorLink(
-                                                source = "Movix",
-                                                name = finalname,
-                                                url = link,
-                                                type = if (ism3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                                            ) {
-                                                this.quality = source.quality?.filter { it.isDigit() }?.toIntOrNull() ?: Qualities.Unknown.value
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            "Purstream" -> {
-                                val purres = AppUtils.tryParseJson<MovixPurstreamResponse>(response)
-                                purres?.sources?.forEach { source ->
-                                    if (!source.url.isNullOrBlank()) {
-                                        val ism3u8 = source.format == "m3u8" || source.url.contains(".m3u8")
-                                        callback(
-                                            newExtractorLink(
-                                                source = "Purstream",
-                                                name = source.name ?: "Purstream",
-                                                url = source.url,
-                                                type = if (ism3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                                            ) {
-                                                this.quality = source.name?.filter { it.isDigit() }?.toIntOrNull() ?: Qualities.Unknown.value
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                            else -> {
-                                val links = extractLinksFromRaw(response, targeturl, type, episode)
-                                processLinks(brandname, links, subtitleCallback, callback)
-                            }
+                    if (isvalidresponse(response)) {
+                        if (brandname == "Purstream") {
+                            parsepurstream(response, callback)
+                        } else {
+                            val links = extractlinksfromraw(response, targeturl, type, episode)
+                            processlinks(brandname, links, subtitleCallback, callback)
                         }
                     }
                 } catch (e: Exception) {
@@ -265,18 +219,93 @@ class Movix : MainAPI() {
             }
         }.awaitAll()
 
+        launch {
+            videolinks(apibase, type, id, season, episode, query, apiheaders, callback)
+        }
+
         true
     }
 
-    private fun extractLinksFromRaw(response: String, url: String, type: String, episode: String?): List<String> {
+    private fun isvalidresponse(response: String): Boolean {
+        val keywords = listOf("\"success\":true", "player_links", "iframe_src", "\"series\":", "\"sources\":", "\"players\":", "\"links\":")
+        return keywords.any { response.contains(it) }
+    }
+
+    private suspend fun parsepurstream(response: String, callback: (ExtractorLink) -> Unit) {
+        AppUtils.tryParseJson<MovixPurstreamResponse>(response)?.sources?.forEach { source ->
+            source.url?.let { link ->
+                if (link.isNotBlank()) {
+                    val linktype = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    val qualityval = source.name?.filter { it.isDigit() }?.toIntOrNull() ?: Qualities.Unknown.value
+
+                    val newlink = newExtractorLink("Purstream", "Purstream", link, linktype) {
+                        this.quality = qualityval
+                    }
+                    callback(newlink)
+                }
+            }
+        }
+    }
+
+    private suspend fun videolinks(
+        apibase: String, type: String, id: String, season: String?, episode: String?,
+        query: String, apiheaders: Map<String, String>, callback: (ExtractorLink) -> Unit
+    ) {
+        try {
+            val ismovie = type == "movie"
+            val cpasurl = if (ismovie) "$apibase/cpasmal/$type/$id" else "$apibase/cpasmal/$type/$id/season/$season/episode/$episode"
+            val infores = app.get(cpasurl, headers = apiheaders, timeout = 15).text
+
+            val titlematch = Regex("\"(?:title|name)\"\\s*:\\s*\"([^\"]+)\"")
+            var title = titlematch.find(infores)?.groupValues?.get(1)
+
+            if (title == null) {
+                val tmdbres = app.get("$apibase/tmdb/$type/$id$query", headers = apiheaders, timeout = 15).text
+                title = titlematch.find(tmdbres)?.groupValues?.get(1)
+            }
+
+            if (title.isNullOrBlank()) return
+
+            val encodedtitle = java.net.URLEncoder.encode(title, "UTF-8")
+            val searchres = app.get("$apibase/search?title=$encodedtitle", headers = apiheaders, timeout = 15).text
+            val downloadid = Regex("\"id\"\\s*:\\s*(\\d+)").find(searchres)?.groupValues?.get(1) ?: return
+
+            val downloadurl = if (ismovie) "$apibase/films/download/$downloadid" else "$apibase/series/download/$downloadid/season/$season/episode/$episode"
+            Log.d("Movix", downloadurl)
+
+            val dlres = app.get(downloadurl, headers = apiheaders, timeout = 15).text
+            AppUtils.tryParseJson<MovixDownloadResponse>(dlres)?.sources?.forEach { source ->
+                val link = source.m3u8 ?: source.src
+
+                if (!link.isNullOrBlank()) {
+                    val langname = source.language ?: ""
+                    val finalname = if (langname.isNotBlank()) "Movix - $langname" else "Movix"
+                    val linktype = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    val qualityval = source.quality?.filter { it.isDigit() }?.toIntOrNull() ?: Qualities.Unknown.value
+
+                    val newlink = newExtractorLink("Movix", finalname, link, linktype) {
+                        this.quality = qualityval
+                        this.headers = mapOf()
+                        this.referer = ""
+                    }
+                    callback(newlink)
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("Movix", e.message.toString())
+        }
+    }
+
+    private fun extractlinksfromraw(response: String, url: String, type: String, episode: String?): List<String> {
         val extracted = mutableListOf<String>()
 
         if (response.contains("player_links") || response.contains("iframe_src")) {
-            val res = AppUtils.tryParseJson<MovixTmdbResponse>(response)
-            res?.player_links?.forEach { it.decoded_url?.let { u -> extracted.add(u) } }
-            res?.current_episode?.player_links?.forEach { it.decoded_url?.let { u -> extracted.add(u) } }
-            res?.iframe_src?.let { extracted.add(it) }
-            res?.current_episode?.iframe_src?.let { extracted.add(it) }
+            AppUtils.tryParseJson<MovixTmdbResponse>(response)?.let {
+                it.player_links?.forEach { p -> p.decoded_url?.let { u -> extracted.add(u) } }
+                it.current_episode?.player_links?.forEach { p -> p.decoded_url?.let { u -> extracted.add(u) } }
+                it.iframe_src?.let { src -> extracted.add(src) }
+                it.current_episode?.iframe_src?.let { src -> extracted.add(src) }
+            }
         }
 
         when {
@@ -288,19 +317,15 @@ class Movix : MainAPI() {
                 }
             }
             url.contains("/api/cpasmal/") || (response.contains("\"players\":") && !url.contains("/imdb/")) -> {
-                val res = AppUtils.tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))
-                res?.links?.values?.flatten()?.forEach { it.url?.let { u -> extracted.add(u) } }
+                AppUtils.tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))?.links?.values?.flatten()?.forEach { it.url?.let { u -> extracted.add(u) } }
             }
             url.contains("/api/imdb/") -> {
-                val res = AppUtils.tryParseJson<MovixImdbResponse>(response)
-                res?.series?.forEach { series ->
+                AppUtils.tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
                     series.seasons?.forEach { season ->
                         season.episodes?.forEach { ep ->
                             if (episode == null || ep.number == episode) {
                                 ep.versions?.values?.forEach { version ->
-                                    version.players?.forEach { player ->
-                                        player.link?.let { extracted.add(it) }
-                                    }
+                                    version.players?.forEach { it.link?.let { u -> extracted.add(u) } }
                                 }
                             }
                         }
@@ -308,19 +333,16 @@ class Movix : MainAPI() {
                 }
             }
             url.contains("/api/fstream/") -> {
-                val res = AppUtils.tryParseJson<MovixFstreamResponse>(response)
-                if (type == "movie") {
-                    res?.links?.values?.flatten()?.forEach { it.url?.let { u -> extracted.add(u) } }
-                } else {
-                    val epmap = res?.episodes
-                    if (episode != null && epmap?.containsKey(episode) == true) {
-                        epmap[episode]?.languages?.values?.flatten()?.forEach { linkobj ->
-                            linkobj.url?.let { u -> extracted.add(u) }
-                        }
+                AppUtils.tryParseJson<MovixFstreamResponse>(response)?.let {
+                    if (type == "movie") {
+                        it.links?.values?.flatten()?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
                     } else {
-                        epmap?.values?.forEach { fstreamepisode ->
-                            fstreamepisode.languages?.values?.flatten()?.forEach { linkobj ->
-                                linkobj.url?.let { u -> extracted.add(u) }
+                        val epmap = it.episodes
+                        if (episode != null && epmap?.containsKey(episode) == true) {
+                            epmap[episode]?.languages?.values?.flatten()?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
+                        } else {
+                            epmap?.values?.forEach { e ->
+                                e.languages?.values?.flatten()?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
                             }
                         }
                     }
@@ -330,71 +352,24 @@ class Movix : MainAPI() {
         return extracted.distinct().filter { it.isNotBlank() }
     }
 
-    private suspend fun processLinks(
-        brand: String,
-        links: List<String>,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
+    private suspend fun processlinks(
+        brand: String, links: List<String>,
+        subtitlecallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit
     ) {
         if (links.isEmpty()) return
         Log.d("Movix", "$brand ${links.size}")
 
+        val cleanbrand = if (brand.contains("Movix")) "Movix" else brand
+
         links.forEach { link ->
             Log.d("Movix", link)
-            val cleanbrand = if (brand.contains("Movix")) "Movix" else brand
-
-            when {
-                link.contains("kokoflix.lol") || link.contains("kakaflix.lol") -> {
-                    val redirectedurl = app.get(link, referer = mainUrl, timeout = 10).url
-                    Log.d("Movix", redirectedurl)
-                    loadCustomExtractor(cleanbrand, redirectedurl, link, subtitleCallback, callback)
-                }
-                else -> {
-                    loadCustomExtractor(cleanbrand, link, mainUrl, subtitleCallback, callback)
-                }
+            if (link.contains("kokoflix.lol") || link.contains("kakaflix.lol")) {
+                val redirectedurl = app.get(link, referer = mainUrl, timeout = 10).url
+                Log.d("Movix", redirectedurl)
+                loadcustomextractor(cleanbrand, redirectedurl, link, subtitlecallback, callback)
+            } else {
+                loadcustomextractor(cleanbrand, link, mainUrl, subtitlecallback, callback)
             }
-        }
-    }
-
-    private suspend fun loadCustomExtractor(
-        brand: String,
-        url: String,
-        referer: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) = coroutineScope {
-        try {
-            if (url.contains(".m3u8") || url.contains(".mp4") || url.contains(".mkv")) {
-                callback.invoke(
-                    newExtractorLink(
-                        brand,
-                        brand,
-                        url,
-                        if (url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                    ) { this.referer = referer }
-                )
-                return@coroutineScope
-            }
-
-            loadExtractor(url, referer, subtitleCallback) { link ->
-                launch {
-                    callback.invoke(
-                        newExtractorLink(
-                            brand,
-                            if (link.name.isBlank()) brand else "$brand - ${link.name}",
-                            link.url,
-                        ) {
-                            this.quality = link.quality
-                            this.type = link.type
-                            this.referer = link.referer
-                            this.headers = link.headers
-                            this.extractorData = link.extractorData
-                        }
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("Movix", e.message.toString())
         }
     }
     }

@@ -10,6 +10,21 @@ import com.lagradost.cloudstream3.utils.M3u8Helper.Companion.generateM3u8
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import android.util.Base64
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.extractors.Voe
+import com.lagradost.cloudstream3.utils.ExtractorApi
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
+
+
+class Ralphy : Voe() { override var mainUrl = "https://ralphysuccessfull.org" }
 
 open class Uqload : ExtractorApi() {
     override var name = "Uqload"
@@ -53,8 +68,10 @@ open class Uqload : ExtractorApi() {
 }
 
 class UqloadIo : Uqload() {
-    override var name = "Uqload.io"
     override var mainUrl = "https://uqload.io"
+}
+class Uqloadcx : Uqload() {
+    override var mainUrl = "https://uqload.cx"
 }
 
 open class DoodStream : ExtractorApi() {
@@ -174,7 +191,7 @@ class RyderJet : VidHidePro() { override var mainUrl = "https://ryderjet.com" }
 class LuluVdo : VidHidePro() { override var mainUrl = "https://luluvdo.com" }
 class VtbeTo : VidHidePro() { override var mainUrl = "https://vtbe.to" }
 class SaveFiles : VidHidePro() { override var mainUrl = "https://savefiles.com" }
-class DhcPlay : VidHidePro() { override var name = "DHC Play"; override var mainUrl = "https://dhcplay.com" }
+class DhcPlay : VidHidePro() { override var mainUrl = "https://dhcplay.com" }
 class FileLionsLive : VidHidePro() { override var mainUrl = "https://filelions.live" }
 class FileLionsOnline : VidHidePro() { override var mainUrl = "https://filelions.online" }
 class FileLionsTo : VidHidePro() { override var mainUrl = "https://filelions.to" }
@@ -199,14 +216,6 @@ open class Vidzy : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val headers = mapOf(
-            "Sec-Fetch-Dest" to "empty",
-            "Sec-Fetch-Mode" to "cors",
-            "Sec-Fetch-Site" to "cross-site",
-            "Origin" to mainUrl,
-            "User-Agent" to USER_AGENT
-        )
-
         val response = app.get(getEmbedUrl(url), referer = referer)
         val script = if (!getPacked(response.text).isNullOrEmpty()) {
             var result = getAndUnpack(response.text)
@@ -218,13 +227,29 @@ open class Vidzy : ExtractorApi() {
             response.document.selectFirst("script:containsData(sources:)")?.data()
         } ?: return
 
-        Regex(":\\s*\"(.*?m3u8.*?)\"").findAll(script).forEach { m3u8Match ->
-            generateM3u8(
-                name,
-                fixUrl(m3u8Match.groupValues[1]),
-                referer = "$mainUrl/",
-                headers = headers
-            ).forEach(callback)
+        Log.d("Vidzy", "$script")
+        Regex("""src\s*:\s*"([^"]+m3u8[^"]*)"""").findAll(script).forEach { m3u8Match ->
+            val m3u8Url = fixUrl(m3u8Match.groupValues[1])
+            Log.d("Vidzy", "Extracted M3U8: $m3u8Url")
+
+            callback(
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = m3u8Url,
+                    type = ExtractorLinkType.M3U8
+                ) {
+                    this.referer = "$mainUrl/"
+                    this.quality = Qualities.Unknown.value
+                    this.headers = mapOf(
+                        "Sec-Fetch-Dest" to "empty",
+                        "Sec-Fetch-Mode" to "cors",
+                        "Sec-Fetch-Site" to "cross-site",
+                        "Origin" to mainUrl,
+                        "User-Agent" to USER_AGENT
+                    )
+                }
+            )
         }
     }
 
@@ -233,11 +258,11 @@ open class Vidzy : ExtractorApi() {
             url.contains("/d/") -> url.replace("/d/", "/v/")
             url.contains("/download/") -> url.replace("/download/", "/v/")
             url.contains("/file/") -> url.replace("/file/", "/v/")
+            url.contains("/embed-") -> url
             else -> url.replace("/f/", "/v/")
         }
     }
 }
-
 
 open class VeevToExtractor : ExtractorApi() {
 
@@ -347,12 +372,11 @@ open class VeevToExtractor : ExtractorApi() {
                 if (encodedUrl.isNotEmpty()) {
                     val finalUrl = decodeUrl(veevDecode(encodedUrl), tArray)
                     if (finalUrl.startsWith("http")) {
-                        val quality = source.optString("vid_title", "Unknown")
-                        Log.d("VEEVTO", "$finalUrl")
+                        Log.d(name, finalUrl)
                         callback.invoke(
                             newExtractorLink(
-                                source = "VeevTo",
-                                name = "VeevTo ($quality)",
+                                source = name,
+                                name = name,
                                 url = finalUrl,
                                 type = ExtractorLinkType.VIDEO
                             ) { this.referer = "$mainUrl/" }
@@ -361,7 +385,7 @@ open class VeevToExtractor : ExtractorApi() {
                 }
             }
         } catch (e: Exception) {
-            Log.e("VEEVTO", "${e.message}")
+            Log.e(name, "${e.message}")
         }
     }
 }
@@ -370,4 +394,3 @@ open class VeevToExtractor : ExtractorApi() {
 class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
 class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
-

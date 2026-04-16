@@ -1,20 +1,20 @@
 package com.byayzen
 
+import com.lagradost.api.Log
+import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+
 const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
 const val tmdblang = "fr-FR"
-const val apibase  = "https://api.movix.blog/api"
 const val tmdbbase = "https://api.themoviedb.org/3"
 const val tmdbimg500  = "https://image.tmdb.org/t/p/w500"
 const val tmdbimg1280 = "https://image.tmdb.org/t/p/w1280"
 const val tmdbimg185  = "https://image.tmdb.org/t/p/w185"
-
-data class WiflixTvResponse(
-    val episodes: Map<String, Map<String, List<GenericSource>>>?
-)
-
-data class DownloadRes(
-    val sources: List<DownloadSource>?
-)
 
 data class DownloadSource(val src: String?, val quality: String?, val language: String?, val m3u8: String?)
 
@@ -24,10 +24,6 @@ data class GenericSource(
 
 data class CpasmalRes(
     val links: Map<String, List<GenericSource>>?
-)
-
-data class FstreamTvRes(
-    val episodes: Map<String, FstreamEpisode>?
 )
 
 data class FstreamEpisode(val languages: Map<String, List<FstreamLink>>?)
@@ -170,3 +166,48 @@ data class FstreamLink(val url: String?)
 
 data class MovixPurstreamResponse(val sources: List<PurstreamSource>?)
 data class PurstreamSource(val url: String?, val name: String?, val format: String?)
+
+
+
+suspend fun loadcustomextractor(
+    brand: String,
+    url: String,
+    referer: String,
+    subtitlecallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+) = coroutineScope {
+    try {
+        if (url.contains(".m3u8") || url.contains(".mp4") || url.contains(".mkv")) {
+            val ism3u8 = url.contains(".m3u8")
+            callback.invoke(
+                newExtractorLink(
+                    source = brand,
+                    name = brand,
+                    url = url,
+                    type = if (ism3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                ) { this.referer = referer }
+            )
+            return@coroutineScope
+        }
+
+        loadExtractor(url, referer, subtitlecallback) { link ->
+            launch {
+                callback.invoke(
+                    newExtractorLink(
+                        brand,
+                        if (link.name.isBlank()) brand else "$brand - ${link.name}",
+                        link.url,
+                    ) {
+                        this.quality = link.quality
+                        this.type = link.type
+                        this.referer = link.referer
+                        this.headers = link.headers
+                        this.extractorData = link.extractorData
+                    }
+                )
+            }
+        }
+    } catch (e: Exception) {
+        Log.d("Movix", e.message.toString())
+    }
+}
