@@ -114,90 +114,156 @@ class YoTurkish : MainAPI() {
 
     override suspend fun loadLinks(
         data: String,
-        iscasting: Boolean,
-        subtitlecallback: (SubtitleFile) -> Unit,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         Log.d("Yoturkish", data)
 
         try {
             val resolver = WebViewResolver(
-                interceptUrl = Regex("""yoturkish\.to/all_done"""),
+                interceptUrl = Regex("${mainUrl.replace("https://", "").replace("/", "")}/all_done"),
                 additionalUrls = listOf(
-                    Regex("""engifuosi\.\w+"""),
-                    Regex("""rufiiguta\.\w+"""),
-                    Regex("""kitraskimisi\.\w+"""),
-                    Regex("""tukipasti\.\w+"""),
-                    Regex("""sssrr\.org/sora""")
+                    Regex("""srv\.tokvoy\.com/.*\.m3u8"""),
+                    Regex("""engifuosi\.\w+/(f|d)/.*"""),
+                    Regex("""rufiiguta\.\w+/\?v=.*"""),
+                    Regex("""tukipasti\.\w+/t/.*"""),
+                    Regex("""kitraskimisi\.\w+/e/.*"""),
+                    Regex("""sssrr\.org/sora.*"""),
+                    Regex("${mainUrl.replace("https://", "").replace("/", "")}/yoturkish_dl.*")
                 ),
                 useOkhttp = false,
-                timeout = 30000,
+                timeout = 20000,
                 script = """
-            (function() {
-                for (var i = 1; i <= 4; i++) {
-                    (function(idx) {
-                        setTimeout(function() {
-                            var btn = document.querySelector('.player_nav > ul > li:nth-child(' + idx + ') > div > a');
-                            if (btn) { btn.click(); }
-                        }, idx * 1500);
-                    })(i);
-                }
+                (function() {
+                    if (window !== window.top) return;
+                    if (window.hasRunAlready) return;
+                    window.hasRunAlready = true;
 
-                setTimeout(function() {
-                    var xhr = new XMLHttpRequest();
-                    xhr.open('GET', 'https://yoturkish.to/all_done', true);
-                    xhr.send();
-                }, 12000);
-            })();
-        """.trimIndent()
+                    var sentLinks = new Set();
+                    
+                    function sendFoundLink(type, link) {
+                        if(!link || !link.includes('http')) return;
+                        if(link.includes('sharethis') || link.includes('pubadx') || link.includes('yandex') || link.includes('a-ads')) return;
+                        
+                        if (!sentLinks.has(link)) {
+                             sentLinks.add(link);
+                             var xhr = new XMLHttpRequest();
+                             xhr.open('GET', '${mainUrl.removeSuffix("/")}/yoturkish_dl?url=' + encodeURIComponent(link), true);
+                             xhr.send();
+                        }
+                    }
+
+                    function triggerTabsAndScrape() {
+                        var dl = document.querySelector('.dl-contenti a');
+                        if (dl && dl.href) sendFoundLink('download', dl.href);
+
+                        var tabs = document.querySelectorAll('.optitabs a[href^="#tab"]');
+                        if(tabs.length === 0) {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('GET', '${mainUrl.removeSuffix("/")}/all_done', true);
+                            xhr.send();
+                            return;
+                        }
+
+                        tabs.forEach(function(btn, idx) {
+                            setTimeout(function() {
+                                btn.click();
+                                setTimeout(function() {
+                                     var iframes = document.querySelectorAll('#player iframe, .play iframe');
+                                     iframes.forEach(function(ifr) {
+                                         sendFoundLink('iframe', ifr.src);
+                                     });
+                                }, 1000);
+                            }, idx * 1500); 
+                        });
+                        
+                        var totalTime = (tabs.length * 1500) + 1500;
+                        setTimeout(function() {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('GET', '${mainUrl.removeSuffix("/")}/all_done', true);
+                            xhr.send();
+                        }, totalTime);
+                    }
+
+                    var attempts = 0;
+                    var checkExist = setInterval(function() {
+                        var tabs = document.querySelectorAll('.optitabs a[href^="#tab"]');
+                        if (tabs.length > 0) {
+                            clearInterval(checkExist);
+                            triggerTabsAndScrape();
+                        } else {
+                            attempts++;
+                            if (attempts > 10) { 
+                                clearInterval(checkExist);
+                                triggerTabsAndScrape(); 
+                            }
+                        }
+                    }, 500);
+                })();
+            """.trimIndent()
             )
 
             val result = resolver.resolveUsingWebView(url = data)
-            val foundurls = mutableSetOf<String>()
+            val foundUrls = mutableSetOf<String>()
 
             result?.second?.forEach { req ->
-                val url = req.url.toString()
+                var url = req.url.toString()
 
-                if (url.contains("/sora/") || url.contains(".m3u8")) {
-                    foundurls.add(url)
+                if (url.contains("yoturkish_dl?url=")) {
+                    val decodedUrl = java.net.URLDecoder.decode(url.substringAfter("url="), "UTF-8")
+                    if (!decodedUrl.contains("pubadx") && !decodedUrl.contains("yandex") && !decodedUrl.contains("sharethis") && !decodedUrl.contains("a-ads")) {
+                        foundUrls.add(decodedUrl)
+                    }
                 }
-                else if (url.contains("rufiiguta.com/?v=") || url.contains("engifuosi.com/f/")) {
-                    if (!url.contains(".js") && !url.contains(".css")) {
-                        foundurls.add(url)
+                else if (
+                    url.contains(".m3u8") ||
+                    url.contains("/sora/") ||
+                    url.contains("rufiiguta.com") ||
+                    url.contains("engifuosi.com") ||
+                    url.contains("tukipasti.com") ||
+                    url.contains("kitraskimisi.com")
+                ) {
+                    if (!url.contains(Regex("""\.(js|css|png|jpg|jpeg|woff|svg|json)"""))) {
+                        val cleanUrl = url.substringBefore("&").substringBefore("#")
+                        if(cleanUrl.isNotEmpty()) foundUrls.add(cleanUrl)
                     }
                 }
             }
 
-            Log.d("Yoturkish", "${foundurls.size}")
+            Log.d("Yoturkish", foundUrls.size.toString())
 
-            foundurls.forEach { url ->
+            foundUrls.forEach { url ->
                 Log.d("Yoturkish", url)
                 try {
-                    if (url.contains("/sora/") || url.contains(".m3u8")) {
+                    if (url.contains(".m3u8") || url.contains("/sora/")) {
                         callback.invoke(
                             newExtractorLink(
-                                name = if(url.contains("sssrr")) "Rufiiguta (Sora)" else "Yoturkish Stream",
+                                name = if (url.contains("tokvoy") || url.contains("sora")) "YoTurkish (Direct)" else "YoTurkish Stream",
                                 source = "YoTurkish",
                                 url = url,
                                 type = ExtractorLinkType.M3U8,
                                 initializer = {
-                                    this.referer = "https://rufiiguta.com/"
-                                    this.headers = mapOf("Origin" to "https://rufiiguta.com")
+                                    this.referer = "$mainUrl/"
+                                    this.headers = mapOf(
+                                        "Origin" to mainUrl.removeSuffix("/"),
+                                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                    )
                                 }
                             )
                         )
                     } else {
-                        loadExtractor(url, data, subtitlecallback, callback)
+                        loadExtractor(url, data, subtitleCallback, callback)
                     }
                 } catch (e: Exception) {
-                    Log.d("Yoturkish", "${e.message}")
+                    Log.d("Yoturkish", e.message.toString())
                 }
             }
 
-            return foundurls.isNotEmpty()
+            return foundUrls.isNotEmpty()
 
         } catch (e: Exception) {
-            Log.d("Yoturkish", "${e.message}")
+            Log.d("Yoturkish", e.message.toString())
         }
         return false
     }
