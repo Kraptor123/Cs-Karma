@@ -14,7 +14,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
 class WatchWrestling : MainAPI() {
-    override var mainUrl = "https://instapro.ac"
+    override var mainUrl = "https://watchwrestling.ae"
     override var name = "WatchWrestling"
     override val hasMainPage = true
     override var lang = "en"
