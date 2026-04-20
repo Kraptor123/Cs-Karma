@@ -1,6 +1,7 @@
 package com.byayzen
 
 import com.lagradost.api.Log
+import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
@@ -8,6 +9,43 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import com.lagradost.cloudstream3.app
+import android.content.Context
+
+
+object MovixHelper {
+    var dynamicurl = "https://www.movix.llc"
+    val prefname = "movix_prefs"
+    val domainkey = "movix_domain"
+
+    suspend fun updatemainurl() {
+        val prefs = CloudStreamApp.context?.getSharedPreferences(prefname, Context.MODE_PRIVATE)
+        val savedurl = prefs?.getString(domainkey, null)
+
+        if (savedurl != null) {
+            val checkresponse = app.get(savedurl)
+            if (checkresponse.code in 200..299) {
+                dynamicurl = savedurl
+                Log.d("MovixHelper", "Shared prefdeki aktif url: $dynamicurl")
+                return
+            } else {
+                prefs.edit().remove(domainkey).apply()
+                Log.d("MovixHelper", "Sharedpref'den url silindi")
+            }
+        }
+
+        val healthresponse = app.get("https://www.movix.health/")
+        val healthtext = healthresponse.text
+        val regex = """Accéder à\s+([a-zA-Z0-9.-]+\.[a-z]{2,})""".toRegex()
+        val match = regex.find(healthtext)
+
+        if (match != null) {
+            dynamicurl = "https://" + match.groupValues[1]
+            prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
+            Log.d("MovixHelper", "new url fetched and saved: $dynamicurl")
+        }
+    }
+}
 
 const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
 const val tmdblang = "fr-FR"

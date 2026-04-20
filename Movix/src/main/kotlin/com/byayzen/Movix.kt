@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.joinAll
 
 class Movix : MainAPI() {
-    override var mainUrl = "https://www.movix.llc"
+    override var mainUrl = MovixHelper.dynamicurl
     override var name = "Movix"
     override val hasMainPage = true
     override var lang = "fr"
@@ -22,20 +22,41 @@ class Movix : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
-        "movie/28" to "Action", "movie/12" to "Aventure", "movie/16" to "Animation",
-        "movie/35" to "Comédie", "movie/80" to "Crime", "movie/99" to "Documentaire",
-        "movie/18" to "Drame", "movie/10751" to "Famille", "movie/14" to "Fantastique",
-        "movie/36" to "Histoire", "movie/27" to "Horreur", "movie/10402" to "Musique",
-        "movie/9648" to "Mystère", "movie/10749" to "Romance", "movie/878" to "Science-Fiction",
-        "movie/10770" to "Téléfilm", "movie/53" to "Thriller", "movie/10752" to "Guerre",
-        "movie/37" to "Western", "tv/10759" to "Action et Aventure", "tv/16" to "Animation TV",
-        "tv/35" to "Comédie TV", "tv/80" to "Crime TV", "tv/99" to "Documentaire TV",
-        "tv/18" to "Drame TV", "tv/10751" to "Famille TV", "tv/10762" to "Enfants",
-        "tv/9648" to "Mystère TV", "tv/10763" to "Actualités", "tv/10764" to "Téléréalité",
-        "tv/10765" to "SF et Fantastique", "tv/10766" to "Feuilleton", "tv/10767" to "Talk-show",
+        "movie/28" to "Action",
+        "movie/12" to "Aventure",
+        "movie/16" to "Animation",
+        "movie/35" to "Comédie",
+        "movie/80" to "Crime",
+        "movie/99" to "Documentaire",
+        "movie/18" to "Drame",
+        "movie/10751" to "Famille",
+        "movie/14" to "Fantastique",
+        "movie/36" to "Histoire",
+        "movie/27" to "Horreur",
+        "movie/10402" to "Musique",
+        "movie/9648" to "Mystère",
+        "movie/10749" to "Romance",
+        "movie/878" to "Science-Fiction",
+        "movie/10770" to "Téléfilm",
+        "movie/53" to "Thriller",
+        "movie/10752" to "Guerre",
+        "movie/37" to "Western",
+        "tv/10759" to "Action et Aventure",
+        "tv/16" to "Animation TV",
+        "tv/35" to "Comédie TV",
+        "tv/80" to "Crime TV",
+        "tv/99" to "Documentaire TV",
+        "tv/18" to "Drame TV",
+        "tv/10751" to "Famille TV",
+        "tv/10762" to "Enfants",
+        "tv/9648" to "Mystère TV",
+        "tv/10763" to "Actualités",
+        "tv/10764" to "Téléréalité",
+        "tv/10765" to "SF et Fantastique",
+        "tv/10766" to "Feuilleton",
+        "tv/10767" to "Talk-show",
         "tv/10768" to "Guerre et Politique"
     )
-
     private fun TmdbResult.toMainPageResult(type: String): SearchResponse? {
         val titleText =
             this.title ?: this.name ?: this.original_title ?: this.original_name ?: return null
