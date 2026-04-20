@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class MainUrlUpdater:
     def __init__(self, base_dir="."):
         self.base_dir = base_dir
-        self.oturum = CloudScraper()
+        self.oturum   = CloudScraper()
 
     @property
     def eklentiler(self):
@@ -26,15 +26,20 @@ class MainUrlUpdater:
         except FileNotFoundError:
             return []
 
+    def _kt_dosyasini_bul(self, dizin, dosya_adi):
+        start = os.path.join(self.base_dir, dizin)
+        for kok, alt_dizinler, dosyalar in os.walk(start):
+            if dosya_adi in dosyalar:
+                return os.path.join(kok, dosya_adi)
+        return None
+
     @property
     def kt_dosyalari(self):
         result = []
         for eklenti in self.eklentiler:
-            start = os.path.join(self.base_dir, eklenti)
-            for kok, _, dosyalar in os.walk(start):
-                for dosya in dosyalar:
-                    if dosya.endswith(".kt"):
-                        result.append(os.path.join(kok, dosya))
+            kt_path = self._kt_dosyasini_bul(eklenti, f"{eklenti}.kt")
+            if kt_path:
+                result.append(kt_path)
         return result
 
     def _mainurl_bul(self, kt_dosya_yolu):
@@ -50,6 +55,7 @@ class MainUrlUpdater:
     def _mainurl_guncelle(self, kt_dosya_yolu, eski_url, yeni_url):
         if not eski_url or not yeni_url:
             return False
+
         try:
             with open(kt_dosya_yolu, "r+", encoding="utf-8") as file:
                 icerik = file.read()
@@ -61,8 +67,10 @@ class MainUrlUpdater:
                 )
                 if adet == 0:
                     yeni_icerik = icerik.replace(eski_url, yeni_url)
+
                 if yeni_icerik == icerik:
                     return False
+
                 file.seek(0)
                 file.write(yeni_icerik)
                 file.truncate()
@@ -106,19 +114,6 @@ class MainUrlUpdater:
                 result[kt_dosya_yolu] = mainurl
         return result
 
-    def _movix_guncel_domain_al(self):
-        try:
-            res = self.oturum.get("https://www.movix.health/", timeout=15)
-            buttons = re.findall(r'<button(.*?)>(.*?)</button>', res.text, flags=re.IGNORECASE | re.DOTALL)
-            for attrs, content in buttons:
-                if 'disabled' not in attrs.lower():
-                    match = re.search(r'Accéder à\s+([a-zA-Z0-9.-]+)', content, re.IGNORECASE)
-                    if match:
-                        return f"https://{match.group(1)}"
-        except Exception:
-            pass
-        return None
-
     def guncelle(self):
         for dosya, mainurl in self.mainurl_listesi.items():
             try:
@@ -134,23 +129,23 @@ class MainUrlUpdater:
             if not mainurl_sadece_domain:
                 continue
 
-            yeni_domain = None
+            try:
+                istek = self.oturum.get(mainurl_sadece_domain, allow_redirects=True, timeout=15)
+            except Exception:
+                continue
 
-            if "movix" in dosya.lower():
-                yeni_domain = self._movix_guncel_domain_al()
-                if not yeni_domain:
-                    continue
-            else:
+            final_url = getattr(istek, "url", None)
+            if not final_url:
                 try:
-                    istek = self.oturum.get(mainurl_sadece_domain, allow_redirects=True, timeout=15)
-                    final_url = getattr(istek, "url", None)
-                    if not final_url:
-                        final_url = istek.geturl()
-                    if final_url:
-                        final_url = final_url.rstrip('/')
-                        yeni_domain = self._sadece_domain_al(final_url)
+                    final_url = istek.geturl()
                 except Exception:
-                    continue
+                    final_url = None
+
+            if not final_url:
+                continue
+
+            final_url = final_url.rstrip('/')
+            yeni_domain = self._sadece_domain_al(final_url)
 
             if not yeni_domain or "instapro.ac" in yeni_domain.lower():
                 continue
@@ -163,8 +158,8 @@ class MainUrlUpdater:
                 if changed:
                     build_gradle_yolu = os.path.join(self.base_dir, eklenti_adi, "build.gradle.kts")
                     yeni_v = self._versiyonu_artir(build_gradle_yolu)
-                    v_str = f" (v{yeni_v})" if yeni_v is not None else ""
-                    logger.info(f"[»] {eklenti_adi}: {mainurl} -> {yeni_domain}{v_str}")
+                    if yeni_v is not None:
+                        logger.info(f"[»] {mainurl} -> {yeni_domain} (v{yeni_v})")
             except Exception:
                 pass
 
