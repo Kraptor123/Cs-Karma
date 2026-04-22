@@ -185,7 +185,13 @@ class Movix : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
-        val domainsilici = mainUrl.removePrefix("https://").removePrefix("http://").removeSuffix("/")
+        MovixHelper.updatemainurl()
+        val currentUrl = MovixHelper.dynamicurl
+        Log.d("Movix", "Loadlinks domaini: $currentUrl")
+
+        val domainsilici = currentUrl
+            .removePrefix("https://").removePrefix("http://").
+            removePrefix("www.").removeSuffix("/")
         val apibase = "https://api.$domainsilici/api"
         val parts = data.split("-")
         val rawpath = parts[0]
@@ -194,14 +200,12 @@ class Movix : MainAPI() {
         val season = parts.getOrNull(1)
         val episode = parts.getOrNull(2)
         val query = if (type == "tv" && season != null && episode != null) "?season=$season&episode=$episode" else ""
-
-        Log.d("Movix", "$data $id $type $query")
-
         val apiheaders = mapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0",
-            "Origin" to mainUrl,
-            "Referer" to "$mainUrl/"
+            "Origin" to "https://$domainsilici",
+            "Referer" to "https://$domainsilici/"
         )
+
 
         val requests = mutableListOf<Pair<String, String>>()
         requests.add("Movix" to "$apibase/links/$type/$id$query")

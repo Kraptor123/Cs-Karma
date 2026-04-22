@@ -14,35 +14,41 @@ import android.content.Context
 
 
 object MovixHelper {
-    var dynamicurl = "https://www.movix.llc"
+    var dynamicurl = "https://www.movix.cash"
     val prefname = "movix_prefs"
     val domainkey = "movix_domain"
 
     suspend fun updatemainurl() {
         val prefs = CloudStreamApp.context?.getSharedPreferences(prefname, Context.MODE_PRIVATE)
         val savedurl = prefs?.getString(domainkey, null)
-
-        if (savedurl != null) {
-            val checkresponse = app.get(savedurl)
-            if (checkresponse.code in 200..299) {
-                dynamicurl = savedurl
-                Log.d("MovixHelper", "Shared prefdeki aktif url: $dynamicurl")
-                return
-            } else {
-                prefs.edit().remove(domainkey).apply()
-                Log.d("MovixHelper", "Sharedpref'den url silindi")
+        if (savedurl != null && !savedurl.contains("movix.health")) {
+            try {
+                val checkresponse = app.get(savedurl, timeout = 5)
+                if (checkresponse.code in 200..299) {
+                    dynamicurl = savedurl
+                    Log.d("MovixHelper", "$dynamicurl")
+                    return
+                }
+            } catch (e: Exception) {
             }
         }
 
-        val healthresponse = app.get("https://www.movix.health/")
-        val healthtext = healthresponse.text
-        val regex = """Accéder à\s+([a-zA-Z0-9.-]+\.[a-z]{2,})""".toRegex()
-        val match = regex.find(healthtext)
+        try {
+            val healthresponse = app.get("https://www.movix.health/")
+            val healthtext = healthresponse.text
+            val regex = """Accéder à\s+([a-zA-Z0-9.-]+\.[a-z]{2,})""".toRegex()
+            val match = regex.find(healthtext)
 
-        if (match != null) {
-            dynamicurl = "https://" + match.groupValues[1]
-            prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
-            Log.d("MovixHelper", "new url fetched and saved: $dynamicurl")
+            if (match != null) {
+                val extractedDomain = "https://" + match.groupValues[1].trim()
+                if (!extractedDomain.contains("movix.health")) {
+                    dynamicurl = extractedDomain
+                    prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
+                    Log.d("MovixHelper", " $dynamicurl")
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("MovixHelper", " ${e.message}")
         }
     }
 }
