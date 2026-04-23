@@ -149,14 +149,17 @@ class GnulaHD : MainAPI() {
         val badge = document.selectFirst("div.gnpv-badge")?.text() ?: ""
         val year = Regex("\\d{4}").find(badge)?.value?.toIntOrNull()
 
-        val durationtext = document.selectFirst("span.gnpv-pill:contains(hr), span.gnpv-pill:contains(min)")?.text()
+        val durationtext =
+            document.selectFirst("span.gnpv-pill:contains(hr), span.gnpv-pill:contains(min)")
+                ?.text()
         val duration = durationtext?.replace(Regex("\\D"), "")?.toIntOrNull()
 
         val actors = document.select("div.gnpv-mb-item:contains(Reparto) a").map { it.text() }
         val tags = document.select("div.gnpv-genres a").map { it.text() }
 
         val isanime = tags.any { it.contains("Anime", true) }
-        val isseries = badge.contains("Serie", true) || isanime || document.selectFirst("div.eplister") != null
+        val isseries =
+            badge.contains("Serie", true) || isanime || document.selectFirst("div.eplister") != null
 
         val tvtype = if (isanime) TvType.Anime else if (isseries) TvType.TvSeries else TvType.Movie
 
@@ -164,7 +167,8 @@ class GnulaHD : MainAPI() {
         val scoreval = scoretext?.toDoubleOrNull()
 
         val recommendations = document.select("a.gnpv-related-card").mapNotNull {
-            val rectitle = it.selectFirst("span.gnpv-related-title")?.text() ?: return@mapNotNull null
+            val rectitle =
+                it.selectFirst("span.gnpv-related-title")?.text() ?: return@mapNotNull null
             val rechref = fixUrl(it.attr("href"))
             val recposter = it.selectFirst("img")?.attr("src")
 
@@ -232,12 +236,14 @@ class GnulaHD : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        Log.d("Ayzen", data)
         val res = app.get(data).text
         val regex = Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""")
         val match = regex.find(res)
 
         if (match != null) {
             val json = match.groupValues[2]
+            Log.d("Ayzen", json)
             try {
                 val langs = AppUtils.parseJson<List<GnulaLang>>(json)
 
@@ -250,11 +256,13 @@ class GnulaHD : MainAPI() {
                             if (cleanurl.startsWith("//")) {
                                 cleanurl = "https:$cleanurl"
                             }
+                            Log.d("Ayzen", cleanurl)
                             loadCustomExtractor(label, cleanurl, data, subtitleCallback, callback)
                         }
                     }
                 }
             } catch (e: Exception) {
+                Log.d("Ayzen", e.toString())
             }
         }
         return true
@@ -268,8 +276,10 @@ class GnulaHD : MainAPI() {
         callback: (ExtractorLink) -> Unit,
         quality: Int? = null,
     ) {
+        Log.d("Ayzen", url)
         loadExtractor(url, referer, subtitleCallback) { ex ->
             if (ex.url.isNotBlank() && (ex.url.startsWith("http") || ex.url.startsWith("https"))) {
+                Log.d("Ayzen", ex.url)
                 CoroutineScope(Dispatchers.IO).launch {
                     callback.invoke(
                         newExtractorLink(
@@ -288,7 +298,7 @@ class GnulaHD : MainAPI() {
             }
         }
     }
-    }
+}
 
 
 data class GnulaLang(

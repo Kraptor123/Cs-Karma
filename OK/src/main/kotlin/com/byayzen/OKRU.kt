@@ -28,40 +28,77 @@ class OKRU : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val tag = request.data.substringAfterLast("/")
-        val isserial = request.data.contains("serial")
-        val isshowcase = request.data.contains("showcase")
-        var doc = app.get(request.data).document
+        val isSerial = request.data.contains("serial")
+        val isShowcase = request.data.contains("showcase")
+        var document = app.get(request.data).document
+        var lastElement = if (isShowcase) "18" else "1669805881145"
 
         if (page > 1) {
-            val lelem = doc.selectFirst("div.loader-container")?.attr("data-last-element") ?: if (isshowcase) "18" else "1669805881145"
-            val purl = if (isshowcase) "$mainUrl/video?st.cmd=anonymVideo&st.m=SHOWCASE&st.furl=%2Fvideo%2Fshowcase&cmd=VideoUniversalContentBlock"
-            else "$mainUrl/video/serial?st.cmd=anonymVideo&st.fltag=$tag&st.m=ALBUMS_CATALOG&st.ft=serial&st.furl=%2Fvideo%2Fserial%2F$tag&cmd=VideoUniversalContentBlock"
+            val postUrl = if (isShowcase) {
+                "$mainUrl/video/showcase?st.cmd=anonymVideo&st.m=SHOWCASE&st.ft=showcase&st.furl=%2Fvideo%2Fshowcase&cmd=VideoUniversalContentBlock"
+            } else {
+                "$mainUrl/video/serial?st.cmd=anonymVideo&st.fltag=$tag&st.m=ALBUMS_CATALOG&st.ft=serial&st.furl=%2Fvideo%2Fserial%2F$tag&cmd=VideoUniversalContentBlock"
+            }
 
-            val res = app.post(purl, data = mapOf("fetch" to "false", "st.page" to page.toString(), "st.lastelem" to lelem, "gwt.requested" to "9579ea2eT1774883610506"), headers = mapOf("ok-screen" to "anonymVideo", "X-Requested-With" to "XMLHttpRequest"))
-            doc = res.document
+            val response = app.post(
+                postUrl,
+                data = mapOf(
+                    "fetch" to "false",
+                    "st.page" to page.toString(),
+                    "st.lastelem" to lastElement,
+                    "gwt.requested" to "9579ea2eT1774883610506"
+                ),
+                headers = mapOf(
+                    "ok-screen" to "anonymVideo",
+                    "X-Requested-With" to "XMLHttpRequest"
+                )
+            )
+            lastElement = response.headers["lastelem"] ?: lastElement
+            document = response.document
         }
 
-        val reslist = mutableListOf<SearchResponse>()
+        val resultsList = mutableListOf<SearchResponse>()
 
-        if (isserial) {
-            doc.select("video-channels-vitrine-slider").forEach { slider ->
+        if (isSerial) {
+            document.select("video-channels-vitrine-slider").forEach { slider ->
                 val props = slider.attr("data-props")
-                val reg = Regex("""\{"id":"(.*?)".*?"href":"(.*?)","name":"(.*?)","imageUrl":"(.*?)"""")
-                reg.findAll(props).forEach { m ->
-                    val href = fixUrl(m.groupValues[2].replace("\\u0026", "&"))
-                    val name = m.groupValues[3]
-                    val poster = m.groupValues[4].replace("\\u0026", "&")
-                    reslist.add(newTvSeriesSearchResponse(name, href, TvType.TvSeries) { this.posterUrl = poster })
+                val regex = Regex("""\{"id":"(.*?)".*?"href":"(.*?)","name":"(.*?)","imageUrl":"(.*?)"""")
+                regex.findAll(props).forEach { match ->
+                    val href = fixUrl(match.groupValues[2].replace("\\u0026", "&"))
+                    val name = match.groupValues[3]
+                    val poster = match.groupValues[4].replace("\\u0026", "&")
+                    resultsList.add(newTvSeriesSearchResponse(name, href, TvType.TvSeries) {
+                        this.posterUrl = poster
+                    })
                 }
             }
         } else {
-            doc.select("div.ugrid_i, div.video-card, div.video-slider_i").forEach {
-                it.tomainpageresult()?.let { res -> reslist.add(res) }
+            document.select("div.ugrid_i.js-seen-item-movie").forEach { item ->
+                val card = item.selectFirst("div.video-card") ?: return@forEach
+                val titleElement = card.selectFirst("a.video-card_n")
+                val linkElement = card.selectFirst("a.video-card_lk")
+                val imgElement = card.selectFirst("img.video-card_img")
+
+                val name = titleElement?.text() ?: return@forEach
+                val href = fixUrl(linkElement?.attr("href") ?: return@forEach)
+                val poster = imgElement?.attr("src") ?: ""
+
+                resultsList.add(newMovieSearchResponse(name, href, TvType.Movie) {
+                    this.posterUrl = poster
+                })
             }
         }
 
-        val finalres = reslist.distinctBy { it.url }
-        return newHomePageResponse(request.name, finalres, hasNext = finalres.isNotEmpty())
+        val finalResults = resultsList.distinctBy { it.url }
+
+        return newHomePageResponse(
+            list = HomePageList(
+                name = request.name,
+                list = finalResults,
+                isHorizontalImages = true
+            ),
+            hasNext = finalResults.isNotEmpty()
+        )
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
@@ -81,23 +118,12 @@ class OKRU : MainAPI() {
         val results = searchdata?.videos?.list?.mapNotNull { item ->
             val title = item.movie?.title ?: item.name ?: return@mapNotNull null
             val id = item.movie?.id ?: return@mapNotNull null
-            val poster = item.movie?.thumbnail?.big ?: item.movie?.thumbnail?.small ?: item.imageUrl
+            val poster = item.movie.thumbnail?.big ?: item.movie?.thumbnail?.small ?: item.imageUrl
             newMovieSearchResponse(title, "$mainUrl/video/$id", TvType.Movie) {
                 this.posterUrl = fixUrlNull(poster) }
         } ?: emptyList()
 
         return newSearchResponseList(results, hasNext = searchdata?.videos?.hasMore == true)
-    }
-
-    private fun Element.tomainpageresult(): SearchResponse? {
-        val telem = this.selectFirst("a.video-card_n, a.video_channels_vitrine_slider_title")
-        val title = (telem?.text()?.trim() ?: telem?.attr("title")?.trim() ?: this.selectFirst("img")?.attr("alt")?.trim()) ?: return null
-        val href = this.selectFirst("a.video-card_lk, a.video_channels_vitrine_slider_channel-link")?.attr("href")?.takeIf { it != "#" } ?: telem?.attr("href")
-        val fhref = fixUrlNull(href) ?: return null
-        val purl = fixUrlNull(this.selectFirst("img.video_channels_vitrine_slider_cover2, img.video-card_img, img")?.attr("src"))
-
-        return if (fhref.contains("/video/c")) newTvSeriesSearchResponse(title, fhref, TvType.TvSeries) { this.posterUrl = purl }
-        else newMovieSearchResponse(title, fhref, TvType.Movie) { this.posterUrl = purl }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
