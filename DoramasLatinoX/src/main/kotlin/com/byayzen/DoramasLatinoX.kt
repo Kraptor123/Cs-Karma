@@ -12,7 +12,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 
 class DoramasLatinoX : MainAPI() {
-    override var mainUrl = "https://doramaslatinox.com"
+    override var mainUrl = "https://doramafox.es"
     override var name = "DoramasLatinoX"
     override val hasMainPage = true
     override var lang = "mx"
