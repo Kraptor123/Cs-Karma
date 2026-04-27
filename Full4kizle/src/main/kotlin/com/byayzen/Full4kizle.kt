@@ -188,10 +188,18 @@ class Full4kizle : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val document = app.get(data).document
-        val iframe = document.selectFirst(".p-v12-video-frame iframe")?.attr("abs:src")
-        if (iframe != null) {
-            loadExtractor(iframe, data, subtitleCallback, callback)
+        val res = app.get(data)
+        val doc = res.document
+        val element = doc.selectFirst(".p-v12-video-frame iframe")
+
+        val iframeUrl = element?.attr("data-litespeed-src").takeIf { !it.isNullOrBlank() }
+            ?: element?.attr("src")
+
+        Log.d("kraptor_$name", "LoadLinks URL: $data")
+        Log.d("kraptor_$name", "Iframe URL: $iframeUrl")
+
+        if (!iframeUrl.isNullOrEmpty() && iframeUrl != "about:blank") {
+            loadExtractor(iframeUrl, data, subtitleCallback, callback)
         }
 
         return true
