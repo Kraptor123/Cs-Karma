@@ -22,6 +22,14 @@ class Movix : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     override val mainPage = mainPageOf(
+        "movie/now_playing" to "Nouveaux Films",
+        "tv/on_the_air" to "Nouvelles Séries",
+        "discover/movie?with_watch_providers=8&watch_region=FR" to "Netflix Films",
+        "discover/tv?with_watch_providers=8&watch_region=FR" to "Netflix Séries",
+        "discover/movie?with_watch_providers=119&watch_region=FR" to "Prime Video Films",
+        "discover/tv?with_watch_providers=119&watch_region=FR" to "Prime Video Séries",
+        "discover/movie?with_watch_providers=337&watch_region=FR" to "Disney+ Films",
+        "discover/tv?with_watch_providers=337&watch_region=FR" to "Disney+ Séries",
         "movie/28" to "Action",
         "movie/12" to "Aventure",
         "movie/16" to "Animation",
@@ -33,19 +41,14 @@ class Movix : MainAPI() {
         "movie/14" to "Fantastique",
         "movie/36" to "Histoire",
         "movie/27" to "Horreur",
-        "movie/10402" to "Musique",
         "movie/9648" to "Mystère",
         "movie/10749" to "Romance",
         "movie/878" to "Science-Fiction",
-        "movie/10770" to "Téléfilm",
         "movie/53" to "Thriller",
         "movie/10752" to "Guerre",
-        "movie/37" to "Western",
         "tv/10759" to "Action et Aventure",
-        "tv/16" to "Animation TV",
         "tv/35" to "Comédie TV",
         "tv/80" to "Crime TV",
-        "tv/99" to "Documentaire TV",
         "tv/18" to "Drame TV",
         "tv/10751" to "Famille TV",
         "tv/10762" to "Enfants",
@@ -53,10 +56,9 @@ class Movix : MainAPI() {
         "tv/10763" to "Actualités",
         "tv/10764" to "Téléréalité",
         "tv/10765" to "SF et Fantastique",
-        "tv/10766" to "Feuilleton",
-        "tv/10767" to "Talk-show",
-        "tv/10768" to "Guerre et Politique"
+        "tv/10766" to "Feuilleton"
     )
+
     private fun TmdbResult.toMainPageResult(type: String): SearchResponse? {
         val titleText =
             this.title ?: this.name ?: this.original_title ?: this.original_name ?: return null
@@ -74,13 +76,21 @@ class Movix : MainAPI() {
         }
     }
 
+
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val type = if (request.data.startsWith("movie")) "movie" else "tv"
-        val genreid = request.data.split("/").last()
-        val url =
-            "$tmdbbase/discover/$type?api_key=$tmdbkey&language=$tmdblang&with_genres=$genreid&page=$page&sort_by=popularity.desc&include_adult=false"
-        val response = app.get(url).parsed<TmdbMainResponse>()
-        val home = response.results.mapNotNull { it.toMainPageResult(type) }
+        val d = request.data
+        val t = if (d.contains("movie")) "movie" else "tv"
+
+        val url = when {
+            d.contains("?") -> "$tmdbbase/$d&api_key=$tmdbkey&language=$tmdblang&page=$page"
+            d.split("/").last().toIntOrNull() != null -> {
+                val id = d.split("/").last()
+                "$tmdbbase/discover/$t?api_key=$tmdbkey&language=$tmdblang&with_genres=$id&page=$page&sort_by=popularity.desc&include_adult=false" }
+            else -> "$tmdbbase/$d?api_key=$tmdbkey&language=$tmdblang&page=$page"
+        }
+
+        val res = app.get(url).parsed<TmdbMainResponse>()
+        val home = res.results.mapNotNull { it.toMainPageResult(t) }
         return newHomePageResponse(request.name, home)
     }
 

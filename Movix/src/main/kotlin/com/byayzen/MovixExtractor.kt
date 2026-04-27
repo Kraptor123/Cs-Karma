@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets
 import android.util.Base64
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.extractors.FileMoon
+import com.lagradost.cloudstream3.extractors.FilemoonV2
 import com.lagradost.cloudstream3.extractors.Voe
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -379,7 +381,9 @@ open class VeevToExtractor : ExtractorApi() {
                                 name = name,
                                 url = finalUrl,
                                 type = ExtractorLinkType.VIDEO
-                            ) { this.referer = "$mainUrl/" }
+                            ) {
+                                this.referer = "$mainUrl/"
+                            }
                         )
                     }
                 }
@@ -391,6 +395,62 @@ open class VeevToExtractor : ExtractorApi() {
 }
 
 
+class GoodStream : ExtractorApi() {
+    override var name = "GoodStream"
+    override var mainUrl = "https://goodstream.one"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val code = url.substringAfterLast("/")
+        val post = "$mainUrl/dl"
+        val ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:150.0) Gecko/20100101 Firefox/150.0"
+        val lang = "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
+        val res = app.post(
+            post,
+            data = mapOf(
+                "op" to "embed",
+                "file_code" to code,
+                "auto" to "1",
+                "referer" to ""
+            ),
+            headers = mapOf(
+                "Referer" to url,
+                "User-Agent" to ua,
+                "Accept-Language" to lang
+            )
+        )
+
+        val src = Regex("""file\s*:\s*"(.*?)"""").find(res.text)?.groupValues?.get(1) ?: return
+        callback(
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = src,
+                type = ExtractorLinkType.M3U8
+            ) {
+                this.headers = mapOf(
+                    "Referer" to "$mainUrl/",
+                    "Origin" to mainUrl,
+                    "User-Agent" to ua,
+                    "Accept-Language" to lang,
+                )
+            }
+        )
+    }
+}
+
+
+
 class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
 class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
+
+class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
+
+class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }
+
