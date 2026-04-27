@@ -72,23 +72,21 @@ class LayarKaca : MainAPI() {
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val document = app.get("https://gudangvape.com/search.php?s=$query&page=$page", referer = "${mainUrl}/").text
-
         val mapper = mapper.readValue<SearchApi>(document)
-
         val aramaCevap = mapper.data.mapNotNull { it.toSearchResult() }
 
         return newSearchResponseList(aramaCevap, hasNext = true)
     }
 
     private fun Data.toSearchResult(): SearchResponse? {
-        val title     = this.title
-        val href      = fixUrlNull(this.slug) ?: return null
-        val posterUrl = "https://poster.lk21.party/wp-content/uploads/${this.poster}"
-        val score     = this.rating
+        val title = this.title
+        val href = fixUrlNull(this.slug) ?: return null
+        val posterUrl = "https://static-jpg.lk21.party/wp-content/uploads/${this.poster}"
+        val score = this.rating
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
             this.posterUrl = posterUrl
-            this.score     = Score.from10(score)
+            this.score = Score.from10(score)
         }
     }
 
