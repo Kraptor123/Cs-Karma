@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 class CricHD : MainAPI() {
-    override var mainUrl = "https://crichd.asia"
+    override var mainUrl = "https://app.crichd.com"
     override var name = "CricHD"
     override val hasMainPage = true
     override var lang = "en"
