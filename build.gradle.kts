@@ -51,11 +51,11 @@ subprojects {
         // when running through gitHub workflow, GITHUB_REPOSITORY should contain current repository name
         setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/Kraptor123/kraptoranime")
 
-        authors = listOf("kraptor")
+        authors = listOf("byayzen")
     }
 
     android {
-        namespace = "com.kraptor"
+        namespace = "com.byayzen"
 
         defaultConfig {
             minSdk = 21
@@ -105,7 +105,7 @@ subprojects {
         implementation("me.xdrop:fuzzywuzzy:1.4.0")
         implementation("com.google.code.gson:gson:2.13.2")
         implementation("app.cash.quickjs:quickjs-android:0.9.2")
-        implementation("com.github.vidstige:jadb:v1.2.1")
+        implementation("com.github.vidstige:jadb:1.2.1")
     }
 }
 

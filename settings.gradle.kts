@@ -5,8 +5,14 @@ rootProject.name = "CloudstreamPlugins"
 val disabled = listOf("__Temel", "__PlayerTest", "ExampleProvider")
 
 File(rootDir, ".").eachDir { dir ->
-    if (!disabled.contains(dir.name) && File(dir, "build.gradle.kts").exists()) {
-        include(dir.name)
+    val buildFile = File(dir, "build.gradle.kts")
+    if (!disabled.contains(dir.name) && buildFile.exists()) {
+        val content = buildFile.readText()
+        val isInactive = content.contains("status\\s*=\\s*0".toRegex())
+
+        if (!isInactive) {
+            include(dir.name)
+        }
     }
 }
 
