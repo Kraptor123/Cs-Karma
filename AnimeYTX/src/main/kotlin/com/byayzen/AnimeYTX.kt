@@ -20,7 +20,7 @@ import com.lagradost.cloudstream3.app
 import java.util.regex.Pattern
 
 class AnimeYTX : MainAPI() {
-    override var mainUrl = "https://animeytx.net"
+    override var mainUrl = "https://wwv.animeytx.net"
     override var name = "AnimeYTX"
     override val hasMainPage = true
     override var lang = "es"
