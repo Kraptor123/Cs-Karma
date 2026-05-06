@@ -18,7 +18,7 @@ class Wcoflix : MainAPI() {
     override val supportedTypes = setOf(TvType.Anime, TvType.Cartoon)
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/" to "Son Çıkanlar",
+        "${mainUrl}/" to "Latest Contents",
         "${mainUrl}/#dubbed" to "Dubbed Anime",
         "${mainUrl}/#cartoon" to "Cartoon",
         "${mainUrl}/#subbed" to "Subbed Anime",
