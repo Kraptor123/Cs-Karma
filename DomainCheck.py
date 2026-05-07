@@ -1,3 +1,4 @@
+# ! Bu araç @Kraptor123 tarafından | @Cs-kraptor için yazılmıştır.
 #!/usr/bin/env python3
 # coding: utf-8
 
@@ -15,18 +16,20 @@ class MainUrlUpdater:
 
     @property
     def eklentiler(self):
+        # Eklenti klasörlerini listeler
         try:
             candidates = [
                 dosya for dosya in os.listdir(self.base_dir)
                 if os.path.isdir(os.path.join(self.base_dir, dosya))
                    and not dosya.startswith(".")
-                   and dosya not in {"gradle", "__Temel"}
+                   and dosya not in {"gradle", "__Temel", "HQPorner", "xVideos", "PornHub", "Xhamster", "Chatrubate"}
             ]
             return sorted(candidates)
         except FileNotFoundError:
             return []
 
     def _kt_dosyasini_bul(self, dizin, dosya_adi):
+        # Klasör içinde .kt dosyasını arar
         start = os.path.join(self.base_dir, dizin)
         for kok, alt_dizinler, dosyalar in os.walk(start):
             if dosya_adi in dosyalar:
@@ -35,6 +38,7 @@ class MainUrlUpdater:
 
     @property
     def kt_dosyalari(self):
+        # Ana eklenti dosyalarının yollarını toplar
         result = []
         for eklenti in self.eklentiler:
             kt_path = self._kt_dosyasini_bul(eklenti, f"{eklenti}.kt")
@@ -43,19 +47,18 @@ class MainUrlUpdater:
         return result
 
     def _mainurl_bul(self, kt_dosya_yolu):
+        # Dosyadan mainUrl değerini çeker
         try:
             with open(kt_dosya_yolu, "r", encoding="utf-8") as file:
                 icerik = file.read()
                 if m := re.search(r'override\s+var\s+mainUrl\s*=\s*["\']([^"\']+)["\']', icerik):
                     return m[1]
         except Exception:
-            pass
+            logger.error(f"Dosya okunurken hata: {kt_dosya_yolu}")
         return None
 
     def _mainurl_guncelle(self, kt_dosya_yolu, eski_url, yeni_url):
-        if not eski_url or not yeni_url:
-            return False
-
+        # mainUrl atamasını günceller
         try:
             with open(kt_dosya_yolu, "r+", encoding="utf-8") as file:
                 icerik = file.read()
@@ -78,35 +81,45 @@ class MainUrlUpdater:
         except Exception:
             return False
 
-    def _versiyonu_artir(self, build_gradle_yolu):
+    def _gradle_guncelle(self, build_gradle_yolu, yeni_url):
+        # Versiyon artırır ve iconUrl içindeki domaini günceller
         try:
+            yeni_domain = self._sadece_domain_al(yeni_url)
             with open(build_gradle_yolu, "r+", encoding="utf-8") as file:
                 icerik = file.read()
-                if version_match := re.search(r'(^\s*version\s*=\s*)(\d+)(\s*$)', icerik, flags=re.MULTILINE):
-                    eski_versiyon = int(version_match[2])
-                    yeni_versiyon = eski_versiyon + 1
-                    yeni_icerik = icerik.replace(f"{version_match[1]}{eski_versiyon}{version_match[3]}", f"{version_match[1]}{yeni_versiyon}{version_match[3]}")
-                    file.seek(0)
-                    file.write(yeni_icerik)
-                    file.truncate()
-                    return yeni_versiyon
-        except Exception:
-            pass
-        return None
 
-    def _sadece_domain_al(self, url):
-        if not url:
+                # Versiyon artırma
+                if v_match := re.search(r'(^\s*version\s*=\s*)(\d+)', icerik, flags=re.MULTILINE):
+                    eski_v = int(v_match.group(2))
+                    yeni_v = eski_v + 1
+                    icerik = icerik.replace(v_match.group(0), f"{v_match.group(1)}{yeni_v}")
+                else:
+                    yeni_v = None
+
+                # iconUrl içindeki domaini güncelleme (favicon parametresi)
+                # url=https://... kısmını yakalayıp yeni domainle değiştirir
+                icerik = re.sub(r'(url=https?://)([^&"\s]+)', r'\1' + yeni_domain.replace("https://", "").replace("http://", ""), icerik)
+
+                file.seek(0)
+                file.write(icerik)
+                file.truncate()
+                return yeni_v
+        except Exception:
             return None
+
+    def _sadece_domain_al(self, url, https_tercih=True):
+        # URL'den temiz domain kısmını çeker
+        if not url: return None
         try:
-            parsed = urlparse(url if re.match(r'^[a-zA-Z]+://', url) else f"http://{url}")
-            if not parsed.netloc:
-                return None
-            return f"{parsed.scheme}://{parsed.netloc}"
+            parsed = urlparse(url if "://" in url else f"http://{url}")
+            scheme = "https" if https_tercih else parsed.scheme
+            return f"{scheme}://{parsed.netloc}"
         except Exception:
             return None
 
     @property
     def mainurl_listesi(self):
+        # Geçerli mainUrl'i olan dosyaları listeler
         result = {}
         for kt_dosya_yolu in self.kt_dosyalari:
             mainurl = self._mainurl_bul(kt_dosya_yolu)
@@ -122,46 +135,27 @@ class MainUrlUpdater:
             except Exception:
                 continue
 
-            if not mainurl:
-                continue
+            logger.info(f"[~] Kontrol Ediliyor : {eklenti_adi}")
 
-            mainurl_sadece_domain = self._sadece_domain_al(mainurl)
-            if not mainurl_sadece_domain:
-                continue
+            mainurl_temiz = self._sadece_domain_al(mainurl)
+            if not mainurl_temiz: continue
 
             try:
-                istek = self.oturum.get(mainurl_sadece_domain, allow_redirects=True, timeout=15)
+                istek = self.oturum.get(mainurl_temiz, allow_redirects=True, timeout=15)
+                final_url = istek.url.rstrip('/')
             except Exception:
+                logger.warning(f"[!] Bağlantı hatası: {mainurl_temiz}")
                 continue
 
-            final_url = getattr(istek, "url", None)
-            if not final_url:
-                try:
-                    final_url = istek.geturl()
-                except Exception:
-                    final_url = None
-
-            if not final_url:
-                continue
-
-            final_url = final_url.rstrip('/')
             yeni_domain = self._sadece_domain_al(final_url)
-
-            if not yeni_domain or "instapro.ac" in yeni_domain.lower():
+            if not yeni_domain or mainurl_temiz == yeni_domain:
                 continue
 
-            if mainurl_sadece_domain == yeni_domain:
-                continue
-
-            try:
-                changed = self._mainurl_guncelle(dosya, mainurl, yeni_domain)
-                if changed:
-                    build_gradle_yolu = os.path.join(self.base_dir, eklenti_adi, "build.gradle.kts")
-                    yeni_v = self._versiyonu_artir(build_gradle_yolu)
-                    if yeni_v is not None:
-                        logger.info(f"[»] {mainurl} -> {yeni_domain} (v{yeni_v})")
-            except Exception:
-                pass
+            # Güncelleme işlemleri
+            if self._mainurl_guncelle(dosya, mainurl, yeni_domain):
+                gradle_yolu = os.path.join(self.base_dir, eklenti_adi, "build.gradle.kts")
+                yeni_v = self._gradle_guncelle(gradle_yolu, yeni_domain)
+                logger.info(f"[»] {mainurl} -> {yeni_domain} (v{yeni_v if yeni_v else '?'})")
 
 if __name__ == "__main__":
     updater = MainUrlUpdater(base_dir=".")

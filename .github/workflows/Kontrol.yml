@@ -35,7 +35,7 @@ jobs:
           pip install -U setuptools wheel cloudscraper pycryptodome
 
       - name: Betiği Çalıştır
-        run: python KONTROL.py
+        run: python DomainCheck.py
 
       - name: Değişiklik Kontrolü
         id: degisiklik_kontrol
