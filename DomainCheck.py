@@ -11,8 +11,11 @@ logger = logging.getLogger(__name__)
 
 class MainUrlUpdater:
     def __init__(self, base_dir="."):
-        self.base_dir = base_dir
-        self.oturum   = CloudScraper()
+            self.base_dir = base_dir
+            self.oturum   = CloudScraper()
+            self.blacklist = {
+                "instapro.ac",
+            }
 
     @property
     def eklentiler(self):
@@ -149,6 +152,11 @@ class MainUrlUpdater:
 
             yeni_domain = self._sadece_domain_al(final_url)
             if not yeni_domain or mainurl_temiz == yeni_domain:
+                continue
+
+            parsed_yeni = urlparse(yeni_domain)
+            if parsed_yeni.netloc.lower() in self.blacklist or parsed_yeni.netloc.lower().startswith("www.") and parsed_yeni.netloc[4:].lower() in self.blacklist:
+                logger.info(f"[-] Blacklistde olduğu için atlandı: {yeni_domain}")
                 continue
 
             # Güncelleme işlemleri

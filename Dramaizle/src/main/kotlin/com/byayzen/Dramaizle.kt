@@ -2,6 +2,7 @@
 
 package com.byayzen
 
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
@@ -17,72 +18,124 @@ class DramaFlix : MainAPI() {
 
     private val api = "$mainUrl/api/series"
 
-    private fun Seri.apiconvert(): SearchResponse {
-        return newMovieSearchResponse(this.title, "$mainUrl/api/series/${this.slug}", TvType.TvSeries) {
-            this.posterUrl = this@apiconvert.cover_image
-            this.id = this@apiconvert.id
-        }
-    }
+    override val mainPage = mainPageOf(
+        "$mainUrl/api/series?language=TR" to "Newly Added",
+        "$mainUrl/api/series?language=TR&platform=ShortMax" to "ShortMax",
+        "$mainUrl/api/series?language=TR&platform=NetShort" to "NetShort",
+        "$mainUrl/api/series?language=TR&platform=DramaBox" to "DramaBox",
+        "$mainUrl/api/series?language=TR&platform=DramaWave" to "DramaWave",
+        "$mainUrl/api/series?language=TR&platform=ReelShort" to "ReelShort",
+        "$mainUrl/api/series?language=TR&platform=StarDust" to "StarDust",
+        "$mainUrl/api/series?language=TR&platform=DramaBite" to "DramaBite",
+        "$mainUrl/api/series?language=TR&platform=FlexTV" to "FlexTV",
+        "$mainUrl/api/series?language=TR&platform=FreeReels" to "FreeReels",
+        "$mainUrl/api/series?language=TR&platform=RapidTV" to "RapidTV",
+        "$mainUrl/api/series?language=TR&platform=SodaReels" to "SodaReels"
+    )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val listeler = mutableListOf<HomePageList>()
         val limit = 25
-        val kayma = (page - 1) * limit
+        val offset = (page - 1) * limit
 
-        val platformlar = listOf(
-            "NetShort",
-            "DramaBox",
-            "ShortMax",
-            "DramaWawe",
-            "ReelShort",
-            "StarDust"
-        )
+        val cleanlink = if (request.data.contains("?")) {
+            "${request.data}&limit=$limit&offset=$offset"
+        } else {
+            "${request.data}?limit=$limit&offset=$offset"
+        }
 
-        platformlar.forEach { platform ->
-            val link = "$api?limit=$limit&offset=$kayma&language=TR&platform=$platform"
-            val yanit = app.get(link).text
-            val veri = AppUtils.parseJson<List<Seri>>(yanit)
+        val response = app.get(cleanlink).text
 
-            val icerik = veri.map { it.apiconvert() }
-            if (icerik.isNotEmpty()) {
-                listeler.add(HomePageList(platform, icerik))
+        val series = if (response.trim().startsWith("{")) {
+            val res = AppUtils.parseJson<SeriesResponse>(response)
+            res.series
+        } else {
+            AppUtils.parseJson<List<Seri>>(response)
+        }
+
+        val result = series.map { seri ->
+            val fixedcover = if (seri.cover_image.contains("awscover.netshort.com")) {
+                seri.cover_image.replace("https://", "http://")
+            } else {
+                seri.cover_image
+            }
+
+            newMovieSearchResponse(seri.title, "$mainUrl/api/series/${seri.slug}", TvType.TvSeries) {
+                this.posterUrl = fixUrlNull(fixedcover)
+                this.id = seri.id
             }
         }
 
-        return newHomePageResponse(listeler, true)
+        val listeler = listOf(HomePageList(request.name, result))
+        return newHomePageResponse(listeler, result.size >= limit)
     }
+
+    data class SeriesResponse(
+        val series: List<Seri>,
+        val total: Int,
+        val offset: Int,
+        val limit: Int
+    )
 
     override suspend fun search(query: String): List<SearchResponse> {
         val link = "$api?search=$query&language=TR&limit=500"
-        val yanit = app.get(link).text
-        val veri = AppUtils.parseJson<List<Seri>>(yanit)
+        val response = app.get(link).text
 
-        return veri.map { it.apiconvert() }
+        val series = if (response.trim().startsWith("{")) {
+            val res = AppUtils.parseJson<SeriesResponse>(response)
+            res.series
+        } else {
+            AppUtils.parseJson<List<Seri>>(response)
+        }
+
+        return series.map { seri ->
+            val fixedcover = if (seri.cover_image.contains("awscover.netshort.com")) {
+                seri.cover_image.replace("https://", "http://")
+            } else {
+                seri.cover_image
+            }
+
+            newMovieSearchResponse(seri.title, "$mainUrl/api/series/${seri.slug}", TvType.TvSeries) {
+                this.posterUrl = fixUrlNull(fixedcover)
+                this.id = seri.id
+            }
+        }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse {
-        val yanit = app.get(url).text
-        val veri = AppUtils.parseJson<Detay>(yanit)
-        val seri = veri.series
+        val response = app.get(url).text
+        val res = AppUtils.parseJson<Detay>(response)
+        val series = res.series
 
-        return newTvSeriesLoadResponse(
-            seri.title.replaceFirstChar { it.titlecase(Locale.ROOT) },
-            url,
-            TvType.AsianDrama,
-            veri.episodes.map { bolum ->
-                val data = bolum.toJson()
-                newEpisode(data) {
-                    this.name = "Bölüm ${bolum.episode_number}"
-                    this.episode = bolum.episode_number
-                    this.posterUrl = bolum.thumbnail
-                }
+        val title = series.title.replaceFirstChar { it.titlecase(Locale.ROOT) }
+        val description = series.description?.replaceFirstChar { it.titlecase(Locale.ROOT) }
+
+        val poster = series.cover_image.let { img ->
+            if (img.contains("awscover.netshort.com")) img.replace("https://", "http://") else img
+        }
+
+        val tagslist = mutableListOf<String>()
+        series.tags?.let { tagslist.addAll(it) }
+        series.platform?.let { tagslist.add(it) }
+
+        val episodes = res.episodes.map { bolum ->
+            val data = bolum.toJson()
+            val thumb = bolum.thumbnail?.let { img ->
+                if (img.contains("awscover.netshort.com")) img.replace("https://", "http://") else img
             }
-        ) {
-            this.posterUrl = seri.cover_image
-            this.plot = seri.description?.replaceFirstChar { it.titlecase(Locale.ROOT) }
-            this.tags = seri.tags
+
+            newEpisode(data) {
+                this.name = "Bölüm ${bolum.episode_number}"
+                this.episode = bolum.episode_number
+                this.posterUrl = thumb
+            }
+        }
+
+        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
+            this.posterUrl = fixUrlNull(poster)
+            this.plot = description
+            this.tags = tagslist
         }
     }
 
@@ -95,8 +148,10 @@ class DramaFlix : MainAPI() {
         val bolum = AppUtils.parseJson<Bolum>(data)
 
         bolum.subtitles?.forEach { altyazi ->
+            val label = altyazi.label ?: altyazi.language
+            val fixedlabel = if (label.uppercase() == "TR") "Türkçe" else label
             subtitleCallback.invoke(
-                newSubtitleFile(altyazi.label ?: altyazi.language, altyazi.url)
+                newSubtitleFile(fixedlabel, altyazi.url)
             )
         }
 
