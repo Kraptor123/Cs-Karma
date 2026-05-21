@@ -14,19 +14,20 @@ import android.content.Context
 
 
 object MovixHelper {
-    var dynamicurl = "https://www.movix.cash"
+    var dynamicurl = "https://movix.health"
     val prefname = "movix_prefs"
     val domainkey = "movix_domain"
 
     suspend fun updatemainurl() {
         val prefs = CloudStreamApp.context?.getSharedPreferences(prefname, Context.MODE_PRIVATE)
         val savedurl = prefs?.getString(domainkey, null)
+
         if (savedurl != null && !savedurl.contains("movix.health")) {
             try {
                 val checkresponse = app.get(savedurl, timeout = 5)
                 if (checkresponse.code in 200..299) {
                     dynamicurl = savedurl
-                    Log.d("MovixHelper", "$dynamicurl")
+                    Log.d("MovixHelper", dynamicurl)
                     return
                 }
             } catch (e: Exception) {
@@ -41,17 +42,19 @@ object MovixHelper {
 
             if (match != null) {
                 val extractedDomain = "https://" + match.groupValues[1].trim()
-                if (!extractedDomain.contains("movix.health")) {
-                    dynamicurl = extractedDomain
-                    prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
-                    Log.d("MovixHelper", " $dynamicurl")
-                }
+                dynamicurl = extractedDomain
+                prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
+                Log.d("MovixHelper", dynamicurl)
+            } else {
+                Log.d("MovixHelper", dynamicurl)
             }
         } catch (e: Exception) {
-            Log.d("MovixHelper", " ${e.message}")
+            Log.d("MovixHelper", e.message.toString())
         }
     }
 }
+
+
 
 const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
 const val tmdblang = "fr-FR"

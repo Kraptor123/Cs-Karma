@@ -450,6 +450,8 @@ class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
 class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
 
+class BllEmbedseek : VidStack() { override var mainUrl = "https://bll.embedseek.com" }
+
 class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
 
 class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }

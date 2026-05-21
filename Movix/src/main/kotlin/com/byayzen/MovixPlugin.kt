@@ -41,5 +41,6 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(GoodStream())
         registerExtractorAPI(Lukefirst())
         registerExtractorAPI(Bysebuho())
+        registerExtractorAPI(BllEmbedseek())
     }
 }
