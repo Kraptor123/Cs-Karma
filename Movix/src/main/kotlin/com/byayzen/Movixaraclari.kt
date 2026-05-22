@@ -11,46 +11,56 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import com.lagradost.cloudstream3.app
 import android.content.Context
+import android.content.SharedPreferences
+import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 
 
 object MovixHelper {
-    var dynamicurl = "https://movix.health"
     val prefname = "movix_prefs"
     val domainkey = "movix_domain"
+    @Volatile var cachedUrl: String? = null
 
-    suspend fun updatemainurl() {
+    suspend fun updatemainurl(): String {
+        cachedUrl?.let { return it }
+
         val prefs = CloudStreamApp.context?.getSharedPreferences(prefname, Context.MODE_PRIVATE)
         val savedurl = prefs?.getString(domainkey, null)
 
-        if (savedurl != null && !savedurl.contains("movix.health")) {
-            try {
-                val checkresponse = app.get(savedurl, timeout = 5)
-                if (checkresponse.code in 200..299) {
-                    dynamicurl = savedurl
-                    Log.d("MovixHelper", dynamicurl)
-                    return
+        if (savedurl != null) {
+            cachedUrl = savedurl
+            ioSafe {
+                try {
+                    if (app.get(savedurl, timeout = 3).code !in 200..299) {
+                        domainal(prefs)
+                    }
+                } catch (e: Exception) {
+                    Log.d("MovixHelper", e.message.toString())
+                    domainal(prefs)
                 }
-            } catch (e: Exception) {
             }
+            return savedurl
         }
 
+        return domainal(prefs)
+    }
+
+    private suspend fun domainal(prefs: SharedPreferences?): String {
         try {
-            val healthresponse = app.get("https://www.movix.health/")
-            val healthtext = healthresponse.text
-            val regex = """Accéder à\s+([a-zA-Z0-9.-]+\.[a-z]{2,})""".toRegex()
-            val match = regex.find(healthtext)
+            val html = app.get("https://movix.health/", timeout = 5).text
+            val pattern = """(?:La seule adresse active de Movix est\s+<a\s+href="https://|(?:"url"\s*:\s*"https://)|(?:<title>.*?\b))(movix\.[a-z0-9]+)"""
+                .toRegex(RegexOption.IGNORE_CASE)
+            val match = pattern.find(html)
 
             if (match != null) {
-                val extractedDomain = "https://" + match.groupValues[1].trim()
-                dynamicurl = extractedDomain
-                prefs?.edit()?.putString(domainkey, dynamicurl)?.apply()
-                Log.d("MovixHelper", dynamicurl)
-            } else {
-                Log.d("MovixHelper", dynamicurl)
+                val domain = "https://" + match.groupValues[1].trim()
+                cachedUrl = domain
+                prefs?.edit()?.putString(domainkey, domain)?.apply()
+                return domain
             }
         } catch (e: Exception) {
             Log.d("MovixHelper", e.message.toString())
         }
+        return cachedUrl ?: ""
     }
 }
 
