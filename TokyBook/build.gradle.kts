@@ -1,11 +1,11 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
-version = 2
+version = 3
 
 cloudstream {
     authors     = listOf("ByAyzen")
     language    = "en"
     description = "Discover thousands of free audiobooks and podcasts. Your next favorite story is waiting for you."
-    status  = 1
+    status  = 0
     tvTypes = listOf("AudioBook")
     iconUrl = "https://i.imgur.com/jXmev09.png"
 }
