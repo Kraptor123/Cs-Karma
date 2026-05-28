@@ -46,7 +46,7 @@ object MovixHelper {
 
     private suspend fun domainal(prefs: SharedPreferences?): String {
         try {
-            val html = app.get("https://movix.health/", timeout = 5).text
+            val html = app.get("https://movix.online/", timeout = 5).text
             val pattern = """(?:La seule adresse active de Movix est\s+<a\s+href="https://|(?:"url"\s*:\s*"https://)|(?:<title>.*?\b))(movix\.[a-z0-9]+)"""
                 .toRegex(RegexOption.IGNORE_CASE)
             val match = pattern.find(html)
