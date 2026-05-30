@@ -24,9 +24,61 @@ import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
+
+class Vidaraa : ExtractorApi() {
+    override var name = "Vidaraa"
+    override var mainUrl = "https://vidaraa.cc"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val filecode = url.substringAfterLast("/")
+        val apiurl = "$mainUrl/api/stream"
+        val payload = """{"filecode":"$filecode","device":"web"}"""
+
+        Log.d("Vidaraa", "URL: $apiurl")
+        val response = app.post(
+            apiurl,
+            requestBody = payload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()),
+            headers = mapOf(
+                "Referer" to url,
+                "Origin" to mainUrl,
+                "User-Agent" to USER_AGENT
+            )
+        )
+        
+        val resText = response.text
+        Log.d("Vidaraa", "Res: $resText")
+        val streamurl = JSONObject(resText).optString("streaming_url")
+        
+        if (streamurl.isNotBlank()) {
+            val check = app.get(streamurl, referer = "$mainUrl/", timeout = 5)
+            Log.d("Vidaraa", "Code: ${check.code}")
+            if (check.code == 200) {
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = name,
+                        url = streamurl,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = "$mainUrl/"
+                    }
+                )
+            }
+        }
+    }
+}
 
 class Ralphy : Voe() { override var mainUrl = "https://ralphysuccessfull.org" }
+class Bryantenunder : Voe() { override var mainUrl = "https://bryantenunder.com" }
 
 open class Uqload : ExtractorApi() {
     override var name = "Uqload"
@@ -39,41 +91,70 @@ open class Uqload : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val response = app.get(url, referer = referer ?: mainUrl).text
-        val videoRegex = """sources:\s*\[\s*"([^"]+)"""".toRegex()
-        val matchResult = videoRegex.find(response)
+        try {
+            val embedResponse = app.get(
+                url,
+                referer = referer ?: mainUrl,
+                headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0",
+                    "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Upgrade-Insecure-Requests" to "1"
+                )
+            )
 
-        if (matchResult != null) {
-            val videoUrl = matchResult.groupValues[1]
+            val responseText = embedResponse.text
+            val cookies = embedResponse.cookies
+            val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+            val unpacked = getAndUnpack(responseText)
+
+            val m3u8Urls = Regex("""https?://[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*""")
+                .findAll(unpacked).map { it.value }.toList()
+            val mp4Urls = Regex("""https?://[^\s"'<>\\]+\.mp4[^\s"'<>\\]*""")
+                .findAll(unpacked).map { it.value }.toList()
+
+            val videoUrl = m3u8Urls.firstOrNull() ?: mp4Urls.firstOrNull() ?: return
+
+            val streamHeaders = buildMap {
+                put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0")
+                put("Accept", "*/*")
+                put("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
+                put("Origin", mainUrl)
+                put("Referer", "$mainUrl/")
+                put("Sec-Fetch-Dest", "empty")
+                put("Sec-Fetch-Mode", "cors")
+                put("Sec-Fetch-Site", "same-site")
+                if (cookieHeader.isNotEmpty()) put("Cookie", cookieHeader)
+            }
+
+            val isM3u8 = videoUrl.contains(".m3u8")
             callback.invoke(
                 newExtractorLink(
                     source = this.name,
                     name = this.name,
                     url = videoUrl,
-                    type = ExtractorLinkType.VIDEO
+                    type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 ) {
-                    this.quality = 1080
-                    this.referer = mainUrl
-                    this.headers = mapOf(
-                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0",
-                        "Accept" to "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5",
-                        "Accept-Language" to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                        "Connection" to "keep-alive",
-                        "Sec-Fetch-Dest" to "video",
-                        "Sec-Fetch-Mode" to "no-cors",
-                        "Sec-Fetch-Site" to "same-site"
-                    )
+                    this.referer = "$mainUrl/"
+                    this.quality = if (isM3u8) Qualities.Unknown.value else 1080
+                    this.headers = streamHeaders
                 }
             )
+        } catch (e: Exception) {
         }
     }
-}
+    }
 
 class UqloadIo : Uqload() {
     override var mainUrl = "https://uqload.io"
 }
+
 class Uqloadcx : Uqload() {
     override var mainUrl = "https://uqload.cx"
+}
+
+class Uqloadto : Uqload() {
+    override var mainUrl = "https://uqload.to"
 }
 
 open class DoodStream : ExtractorApi() {
@@ -132,6 +213,10 @@ class Vide0Net : DoodStream() {
 
 class DoodDoply : DoodStream() {
     override var mainUrl = "https://doply.net"
+}
+
+class Playmogo : DoodStream() {
+    override var mainUrl = "https://playmogo.com"
 }
 
 class GhBrisk : StreamWishExtractor() {

@@ -169,7 +169,8 @@ data class TmdbDetailResponse(
     val videos          : TmdbVideoResponse?,
     val seasons         : List<TmdbSeason>?,
     val images          : TmdbImageResponse?,
-    val status          : String?
+    val status          : String?,
+    val origin_country  : List<String>?
 )
 
 data class TmdbImageResponse(
@@ -224,6 +225,29 @@ data class FstreamLink(val url: String?)
 data class MovixPurstreamResponse(val sources: List<PurstreamSource>?)
 data class PurstreamSource(val url: String?, val name: String?, val format: String?)
 
+data class FrembedResponse(val result: FrembedResult?)
+data class FrembedResult(val items: List<FrembedItem>?)
+data class FrembedItem(val link: String?)
+
+data class MovixAnimeResponse(
+    val name: String?,
+    val seasons: List<MovixAnimeSeason>?
+)
+
+data class MovixAnimeSeason(
+    val name: String?,
+    val episodes: List<MovixAnimeEpisode>?
+)
+
+data class MovixAnimeEpisode(
+    val index: Int?,
+    val streaming_links: List<MovixAnimeStreamingLink>?
+)
+
+data class MovixAnimeStreamingLink(
+    val language: String?,
+    val players: List<String>?
+)
 
 
 suspend fun loadcustomextractor(
@@ -234,17 +258,41 @@ suspend fun loadcustomextractor(
     callback: (ExtractorLink) -> Unit
 ) = coroutineScope {
     try {
-        if (url.contains(".m3u8") || url.contains(".mp4") || url.contains(".mkv")) {
-            val ism3u8 = url.contains(".m3u8")
-            callback.invoke(
-                newExtractorLink(
-                    source = brand,
-                    name = brand,
-                    url = url,
-                    type = if (ism3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
-                ) { this.referer = referer }
-            )
-            return@coroutineScope
+        if (url.contains("frembed.click")) {
+            FrembedExtractor.getLinks(url, subtitlecallback, callback)
+        }
+
+        val isVideoUrl = url.contains(".m3u") || url.contains(".mp4") || url.contains(".mkv")
+        if (isVideoUrl) {
+            val isSibnet = url.contains("sibnet.ru")
+            
+            if (brand == "Anime" && !isSibnet) {
+                if (app.get(url, referer = referer, timeout = 5).code == 200) {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = brand,
+                            name = brand,
+                            url = url,
+                            type = if (url.contains(".m3u")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        ) { this.referer = referer }
+                    )
+                    return@coroutineScope
+                }
+            }
+            
+            if (url.contains(".m3u8") || url.contains(".mp4") || url.contains(".mkv")) {
+                if (app.get(url, referer = referer, timeout = 5).code == 200) {
+                    callback.invoke(
+                        newExtractorLink(
+                            source = brand,
+                            name = brand,
+                            url = url,
+                            type = if (url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        ) { this.referer = referer }
+                    )
+                    return@coroutineScope
+                }
+            }
         }
 
         loadExtractor(url, referer, subtitlecallback) { link ->

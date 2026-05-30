@@ -42,5 +42,9 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Lukefirst())
         registerExtractorAPI(Bysebuho())
         registerExtractorAPI(BllEmbedseek())
+        registerExtractorAPI(Playmogo())
+        registerExtractorAPI(Uqloadto())
+        registerExtractorAPI(Vidaraa())
+        registerExtractorAPI(Bryantenunder())
     }
 }

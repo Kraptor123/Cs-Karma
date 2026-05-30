@@ -147,8 +147,11 @@ class Movix : MainAPI() {
                         "https://www.youtube.com/embed/${it.key}"
                     }
 
+            val isAnime = res.origin_country?.contains("JP") == true && res.genres?.any { it.id == 16 } == true
+            val tvType = if (isAnime) TvType.Anime else if (type == "movie") TvType.Movie else TvType.TvSeries
+
             return if (type == "movie") {
-                newMovieLoadResponse(titleText, url, TvType.Movie, url) {
+                newMovieLoadResponse(titleText, url, tvType, url) {
                     this.posterUrl = poster; this.backgroundPosterUrl = bg; this.logoUrl = logo
                     this.plot = res.overview; this.year = yearText
                     this.tags = res.genres?.mapNotNull { it.name }
@@ -180,7 +183,7 @@ class Movix : MainAPI() {
                     } ?: emptyList()
                 } ?: emptyList()
 
-                newTvSeriesLoadResponse(titleText, url, TvType.TvSeries, episodes) {
+                newTvSeriesLoadResponse(titleText, url, tvType, episodes) {
                     this.posterUrl = poster; this.backgroundPosterUrl = bg; this.logoUrl = logo
                     this.showStatus = when (res.status) {
                         "Returning Series", "In Production", "Planned" -> ShowStatus.Ongoing;
@@ -229,16 +232,35 @@ class Movix : MainAPI() {
             requests.add("MovixTmdb" to "$apibase/tmdb/$type/$id$query")
             requests.add("IMDB" to "$apibase/imdb/$type/$id")
 
+            try {
+                val tmdbres = app.get("$tmdbbase/$type/$id?api_key=$tmdbkey").parsed<TmdbDetailResponse>()
+                val title = tmdbres.title ?: tmdbres.name ?: tmdbres.original_title ?: tmdbres.original_name
+                val isanime = tmdbres.origin_country?.contains("JP") == true && tmdbres.genres?.any { it.id == 16 } == true
+
+                if (isanime && !title.isNullOrBlank()) {
+                    val encoded = java.net.URLEncoder.encode(title, "UTF-8")
+                    requests.add("Anime" to apibase.substringBeforeLast("/") + "/anime/search/$encoded?includeSeasons=true&includeEpisodes=true")
+                }
+            } catch (e: Exception) {
+                Log.d("Movix", "Tmdb fetch error: ${e.message}")
+            }
+
             if (type == "movie") {
                 requests.add("FStream" to "$apibase/fstream/$type/$id")
                 requests.add("Wiflix" to "$apibase/wiflix/$id")
                 requests.add("Cpasmal" to "$apibase/cpasmal/$type/$id")
                 requests.add("Purstream" to "$apibase/purstream/movie/$id/stream")
+                requests.add("Frembed" to "https://frembed.click/api/public/v1/movies/$id")
             } else {
                 requests.add("FStream" to "$apibase/fstream/$type/$id/season/$season")
                 requests.add("Wiflix" to "$apibase/wiflix/$id/$season")
                 requests.add("Cpasmal" to "$apibase/cpasmal/$type/$id/season/$season/episode/$episode")
                 requests.add("Purstream" to "$apibase/purstream/tv/$id/stream$query")
+                requests.add("Frembed" to "https://frembed.click/api/public/v1/tv/$id?sa=$season&epi=$episode")
+            }
+
+            launch {
+                videolinks(apibase, type, id, season, episode, query, apiheaders, callback)
             }
 
             requests.map { (brandname, targeturl) ->
@@ -246,7 +268,6 @@ class Movix : MainAPI() {
                     try {
                         Log.d("Movix", targeturl)
                         val response = app.get(targeturl, headers = apiheaders, timeout = 15).text
-
                         if (isvalidresponse(response)) {
                             if (brandname == "Purstream") {
                                 parsepurstream(response, callback)
@@ -261,10 +282,6 @@ class Movix : MainAPI() {
                 }
             }.awaitAll()
 
-            launch {
-                videolinks(apibase, type, id, season, episode, query, apiheaders, callback)
-            }
-
             true
         }
 
@@ -277,7 +294,8 @@ class Movix : MainAPI() {
                 "\"sources\":",
                 "\"players\":",
                 "\"links\":",
-                "\"purstream_id\":"
+                "\"purstream_id\":",
+                "frembed"
             )
             return keywords.any { response.contains(it) }
         }
@@ -374,92 +392,76 @@ class Movix : MainAPI() {
             episode: String?
         ): List<String> {
             val extracted = mutableListOf<String>()
-
             if (response.contains("player_links") || response.contains("iframe_src")) {
-                AppUtils.tryParseJson<MovixTmdbResponse>(response)?.let {
-                    it.player_links?.forEach { p -> p.decoded_url?.let { u -> extracted.add(u) } }
-                    it.current_episode?.player_links?.forEach { p ->
-                        p.decoded_url?.let { u ->
-                            extracted.add(
-                                u
-                            )
-                        }
-                    }
-                    it.iframe_src?.let { src -> extracted.add(src) }
-                    it.current_episode?.iframe_src?.let { src -> extracted.add(src) }
+                AppUtils.tryParseJson<MovixTmdbResponse>(response)?.let { res ->
+                    res.player_links?.forEach { it.decoded_url?.let(extracted::add) }
+                    res.current_episode?.player_links?.forEach { it.decoded_url?.let(extracted::add) }
+                    res.iframe_src?.let(extracted::add)
+                    res.current_episode?.iframe_src?.let(extracted::add)
                 }
             }
-
-            when {
-                url.contains("/api/links/") -> {
+            if (url.contains("/api/links/")) {
+                if (type == "movie") {
+                    AppUtils.tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let(extracted::addAll)
+                } else {
+                    AppUtils.tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach { data ->
+                        data.links?.let(extracted::addAll)
+                    }
+                }
+            }
+            if (url.contains("/api/cpasmal/") || (response.contains("\"players\":") && !url.contains("/imdb/"))) {
+                AppUtils.tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))
+                    ?.links?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
+            }
+            if (url.contains("/api/imdb/")) {
+                AppUtils.tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
+                    series.seasons?.forEach { season ->
+                        season.episodes?.filter { episode == null || it.number == episode }?.forEach { ep ->
+                            ep.versions?.values?.forEach { version ->
+                                version.players?.forEach { it.link?.let(extracted::add) }
+                            }
+                        }
+                    }
+                }
+            }
+            if (url.contains("/api/fstream/")) {
+                AppUtils.tryParseJson<MovixFstreamResponse>(response)?.let { res ->
                     if (type == "movie") {
-                        AppUtils.tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let {
-                            extracted.addAll(
-                                it
-                            )
-                        }
+                        res.links?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
                     } else {
-                        AppUtils.tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach {
-                            it.links?.let { l ->
-                                extracted.addAll(
-                                    l
-                                )
-                            }
-                        }
-                    }
-                }
-
-                url.contains("/api/cpasmal/") || (response.contains("\"players\":") && !url.contains(
-                    "/imdb/"
-                )) -> {
-                    AppUtils.tryParseJson<CpasmalRes>(
-                        response.replace(
-                            "\"players\":",
-                            "\"links\":"
-                        )
-                    )?.links?.values?.flatten()?.forEach { it.url?.let { u -> extracted.add(u) } }
-                }
-
-                url.contains("/api/imdb/") -> {
-                    AppUtils.tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
-                        series.seasons?.forEach { season ->
-                            season.episodes?.forEach { ep ->
-                                if (episode == null || ep.number == episode) {
-                                    ep.versions?.values?.forEach { version ->
-                                        version.players?.forEach {
-                                            it.link?.let { u ->
-                                                extracted.add(
-                                                    u
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                url.contains("/api/fstream/") -> {
-                    AppUtils.tryParseJson<MovixFstreamResponse>(response)?.let {
-                        if (type == "movie") {
-                            it.links?.values?.flatten()
-                                ?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
+                        val epmap = res.episodes
+                        if (episode != null && epmap?.containsKey(episode) == true) {
+                            epmap[episode]?.languages?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
                         } else {
-                            val epmap = it.episodes
-                            if (episode != null && epmap?.containsKey(episode) == true) {
-                                epmap[episode]?.languages?.values?.flatten()
-                                    ?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
-                            } else {
-                                epmap?.values?.forEach { e ->
-                                    e.languages?.values?.flatten()
-                                        ?.forEach { link -> link.url?.let { u -> extracted.add(u) } }
+                            epmap?.values?.forEach { e ->
+                                e.languages?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
+                            }
+                        }
+                    }
+                }
+            }
+            if (url.contains("frembed.click")) {
+                AppUtils.tryParseJson<FrembedResponse>(response)?.result?.items?.forEach {
+                    it.link?.let(extracted::add)
+                }
+            }
+            if (url.contains("/anime/search/")) {
+                Log.d("MovixAnime", "Anime Ep: $episode")
+                AppUtils.tryParseJson<List<MovixAnimeResponse>>(response)?.forEach { anime ->
+                    anime.seasons?.forEach { s ->
+                        s.episodes?.forEach { ep ->
+                            val epindex = ep.index?.toString()
+                            if (type == "movie" || epindex == episode) {
+                                if (epindex != null) Log.d("Movix", "Anime Match: $epindex")
+                                ep.streaming_links?.forEach { sl ->
+                                    sl.players?.let(extracted::addAll)
                                 }
                             }
                         }
                     }
                 }
             }
+
             return extracted.distinct().filter { it.isNotBlank() }
         }
 
