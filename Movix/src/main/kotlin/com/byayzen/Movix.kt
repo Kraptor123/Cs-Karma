@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -23,6 +24,14 @@ class Movix : MainAPI() {
         override var lang = "fr"
         override val hasQuickSearch = true
         override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+
+        private inline fun <reified T : Any> tryParseJson(json: String?): T? {
+            return try {
+                json?.let { mapper.readValue<T>(it) }
+            } catch (e: Exception) {
+                null
+            }
+        }
 
         override val mainPage = mainPageOf(
             "movie/now_playing" to "Nouveaux Films",
@@ -301,7 +310,7 @@ class Movix : MainAPI() {
         }
 
         private suspend fun parsepurstream(response: String, callback: (ExtractorLink) -> Unit) {
-            AppUtils.tryParseJson<MovixPurstreamResponse>(response)?.sources?.forEach { source ->
+            tryParseJson<MovixPurstreamResponse>(response)?.sources?.forEach { source ->
                 source.url?.let { link ->
                     if (link.isNotBlank()) {
                         val sourcename = source.name ?: ""
@@ -361,7 +370,7 @@ class Movix : MainAPI() {
                 Log.d("Movix", downloadurl)
 
                 val dlres = app.get(downloadurl, headers = apiheaders, timeout = 15).text
-                AppUtils.tryParseJson<MovixDownloadResponse>(dlres)?.sources?.forEach { source ->
+                tryParseJson<MovixDownloadResponse>(dlres)?.sources?.forEach { source ->
                     val link = source.m3u8 ?: source.src
 
                     if (!link.isNullOrBlank()) {
@@ -393,7 +402,7 @@ class Movix : MainAPI() {
         ): List<String> {
             val extracted = mutableListOf<String>()
             if (response.contains("player_links") || response.contains("iframe_src")) {
-                AppUtils.tryParseJson<MovixTmdbResponse>(response)?.let { res ->
+                tryParseJson<MovixTmdbResponse>(response)?.let { res ->
                     res.player_links?.forEach { it.decoded_url?.let(extracted::add) }
                     res.current_episode?.player_links?.forEach { it.decoded_url?.let(extracted::add) }
                     res.iframe_src?.let(extracted::add)
@@ -402,19 +411,19 @@ class Movix : MainAPI() {
             }
             if (url.contains("/api/links/")) {
                 if (type == "movie") {
-                    AppUtils.tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let(extracted::addAll)
+                    tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let(extracted::addAll)
                 } else {
-                    AppUtils.tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach { data ->
+                    tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach { data ->
                         data.links?.let(extracted::addAll)
                     }
                 }
             }
             if (url.contains("/api/cpasmal/") || (response.contains("\"players\":") && !url.contains("/imdb/"))) {
-                AppUtils.tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))
+                tryParseJson<CpasmalRes>(response.replace("\"players\":", "\"links\":"))
                     ?.links?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
             }
             if (url.contains("/api/imdb/")) {
-                AppUtils.tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
+                tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
                     series.seasons?.forEach { season ->
                         season.episodes?.filter { episode == null || it.number == episode }?.forEach { ep ->
                             ep.versions?.values?.forEach { version ->
@@ -425,7 +434,7 @@ class Movix : MainAPI() {
                 }
             }
             if (url.contains("/api/fstream/")) {
-                AppUtils.tryParseJson<MovixFstreamResponse>(response)?.let { res ->
+                tryParseJson<MovixFstreamResponse>(response)?.let { res ->
                     if (type == "movie") {
                         res.links?.values?.flatten()?.forEach { it.url?.let(extracted::add) }
                     } else {
@@ -441,13 +450,13 @@ class Movix : MainAPI() {
                 }
             }
             if (url.contains("frembed.click")) {
-                AppUtils.tryParseJson<FrembedResponse>(response)?.result?.items?.forEach {
+                tryParseJson<FrembedResponse>(response)?.result?.items?.forEach {
                     it.link?.let(extracted::add)
                 }
             }
             if (url.contains("/anime/search/")) {
                 Log.d("MovixAnime", "Anime Ep: $episode")
-                AppUtils.tryParseJson<List<MovixAnimeResponse>>(response)?.forEach { anime ->
+                tryParseJson<List<MovixAnimeResponse>>(response)?.forEach { anime ->
                     anime.seasons?.forEach { s ->
                         s.episodes?.forEach { ep ->
                             val epindex = ep.index?.toString()
