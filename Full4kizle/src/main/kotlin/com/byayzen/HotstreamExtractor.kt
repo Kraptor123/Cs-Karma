@@ -21,13 +21,15 @@ class HotstreamExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val response = app.get(url, headers = mapOf(
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
-            "Referer" to (referer ?: "https://dizifilm.org/"),
-            "Sec-Fetch-Dest" to "iframe",
-            "Sec-Fetch-Mode" to "navigate",
-            "Sec-Fetch-Site" to "cross-site"
-        )).text
+        val response = app.get(
+            url, headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
+                "Referer" to (referer ?: "https://dizifilm.org/"),
+                "Sec-Fetch-Dest" to "iframe",
+                "Sec-Fetch-Mode" to "navigate",
+                "Sec-Fetch-Site" to "cross-site"
+            )
+        ).text
 
         val match = Regex("""bePlayer\s*\(\s*'([^']+)'\s*,\s*'([^']+)'""").find(response) ?: return
 
@@ -57,7 +59,8 @@ class HotstreamExtractor : ExtractorApi() {
                     this.quality = Qualities.P1080.value
                 }
             )
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+        }
     }
 
     private fun decryptAes(data: JsData, password: String): String {
@@ -91,12 +94,12 @@ class HotstreamExtractor : ExtractorApi() {
     }
 
     data class JsData(
-        @JsonProperty("ct") val ct: String,
-        @JsonProperty("iv") val iv: String,
-        @JsonProperty("s") val s: String
+        @param:JsonProperty("ct") val ct: String,
+        @param:JsonProperty("iv") val iv: String,
+        @param:JsonProperty("s") val s: String
     )
 
     data class DecryptedLocation(
-        @JsonProperty("video_location") val videoLocation: String
+        @param:JsonProperty("video_location") val videoLocation: String
     )
 }

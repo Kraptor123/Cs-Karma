@@ -210,6 +210,6 @@ class DoramasLatinoX : MainAPI() {
     }
 
     data class EmbedResponse(
-        @JsonProperty("embed_url") val embedUrl: String? = null
+        @param:JsonProperty("embed_url") val embedUrl: String? = null
     )
-}
+    }

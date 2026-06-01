@@ -13,16 +13,6 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.*
 
-data class FilmItem(
-    @JsonProperty("title") val title: String? = null,
-    @JsonProperty("poster") val poster: String? = null,
-    @JsonProperty("link") val link: String? = null
-)
-
-data class FilmResponse(
-    @JsonProperty("films") val films: List<FilmItem>? = null,
-    @JsonProperty("hasMore") val hasMore: Boolean? = null
-)
 
 class Yablom : MainAPI() {
     override var mainUrl              = "https://yablom.com"
@@ -133,4 +123,16 @@ class Yablom : MainAPI() {
         return true
     }
 }
+
+
+data class FilmItem(
+    @param:JsonProperty("title") val title: String? = null,
+    @param:JsonProperty("poster") val poster: String? = null,
+    @param:JsonProperty("link") val link: String? = null
+)
+
+data class FilmResponse(
+    @param:JsonProperty("films") val films: List<FilmItem>? = null,
+    @param:JsonProperty("hasMore") val hasMore: Boolean? = null
+)
 

@@ -1,5 +1,6 @@
 package com.byayzen
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -302,11 +303,11 @@ class GnulaHD : MainAPI() {
 
 
 data class GnulaLang(
-    val label: String,
-    val servers: List<GnulaServer>
+    @param:JsonProperty("label") val label: String,
+    @param:JsonProperty("servers") val servers: List<GnulaServer>
 )
 
 data class GnulaServer(
-    val title: String,
-    val src: String
+    @param:JsonProperty("title") val title: String,
+    @param:JsonProperty("src") val src: String
 )

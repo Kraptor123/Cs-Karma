@@ -2,6 +2,7 @@
 
 package com.byayzen
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import org.json.JSONObject
 import org.json.JSONArray
 import com.lagradost.cloudstream3.*
@@ -139,8 +140,8 @@ class Subsplease : MainAPI() {
 }
 
 data class LatestResponse(
-    val page: String? = null,
-    val episode: String? = null,
-    val show: String? = null,
-    val image_url: String? = null
+    @param:JsonProperty("page") val page: String? = null,
+    @param:JsonProperty("episode") val episode: String? = null,
+    @param:JsonProperty("show") val show: String? = null,
+    @param:JsonProperty("image_url") val image_url: String? = null
 )

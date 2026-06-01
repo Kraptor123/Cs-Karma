@@ -2,6 +2,7 @@
 
 package com.byayzen
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -59,7 +60,11 @@ class DramaFlix : MainAPI() {
                 seri.cover_image
             }
 
-            newMovieSearchResponse(seri.title, "$mainUrl/api/series/${seri.slug}", TvType.TvSeries) {
+            newMovieSearchResponse(
+                seri.title,
+                "$mainUrl/api/series/${seri.slug}",
+                TvType.TvSeries
+            ) {
                 this.posterUrl = fixUrlNull(fixedcover)
                 this.id = seri.id
             }
@@ -94,7 +99,11 @@ class DramaFlix : MainAPI() {
                 seri.cover_image
             }
 
-            newMovieSearchResponse(seri.title, "$mainUrl/api/series/${seri.slug}", TvType.TvSeries) {
+            newMovieSearchResponse(
+                seri.title,
+                "$mainUrl/api/series/${seri.slug}",
+                TvType.TvSeries
+            ) {
                 this.posterUrl = fixUrlNull(fixedcover)
                 this.id = seri.id
             }
@@ -122,7 +131,10 @@ class DramaFlix : MainAPI() {
         val episodes = res.episodes.map { bolum ->
             val data = bolum.toJson()
             val thumb = bolum.thumbnail?.let { img ->
-                if (img.contains("awscover.netshort.com")) img.replace("https://", "http://") else img
+                if (img.contains("awscover.netshort.com")) img.replace(
+                    "https://",
+                    "http://"
+                ) else img
             }
 
             newEpisode(data) {
@@ -163,7 +175,8 @@ class DramaFlix : MainAPI() {
                     url = link,
                 ) {
                     this.referer = "$mainUrl/"
-                    this.type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    this.type =
+                        if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 }
             )
         }
@@ -172,34 +185,34 @@ class DramaFlix : MainAPI() {
 
     @Suppress("PropertyName")
     data class Seri(
-        val id: Int,
-        val slug: String,
-        val title: String,
-        val description: String?,
-        val cover_image: String,
-        val platform: String?,
-        val total_episodes: Int?,
-        val tags: List<String>?,
-        val createdAt: Long?
+        @param:JsonProperty("id") val id: Int,
+        @param:JsonProperty("slug") val slug: String,
+        @param:JsonProperty("title") val title: String,
+        @param:JsonProperty("description") val description: String?,
+        @param:JsonProperty("cover_image") val cover_image: String,
+        @param:JsonProperty("platform") val platform: String?,
+        @param:JsonProperty("total_episodes") val total_episodes: Int?,
+        @param:JsonProperty("tags") val tags: List<String>?,
+        @param:JsonProperty("createdAt") val createdAt: Long?
     )
 
     data class Detay(
-        val series: Seri,
-        val episodes: List<Bolum>
+        @param:JsonProperty("series") val series: Seri,
+        @param:JsonProperty("episodes") val episodes: List<Bolum>
     )
 
     @Suppress("PropertyName")
     data class Bolum(
-        val id: Int,
-        val episode_number: Int,
-        val url: String?,
-        val thumbnail: String?,
-        val subtitles: List<Altyazi>?
+        @param:JsonProperty("id") val id: Int,
+        @param:JsonProperty("episode_number") val episode_number: Int,
+        @param:JsonProperty("url") val url: String?,
+        @param:JsonProperty("thumbnail") val thumbnail: String?,
+        @param:JsonProperty("subtitles") val subtitles: List<Altyazi>?
     )
 
     data class Altyazi(
-        val language: String,
-        val url: String,
-        val label: String?
+        @param:JsonProperty("language") val language: String,
+        @param:JsonProperty("url") val url: String,
+        @param:JsonProperty("label") val label: String?
     )
 }
