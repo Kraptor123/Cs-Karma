@@ -19,8 +19,8 @@ class Wcoflix : MainAPI() {
 
     override val mainPage = mainPageOf(
         "${mainUrl}/" to "Latest Contents",
-        "${mainUrl}/#dubbed" to "Dubbed Anime",
         "${mainUrl}/#cartoon" to "Cartoon",
+        "${mainUrl}/#dubbed" to "Dubbed Anime",
         "${mainUrl}/#subbed" to "Subbed Anime",
         "${mainUrl}/#movies" to "Movies"
     )
@@ -38,8 +38,8 @@ class Wcoflix : MainAPI() {
             }
         }
 
-        val home = elements?.mapNotNull { it.toMainPageResult() } ?: emptyList()
-        return newHomePageResponse(request.name, home)
+        val home = elements?.mapNotNull { it.toMainPageResult() }?.distinctBy { it.url } ?: emptyList()
+        return newHomePageResponse(request.name, home, hasNext = false)
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {

@@ -1,17 +1,13 @@
-//Bu araç @kraptor tarafından | Cs-Karma için yazılmıştır!
-
 package com.byayzen
 
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.utils.StringUtils.decodeUri
 import android.util.Log
 
 open class WcoStreamExtractor : ExtractorApi() {
     override val name = "WcoStream"
     override val mainUrl = "https://embed.wcostream.com"
-
     override val requiresReferer = true
 
     override suspend fun getUrl(
@@ -20,91 +16,55 @@ open class WcoStreamExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        Log.d("kraptor_Wco","url = $url")
+        val qp = url.substringAfter("?", "").split("&")
+            .associate { val p = it.split("=", limit = 2); p[0] to (p.getOrNull(1) ?: "") }
 
-        val request = app.get(url, referer = referer)
+        val fileRaw = qp["file"] ?: return
+        val embed = qp["embed"] ?: ""
+        val fullhd = qp["fullhd"] ?: "1"
+        val v = "$embed/${fileRaw.replace(".flv", ".mp4").replace("%2F", "/")}"
 
-        val digerIstek = fixUrl(request.document.selectFirst("div#d-player a")?.attr("href") ?: request.document.selectFirst("iframe")?.attr("src") ?: "")
+        val cevap = try {
+            mapper.readValue<WcoCevap>(
+                app.get(
+                    "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&fullhd=$fullhd",
+                    referer = url,
+                    headers = mapOf("X-Requested-With" to "XMLHttpRequest")
+                ).text
+            )
+        } catch (e: Exception) {
+            Log.d("kraptor_Wco", "hata = ${e.message}")
+            null
+        } ?: return
 
-        val ikinciReq = app.get(digerIstek, referer = request.url)
-        val script = ikinciReq.document.select("script").find {
-            it.data().contains("getvidlink.php") || it.data().contains("token")
-        }?.data() ?: ""
+        val host = (cevap.server ?: cevap.cdn ?: "").replace("\\", "").trim()
+            .let { if (it.endsWith("/")) it else "$it/" }
 
-        Log.d("kraptor_Wco","script = $script")
+        if (!cevap.sub.isNullOrEmpty()) {
+            subtitleCallback(SubtitleFile(lang = "en", url = "$host/getvid?evid=${cevap.sub}"))
+        }
 
-        val vRegex = Regex("""v\s*[:=]\s*["']([^"']+)["']""")
-        val embedRegex = Regex("""embed\s*[:=]\s*["']([^"']+)["']""")
-        val hdRegex = Regex("""hd\s*[:=]\s*["']([^"']+)["']""")
-        val fullhdRegex = Regex("""fullhd\s*[:=]\s*["']([^"']+)["']""")
-        val tokenRegex = Regex("""token\s*[:=]\s*["']([^"']+)["']""")
+        listOfNotNull(
+            cevap.fullhd?.takeIf { it.isNotEmpty() }?.let { it to "FHD" },
+            cevap.hd?.takeIf { it.isNotEmpty() }?.let { it to "HD" },
+            cevap.enc?.takeIf { it.isNotEmpty() }?.let { it to "SD" }
+        ).forEach { (evid, kalite) ->
+            try {
+                val raw = app.get(
+                    "$host/getvid?evid=$evid&json",
+                    referer = "$mainUrl/",
+                    headers = mapOf("Origin" to mainUrl)
+                ).text.trim().replace("\"", "").replace("\\", "")
 
-        val vWco = vRegex.find(script)?.groupValues?.get(1)?.decodeUri()?.trim() ?: ""
-        val embedWco = embedRegex.find(script)?.groupValues?.get(1)?.trim() ?: ""
-        val hdWco = hdRegex.find(script)?.groupValues?.get(1)?.trim() ?: ""
-        val fullhdWco = fullhdRegex.find(script)?.groupValues?.get(1)?.trim() ?: ""
-        val tokenWco = tokenRegex.find(script)?.groupValues?.get(1)?.trim() ?: ""
-
-        Log.d("kraptor_Wco","vWco = $vWco")
-        Log.d("kraptor_Wco","embedWco = $embedWco")
-        Log.d("kraptor_Wco","hdWco = $hdWco")
-        Log.d("kraptor_Wco","fullhdWco= $fullhdWco")
-        Log.d("kraptor_Wco","tokenWco = $tokenWco")
-
-        if (vWco.isEmpty()) return
-
-        val postIstegi = app.get("${mainUrl}/inc/embed/getvidlink.php",
-            referer = digerIstek,
-            params = mapOf(
-                "v" to vWco,
-                "embed" to embedWco,
-                "hd" to hdWco,
-                "fullhd" to fullhdWco,
-                "token" to tokenWco,
-            ),
-            headers = mapOf("X-Requested-With" to "XMLHttpRequest")
-        ).text
-
-        Log.d("kraptor_Wco","postIstegi = $postIstegi")
-
-        val mapper = try { mapper.readValue<WcoCevap>(postIstegi) } catch(e: Exception) { null } ?: return
-
-        var baseHost = (mapper.server ?: mapper.cdn ?: "").replace("\\", "").trim()
-        if (baseHost.isNotEmpty() && !baseHost.endsWith("/")) baseHost += "/"
-        val videoIstek = listOfNotNull(
-            mapper.fullhd?.let { if (it.isNotEmpty()) Pair("${baseHost}getvid?evid=${it.removePrefix("/")}&json", "FHD") else null },
-            mapper.hd?.let { if (it.isNotEmpty()) Pair("${baseHost}getvid?evid=${it.removePrefix("/")}&json", "HD") else null },
-            mapper.enc?.let { if (it.isNotEmpty()) Pair("${baseHost}getvid?evid=${it.removePrefix("/")}&json", "SD") else null }
-        )
-
-        Log.d("kraptor_Wco","videoIstek = $videoIstek")
-
-        videoIstek.forEach { (videoUrl, kalite) ->
-            if (videoUrl.contains("null&json")) {
-                return@forEach
-            } else {
-                Log.d("kraptor_Wco", "video = $videoUrl")
-
-                val videoAl = app.get(videoUrl, referer = "${mainUrl}/", headers = mapOf("Origin" to mainUrl)).text
-
-                Log.d("kraptor_Wco", "videoAl = $videoAl")
-
-                val videomuz = videoAl.replace("\"", "").replace("\\", "").trim()
-
-                Log.d("kraptor_Wco", "videomuz = $videomuz")
-
-                if (videomuz.startsWith("http")) {
-                    callback.invoke(
-                        newExtractorLink(
-                            source = this.name,
-                            name = "${this.name} $kalite",
-                            url = videomuz,
-                            type = INFER_TYPE
-                        ) {
-                            this.referer = "${mainUrl}/"
+                if (raw.startsWith("http")) {
+                    callback(
+                        newExtractorLink(source = name, name = "Wcoflix $kalite", url = raw, type = INFER_TYPE) {
+                            this.referer = "$mainUrl/"
                         }
                     )
                 }
+            } catch (e: Exception) {
+                Log.d("kraptor_Wco", "video hatasi ($kalite) = ${e.message}")
             }
         }
     }
@@ -116,4 +76,5 @@ data class WcoCevap(
     val cdn: String? = null,
     val hd: String? = null,
     val fullhd: String? = null,
+    val sub: String? = null
 )

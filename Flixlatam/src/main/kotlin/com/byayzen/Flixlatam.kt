@@ -10,8 +10,14 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.crypto.Cipher
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 import org.jsoup.nodes.Document
+import java.security.MessageDigest
 
 class Flixlatam : MainAPI() {
     override var mainUrl = "https://flixlatam.com"
@@ -149,22 +155,16 @@ class Flixlatam : MainAPI() {
 
         val document = response.document
         val html = response.text
-        val title = document.selectFirst("meta[property=og:title]")?.attr("content")
-            ?.replace(
-                Regex("(?i)▷? ?Ver | ?Audio Latino| ?Online| - Series Latinoamerica| - FlixLatam"),
-                ""
-            )
-            ?.trim() ?: return null
 
+        val title = document.selectFirst(".data h1")!!.text().trim()
         val poster = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description = document.selectFirst("meta[property=og:description]")?.attr("content")
             ?: document.selectFirst("div.wp-content p")?.text()?.trim()
 
-        val year =
-            Regex("""datePublished":"(\d{4})""").find(html)?.groupValues?.get(1)?.toIntOrNull()
+        val year = document.selectFirst(".extra .date a")?.text()?.toIntOrNull()
         val tags = document.select(".sgeneros a").map { it.text().trim() }
-        val rating =
-            document.selectFirst(".dt_rating_vgs")?.text()?.replace(",", ".")?.toDoubleOrNull()
+        val rating = document.selectFirst(".rating-value")?.text()?.replace(",", ".")
+            ?.replace(Regex("[^0-9.]"), "")?.toDoubleOrNull()
         val duration =
             document.selectFirst(".runtime")?.text()?.replace(Regex("[^0-9]"), "")?.toIntOrNull()
 
@@ -172,20 +172,22 @@ class Flixlatam : MainAPI() {
             ?: Regex("""embed\/(.*?)[\?|\"]""").find(html)?.groupValues?.get(1)
                 ?.let { "https://www.youtube.com/embed/$it" }
 
-        val recommendations =
-            document.select(".srelacionados article, #single_relacionados article")
-                .mapNotNull { element ->
-                    val recTitle =
-                        element.selectFirst("img")?.attr("alt") ?: element.selectFirst(".data h3 a")
-                            ?.text() ?: return@mapNotNull null
-                    val recHref =
-                        fixUrlNull(element.selectFirst("a")?.attr("href")) ?: return@mapNotNull null
-                    val recPoster = fixUrlNull(element.selectFirst("img")?.attr("src"))
+        val recommendations = document.select(".srelacionados .item").map { element ->
+            val title = element.selectFirst(".data h3 a")!!.text()
+            val href = fixUrl(element.selectFirst("a")!!.attr("href"))
+            val poster = fixUrlNull(element.selectFirst("img")?.attr("src"))
+            val type = if (href.contains("/pelicula/")) {
+                TvType.Movie
+            } else if (href.contains("/serie/")) {
+                TvType.TvSeries
+            } else {
+                TvType.Anime
+            }
 
-                    newMovieSearchResponse(recTitle, recHref, TvType.Movie) {
-                        this.posterUrl = recPoster
-                    }
-                }
+            newMovieSearchResponse(title, href, type) {
+                this.posterUrl = poster
+            }
+        }
 
         val isAnime = tags.any { it.contains("Anime", ignoreCase = true) }
         val isAsian = tags.any {
@@ -232,7 +234,7 @@ class Flixlatam : MainAPI() {
             this.plot = description
             this.year = year
             this.tags = tags
-            this.score = rating?.let { Score.from10(it) }
+            this.score = rating?.let { Score.from(it, 10) }
             this.recommendations = recommendations
             if (trailerUrl != null) addTrailer(trailerUrl)
             if (this is MovieLoadResponse) this.duration = duration
@@ -245,15 +247,13 @@ class Flixlatam : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("Cloudstream", "Yüklüyo: $data")
-
         val response = app.get(data, headers = mapOf("Referer" to mainUrl))
         val iframeUrl = response.document.selectFirst("div.play iframe")?.attr("src")
             ?: response.document.selectFirst("iframe[src*='embed69']")?.attr("src")
+            ?: response.document.selectFirst("iframe[src*='/vidurl/']")?.attr("src")
+            ?: return false
 
-        if (iframeUrl == null) return false
-
-        val finalIframeUrl = if (iframeUrl.startsWith("//")) "https:$iframeUrl" else iframeUrl
+        val finalIframeUrl = fixUrlNull(iframeUrl) ?: return false
         return resolveEmbed69(finalIframeUrl, data, subtitleCallback, callback)
     }
 
@@ -264,77 +264,83 @@ class Flixlatam : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         try {
-            val response = app.get(url, headers = mapOf("Referer" to referer))
-            val html = response.text
+            val html = app.get(url, headers = mapOf("Referer" to referer)).text
 
-            val tokenlar = Regex("""eyJ[a-zA-Z0-9._-]+""")
-                .findAll(html)
-                .map { it.value }
-                .filter { it.length > 50 }
-                .distinct()
-                .toList()
+            val powChallenge = Regex("""const POW_CHALLENGE\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return false
+            val powDifficulty = Regex("""const POW_DIFFICULTY\s*=\s*(\d+);""").find(html)?.groupValues?.get(1)?.toIntOrNull() ?: 3
+            val powSalt = Regex("""const POW_SALT\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return false
 
-            if (tokenlar.isNotEmpty()) {
-                val host = java.net.URI(url).host ?: "embed69.org"
-                val decryptApi = "https://$host/api/decrypt"
+            Log.d(name, "PoW: $powChallenge | $powDifficulty | $powSalt")
 
-                val decryptResponse = app.post(
-                    decryptApi,
-                    headers = mapOf(
-                        "Content-Type" to "application/json",
-                        "Referer" to url,
-                        "Origin" to "https://$host",
-                        "X-Requested-With" to "XMLHttpRequest"
-                    ),
-                    json = mapOf("links" to tokenlar)
-                )
+            val aesKey = withContext(Dispatchers.Default) {
+                solvePow(powChallenge, powDifficulty, powSalt)
+            }
 
-                if (decryptResponse.code == 200) {
-                    val json = AppUtils.parseJson<Map<String, Any>>(decryptResponse.text)
-                    if (json["success"] == true) {
-                        val linkListesi = json["links"] as? List<*>
+            val dataLinkJson = Regex("""let\s+dataLink\s*=\s*(\[[\s\S]*?\]);""").find(html)?.groupValues?.get(1) ?: return false
+            val dataList = AppUtils.parseJson<List<Map<String, Any>>>(dataLinkJson)
+            var foundAny = false
 
-                        linkListesi?.forEach { item ->
-                            val hamLink = when (item) {
-                                is Map<*, *> -> item["link"] as? String
-                                is String -> item
-                                else -> null
-                            }
+            dataList.forEach { entry ->
+                val allEmbeds = (entry["sortedEmbeds"] as? List<*>) ?: listOf<Any>()
+                val downloadEmbeds = (entry["downloadEmbeds"] as? List<*>) ?: listOf<Any>()
 
-                            hamLink?.let {
-                                val temizLink = it.replace("`", "").trim()
+                (allEmbeds + downloadEmbeds).forEach { item ->
+                    val embed = item as? Map<String, Any>
+                    val encryptedLink = embed?.get("link") as? String ?: return@forEach
 
-                                if (temizLink.contains(Regex("embed69|dintezuvio"))) {
-                                    Log.d("Cloudstream", "Nested: $temizLink")
-                                    ioSafe { resolveEmbed69(temizLink, url, subtitleCallback, callback) }
-                                } else {
-                                    val fixedUrl = temizLink
-                                        .replace("dintezuvio.com", "vidhide.com")
-                                        .replace("hglink.to", "streamwish.to")
-                                        .replace("minochinos.com", "vidhide.com")
-                                        .replace("ghbrisk.com", "streamwish.to")
+                    val decryptedLink = decryptAES(encryptedLink, aesKey)
 
-                                    Log.d("Cloudstream", "Link: $fixedUrl")
-                                    loadExtractor(fixedUrl, url, subtitleCallback, callback)
-                                }
-                            }
-                        }
-                        return true
+                    if (decryptedLink != null && decryptedLink.startsWith("http")) {
+                        val fixedUrl = decryptedLink
+                            .replace("dintezuvio.com", "vidhide.com")
+                            .replace("hglink.to", "streamwish.to")
+                            .replace("minochinos.com", "vidhide.com")
+                            .replace("ghbrisk.com", "streamwish.to")
+
+                        Log.d(name, fixedUrl)
+                        loadExtractor(fixedUrl, url, subtitleCallback, callback)
+                        foundAny = true
                     }
                 }
             }
+            return foundAny
         } catch (e: Exception) {
-            Log.d("Cloudstream", "Hata: ${e.message}")
+            Log.e(name, "${e.message}")
         }
         return false
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
-    private fun ioSafe(block: suspend () -> Unit) {
-        try {
-            kotlinx.coroutines.GlobalScope.launch { block() }
+    private fun solvePow(challenge: String, difficulty: Int, salt: String): ByteArray {
+        val prefix = "0".repeat(difficulty)
+        var nonce = 0
+        val digest = MessageDigest.getInstance("SHA-256")
+
+        while (true) {
+            val hashBytes = digest.digest("$challenge$nonce".toByteArray(Charsets.UTF_8))
+            val hashHex = hashBytes.joinToString("") { "%02x".format(it) }
+
+            if (hashHex.startsWith(prefix)) {
+                return digest.digest("$challenge$nonce$salt".toByteArray(Charsets.UTF_8))
+            }
+            nonce++
+        }
+    }
+
+    private fun decryptAES(encryptedBase64: String, aesKey: ByteArray): String? {
+        return try {
+            val decodedBytes = android.util.Base64.decode(encryptedBase64, android.util.Base64.DEFAULT)
+            if (decodedBytes.size <= 16) return null
+
+            val iv = decodedBytes.copyOfRange(0, 16)
+            val ciphertext = decodedBytes.copyOfRange(16, decodedBytes.size)
+            val key = aesKey.copyOfRange(0, 32)
+
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+
+            String(cipher.doFinal(ciphertext), Charsets.UTF_8)
         } catch (e: Exception) {
-            Log.d("Cloudstream", "Coroutinehatası: ${e.message}")
+            null
         }
     }
 }
