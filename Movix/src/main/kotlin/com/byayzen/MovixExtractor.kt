@@ -530,6 +530,41 @@ class GoodStream : ExtractorApi() {
 }
 
 
+class SendvidExtractor : ExtractorApi() {
+    override val name = "Sendvid"
+    override val mainUrl = "https://sendvid.com"
+    override val requiresReferer = true
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val response = app.get(url, referer = referer).text
+
+        val videoUrl = Regex("""property="og:video"\s+content="(.*?)"""").find(response)?.groupValues?.get(1)
+            ?: Regex("""<source\s+src="(.*?)"\s+type="video/mp4"""").find(response)?.groupValues?.get(1)
+            ?: Regex("""var\s+video_source\s+=\s+"(.*?)"""").find(response)?.groupValues?.get(1)
+
+        videoUrl?.let { link ->
+            callback.invoke(
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = link,
+                    type = ExtractorLinkType.VIDEO
+                ) {
+                    headers = mutableMapOf("Referer" to url)
+                    quality = getQualityFromName(link)
+                }
+            )
+        }
+    }
+}
+
+
+
 
 class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
@@ -540,4 +575,8 @@ class BllEmbedseek : VidStack() { override var mainUrl = "https://bll.embedseek.
 class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
 
 class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }
+
+
+
+
 

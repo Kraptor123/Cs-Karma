@@ -19,7 +19,6 @@ object FrembedExtractor {
             val apiUrl = if (isMovie) {
                 "https://frembed.click/api/films?id=$id&idType=tmdb"
             } else {
-                // TV Link örneği: https://frembed.click/embed/tv/ID?sa=S&epi=E
                 val sa = url.substringAfter("sa=", "").substringBefore("&")
                 val epi = url.substringAfter("epi=", "")
                 "https://frembed.click/api/series?id=$id&sa=$sa&epi=$epi"
@@ -33,8 +32,6 @@ object FrembedExtractor {
             )
 
             val response = app.get(apiUrl, headers = headers).text
-            
-            // JSON içindeki link1, link2... link7, link1vostfr vb. anahtarları tarayalım
             val linkPattern = """"(link\d+(?:vostfr|vo)?)"\s*:\s*"([^"]+)"""".toRegex()
             val matches = linkPattern.findAll(response)
 
