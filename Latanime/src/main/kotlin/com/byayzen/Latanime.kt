@@ -5,13 +5,14 @@ package com.byayzen
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import android.util.Log
 
 class Latanime : MainAPI() {
     override var mainUrl = "https://latanime.org"
     override var name = "Latanime"
     override val hasMainPage = true
     override var lang = "mx"
-    override val hasQuickSearch = true
+    override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Anime)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
@@ -177,12 +178,14 @@ class Latanime : MainAPI() {
         doc.select("ul.cap_repro li a").mapNotNull {
             it.attr("data-player").takeIf { p -> p.isNotBlank() }
         }.amap { encData ->
+            Log.d("Ayzen", encData)
             val repUrl = "$mainUrl/reproductor?url=$encData"
             val ifrmSrc = runCatching {
                 app.get(repUrl).document
                     .selectFirst("iframe, embed")
                     ?.attr("src")
             }.getOrNull()
+            Log.d("Ayzen", ifrmSrc ?: "")
 
             loadExtractor(fixUrl(ifrmSrc ?: base64Decode(encData)), data, subtitleCallback, callback)
         }
@@ -190,6 +193,7 @@ class Latanime : MainAPI() {
         doc.select("div.descarga2 div a").mapNotNull {
             it.attr("href").takeIf { h -> h.isNotBlank() }
         }.amap { dlUrl ->
+            Log.d("Ayzen", dlUrl)
             loadExtractor(fixUrl(dlUrl), data, subtitleCallback, callback)
         }
 
