@@ -158,6 +158,10 @@ class DramaFlix : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val bolum = AppUtils.parseJson<Bolum>(data)
+        val ticketResponse = app.get("$mainUrl/api/cdn-ticket", headers = mapOf("Referer" to "$mainUrl/tr"))
+        val dfexp = ticketResponse.cookies["dfexp"]?.let { "dfexp=$it" }
+        val dfsig = ticketResponse.cookies["dfsig"]?.let { "dfsig=$it" }
+        val currentCookie = listOfNotNull(dfexp, dfsig).joinToString("; ")
 
         bolum.subtitles?.forEach { altyazi ->
             val label = altyazi.label ?: altyazi.language
@@ -173,10 +177,12 @@ class DramaFlix : MainAPI() {
                     source = this.name,
                     name = this.name,
                     url = link,
+                    type = if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                 ) {
-                    this.referer = "$mainUrl/"
-                    this.type =
-                        if (link.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    this.referer = "$mainUrl"
+                    if (currentCookie.isNotEmpty()) {
+                        this.headers = mutableMapOf("Cookie" to currentCookie)
+                    }
                 }
             )
         }
