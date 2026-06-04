@@ -17,14 +17,14 @@ class PixeldrainExt : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val id = url.substringAfterLast("/")
-        val videoUrl = "https://pixeldrain.com/api/file/$id"
+        val id = url.trim().substringAfterLast("/")
+        val videoUrl = "https://pixeldrain.com/api/file/$id?download"
 
         callback.invoke(
             newExtractorLink(
                 source = this.name,
                 name = this.name,
-                url = videoUrl,
+                url = videoUrl.trim(),
                 type = ExtractorLinkType.VIDEO
             )
         )
