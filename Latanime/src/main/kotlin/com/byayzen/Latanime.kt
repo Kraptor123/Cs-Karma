@@ -187,14 +187,45 @@ class Latanime : MainAPI() {
             }.getOrNull()
             Log.d("Ayzen", ifrmSrc ?: "")
 
-            loadExtractor(fixUrl(ifrmSrc ?: base64Decode(encData)), data, subtitleCallback, callback)
+            val resolvedUrl = fixUrl(ifrmSrc ?: base64Decode(encData))
+            if (resolvedUrl.contains("pixeldrain.com")) {
+                val id = resolvedUrl.trim().substringAfterLast("/").trim()
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "Pixeldrain",
+                        url = "https://pixeldrain.com/api/file/$id?download",
+                        type = ExtractorLinkType.VIDEO
+                    ) {
+                        this.referer = data
+                        this.quality = Qualities.Unknown.value
+                    }
+                )
+            } else {
+                loadExtractor(resolvedUrl, data, subtitleCallback, callback)
+            }
         }
 
         doc.select("div.descarga2 div a").mapNotNull {
             it.attr("href").takeIf { h -> h.isNotBlank() }
         }.amap { dlUrl ->
             Log.d("Ayzen", dlUrl)
-            loadExtractor(fixUrl(dlUrl), data, subtitleCallback, callback)
+            val resolvedUrl = fixUrl(dlUrl)
+            if (resolvedUrl.contains("pixeldrain.com")) {
+                val id = resolvedUrl.trim().substringAfterLast("/").trim()
+                callback.invoke(
+                    newExtractorLink(
+                        source = name,
+                        name = "Pixeldrain",
+                        url = "https://pixeldrain.com/api/file/$id?download",
+                        type = ExtractorLinkType.VIDEO
+                    ) {
+                        this.referer = data
+                    }
+                )
+            } else {
+                loadExtractor(resolvedUrl, data, subtitleCallback, callback)
+            }
         }
 
         return true

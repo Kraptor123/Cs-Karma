@@ -8,6 +8,5 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class LatanimePlugin: Plugin() {
     override fun load() {
         registerMainAPI(Latanime())
-        registerExtractorAPI(PixeldrainExt())
     }
 }
