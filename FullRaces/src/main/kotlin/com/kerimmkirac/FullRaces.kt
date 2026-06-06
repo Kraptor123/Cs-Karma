@@ -18,9 +18,10 @@ class FullRaces : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie)
 
     override val mainPage = mainPageOf(
+        "${mainUrl}/2026" to "2026",
         "${mainUrl}" to "F1 Races",
-        "${mainUrl}/f2" to "F2 Races",
-        "${mainUrl}/f3" to "F3 Races",
+        "${mainUrl}/f2-full-races" to "F2 Races",
+        "${mainUrl}/f3-full-races" to "F3 Races",
         "${mainUrl}/nascar" to "Nascar Races"
     )
 
