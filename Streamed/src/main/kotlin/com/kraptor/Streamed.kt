@@ -13,7 +13,7 @@ import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
 
 class Streamed() : MainAPI() {
-    override var mainUrl = "https://streamed.st"
+    override var mainUrl = "https://streamed.pk"
     override var name = "Streamed"
     override val hasMainPage = true
     override var lang = "en"
@@ -23,23 +23,23 @@ class Streamed() : MainAPI() {
 
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/api/matches/live/popular" to "Canlı Popüler",
-        "${mainUrl}/api/matches/live" to "Canlı",
-        "${mainUrl}/api/matches/all-today/popular" to "Bugünün Popüler Maçları",
-        "${mainUrl}/api/matches/football/popular" to "Futbol",
-        "${mainUrl}/api/matches/fight/popular" to "Dövüş",
-        "${mainUrl}/api/matches/american-football/popular" to "Amerikan Futbolu",
-        "${mainUrl}/api/matches/basketball/popular" to "Basketbol",
-        "${mainUrl}/api/matches/tennis/popular" to "Tenis",
-        "${mainUrl}/api/matches/hockey/popular" to "Hokey",
-        "${mainUrl}/api/matches/baseball/popular" to "Beyzbol",
-        "${mainUrl}/api/matches/darts/popular" to "Dart",
-        "${mainUrl}/api/matches/motor-sports/popular" to "Motor Sporları",
+        "${mainUrl}/api/matches/live/popular" to "Live Popular",
+        "${mainUrl}/api/matches/live" to "Live",
+        "${mainUrl}/api/matches/all-today/popular" to "Today's Popular Matches",
+        "${mainUrl}/api/matches/football/popular" to "Football",
+        "${mainUrl}/api/matches/fight/popular" to "Fight",
+        "${mainUrl}/api/matches/american-football/popular" to "American Football",
+        "${mainUrl}/api/matches/basketball/popular" to "Basketball",
+        "${mainUrl}/api/matches/tennis/popular" to "Tennis",
+        "${mainUrl}/api/matches/hockey/popular" to "Hockey",
+        "${mainUrl}/api/matches/baseball/popular" to "Baseball",
+        "${mainUrl}/api/matches/darts/popular" to "Darts",
+        "${mainUrl}/api/matches/motor-sports/popular" to "Motor Sports",
         "${mainUrl}/api/matches/golf/popular" to "Golf",
-        "${mainUrl}/api/matches/billiards/popular" to "Bilardo",
+        "${mainUrl}/api/matches/billiards/popular" to "Billiards",
         "${mainUrl}/api/matches/afl/popular" to "AFL",
-        "${mainUrl}/api/matches/cricket/popular" to "Kriket",
-        "${mainUrl}/api/matches/other/popular" to "Diğer"
+        "${mainUrl}/api/matches/cricket/popular" to "Cricket",
+        "${mainUrl}/api/matches/other/popular" to "Other"
     )
 
 
