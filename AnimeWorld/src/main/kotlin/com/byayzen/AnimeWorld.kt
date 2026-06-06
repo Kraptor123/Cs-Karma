@@ -12,7 +12,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import org.jsoup.nodes.Document
 
 class AnimeWorld : MainAPI() {
-    override var mainUrl = "https://animeworld.ac"
+    override var mainUrl = "https://www.animeworld.ac"
     override var name = "AnimeWorld"
     override val hasMainPage = true
     override var lang = "it"
