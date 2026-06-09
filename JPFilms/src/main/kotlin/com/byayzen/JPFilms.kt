@@ -164,6 +164,9 @@ class JPFilms : MainAPI() {
         val jsonstr = scriptdata.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim()
         val currentslug = data.split("/").lastOrNull()?.replace(".html", "") ?: ""
 
+        Log.d(name, jsonstr)
+        Log.d(name, currentslug)
+
         val matches = Regex("""\{"postId":(\d+),"postUrl":"(.*?)","serverId":(\d+),.*?"episodeSlug":"(.*?)","episodeName":"(.*?)".*?\}""").findAll(jsonstr)
 
         matches.forEach { match ->
@@ -172,8 +175,11 @@ class JPFilms : MainAPI() {
             val serverid = match.groupValues[3]
             val slug = match.groupValues[4]
 
+            Log.d(name, "$postid | $serverid | $slug | $posturl")
+
             if (data == posturl || slug == currentslug || currentslug.contains(slug)) {
                 val ajaxurl = "$mainUrl/wp-content/themes/halimmovies/player.php?episode_slug=$slug&server_id=$serverid&post_id=$postid"
+                Log.d(name, ajaxurl)
 
                 try {
                     val response = app.get(
@@ -184,15 +190,16 @@ class JPFilms : MainAPI() {
                             "user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                         )
                     ).text
+                    Log.d(name, response)
 
-                    val m3u8url = Regex("""<source[^>]+src=["']([^"']+)["']""").find(response)?.groupValues?.get(1)
-                        ?: Jsoup.parse(response).selectFirst("source")?.attr("src")
+                    val m3u8url = Regex(""""file"\s*:\s*"(https?:\\\/\\\/[^"]+?)"""").find(response)?.groupValues?.get(1)?.replace("\\/", "/")
 
                     if (m3u8url != null) {
+                        Log.d(name, m3u8url)
                         callback.invoke(
                             newExtractorLink(
-                                name = "JPFilms",
-                                source = "JPFilms",
+                                name = name,
+                                source = name,
                                 url = m3u8url,
                                 type = INFER_TYPE
                             ) {
@@ -203,7 +210,9 @@ class JPFilms : MainAPI() {
                             }
                         )
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    Log.d(name, e.message ?: "")
+                }
             }
         }
         return true
