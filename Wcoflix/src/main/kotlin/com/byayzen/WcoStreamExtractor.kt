@@ -16,32 +16,50 @@ open class WcoStreamExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
+        Log.d("kraptor_Wco", url)
         val qp = url.substringAfter("?", "").split("&")
             .associate { val p = it.split("=", limit = 2); p[0] to (p.getOrNull(1) ?: "") }
 
         val fileRaw = qp["file"] ?: return
         val embed = qp["embed"] ?: ""
-        val fullhd = qp["fullhd"] ?: "1"
-        val v = "$embed/${fileRaw.replace(".flv", ".mp4").replace("%2F", "/")}"
+
+        val v: String
+        val apiPath: String
+
+        if (qp.containsKey("fullhd")) {
+            val fullhdVal = qp["fullhd"] ?: "1"
+            v = "$embed/${fileRaw.replace(".flv", ".mp4").replace("%2F", "/")}"
+            apiPath = "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&fullhd=$fullhdVal"
+        } else {
+            val hdVal = qp["hd"] ?: "1"
+            v = fileRaw.replace(".flv", ".mp4").replace("%2F", "/")
+            apiPath = "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&hd=$hdVal"
+        }
+
+        Log.d("kraptor_Wco", v)
 
         val cevap = try {
-            mapper.readValue<WcoCevap>(
-                app.get(
-                    "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&fullhd=$fullhd",
-                    referer = url,
-                    headers = mapOf("X-Requested-With" to "XMLHttpRequest")
-                ).text
+            val response = app.get(
+                apiPath,
+                referer = url,
+                headers = mapOf("X-Requested-With" to "XMLHttpRequest")
             )
+            Log.d("kraptor_Wco", response.text)
+            mapper.readValue<WcoCevap>(response.text)
         } catch (e: Exception) {
-            Log.d("kraptor_Wco", "hata = ${e.message}")
+            Log.d("kraptor_Wco", e.toString())
             null
         } ?: return
 
         val host = (cevap.server ?: cevap.cdn ?: "").replace("\\", "").trim()
             .let { if (it.endsWith("/")) it else "$it/" }
 
+        Log.d("kraptor_Wco", host)
+
         if (!cevap.sub.isNullOrEmpty()) {
-            subtitleCallback(SubtitleFile(lang = "en", url = "$host/getvid?evid=${cevap.sub}"))
+            val subUrl = "$host/getvid?evid=${cevap.sub}"
+            Log.d("kraptor_Wco", subUrl)
+            subtitleCallback(SubtitleFile(lang = "en", url = subUrl))
         }
 
         listOfNotNull(
@@ -49,22 +67,46 @@ open class WcoStreamExtractor : ExtractorApi() {
             cevap.hd?.takeIf { it.isNotEmpty() }?.let { it to "HD" },
             cevap.enc?.takeIf { it.isNotEmpty() }?.let { it to "SD" }
         ).forEach { (evid, kalite) ->
+            Log.d("kraptor_Wco", "$kalite: $evid")
             try {
+                val vidPath = "$host/getvid?evid=$evid&json"
                 val raw = app.get(
-                    "$host/getvid?evid=$evid&json",
+                    vidPath,
                     referer = "$mainUrl/",
                     headers = mapOf("Origin" to mainUrl)
                 ).text.trim().replace("\"", "").replace("\\", "")
+                Log.d("kraptor_Wco", raw)
 
                 if (raw.startsWith("http")) {
+                    var videoUrl = raw
+                    if (videoUrl.contains("/getvid?evid=")) {
+                        try {
+                            val resp = app.get(
+                                videoUrl,
+                                referer = host,
+                                headers = mapOf("Origin" to host.removeSuffix("/"))
+                            )
+                            val finalUrl = resp.url
+                            if (finalUrl.startsWith("http") && !finalUrl.contains("/getvid?evid=")) {
+                                videoUrl = finalUrl
+                            }
+                        } catch (e: Exception) {
+                            Log.d("kraptor_Wco", e.toString())
+                        }
+                    }
                     callback(
-                        newExtractorLink(source = name, name = "Wcoflix $kalite", url = raw, type = INFER_TYPE) {
+                        newExtractorLink(
+                            source = name,
+                            name = "Wcoflix $kalite",
+                            url = videoUrl,
+                            type = INFER_TYPE
+                        ) {
                             this.referer = "$mainUrl/"
                         }
                     )
                 }
             } catch (e: Exception) {
-                Log.d("kraptor_Wco", "video hatasi ($kalite) = ${e.message}")
+                Log.d("kraptor_Wco", e.toString())
             }
         }
     }
