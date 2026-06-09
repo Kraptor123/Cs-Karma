@@ -2,12 +2,12 @@
 
 package com.kraptor
 
+import android.util.Log
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
@@ -247,16 +247,19 @@ class Streamed() : MainAPI() {
 
         val sourceId = data.substringAfterLast("/")
 
+        Log.d("Ayzen", sourceId)
         val mapper = jacksonObjectMapper().registerKotlinModule()
 
         try {
             val apiUrl = "$mainUrl/api/matches/all"
 
+            Log.d("Ayzen", apiUrl)
             val response = app.get(apiUrl)
             val txt = response.text
 
             val matches: List<Matches> = mapper.readValue(txt)
 
+            Log.d("Ayzen", "${matches.size}")
             val match = matches.find { m ->
                 val hasSourceId = m.sources?.any { it.id == sourceId } == true
                 val isMatchId = m.id == sourceId
@@ -264,9 +267,11 @@ class Streamed() : MainAPI() {
             }
 
             if (match == null) {
+                Log.d("Ayzen", sourceId)
                 return@withContext false
             }
 
+            Log.d("Ayzen", "${match.title} ${match.sources?.size ?: 0}")
 
             fun viewersOf(s: Stream): Int {
                 return try {
@@ -286,11 +291,13 @@ class Streamed() : MainAPI() {
                 if (sType != null && sId != null) {
                     try {
                         val streamApiUrl = "$mainUrl/api/stream/$sType/$sId"
+                        Log.d("Ayzen", streamApiUrl)
                         val sResponse = app.get(streamApiUrl).text
                         val streams: List<Stream> = mapper.readValue(
                             sResponse,
                             object : com.fasterxml.jackson.core.type.TypeReference<List<Stream>>() {}
                         )
+                        Log.d("Ayzen", "$index $sType ${streams.size}")
 
                         streams.forEach {
                             allStreams.add(Pair(it, sType))
@@ -309,6 +316,8 @@ class Streamed() : MainAPI() {
                     streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) } + zeroViewerStreams
                 }
 
+            Log.d("Ayzen", "${streamsToProcess.size}")
+
             val processedStreams = mutableSetOf<String>()
 
             streamsToProcess.forEachIndexed { idx, (stream, sourceType) ->
@@ -317,6 +326,7 @@ class Streamed() : MainAPI() {
                     if (embedUrl.isNotEmpty() && !processedStreams.contains(embedUrl)) {
                         processedStreams.add(embedUrl)
 
+                        Log.d("Ayzen", embedUrl)
                         loadExtractor(
                             url = embedUrl,
                             referer = mainUrl,
@@ -329,11 +339,13 @@ class Streamed() : MainAPI() {
                         )
                     }
                 } catch (e: Exception) {
+                    Log.e("Ayzen", "$idx")
                 }
             }
 
             return@withContext true
         } catch (e: Exception) {
+            Log.e("Streamed", "İframe yok")
             return@withContext false
         }
     }
