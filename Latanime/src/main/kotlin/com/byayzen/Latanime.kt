@@ -217,7 +217,7 @@ class Latanime : MainAPI() {
                     newExtractorLink(
                         source = name,
                         name = "Pixeldrain",
-                        url = "https://pixeldrain.com/api/file/$id?download",
+                        url = "https://pixeldrain.com/api/file/$id?embed",
                         type = ExtractorLinkType.VIDEO
                     ) {
                         this.referer = data
