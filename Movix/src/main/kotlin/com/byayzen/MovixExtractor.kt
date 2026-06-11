@@ -530,6 +530,10 @@ class GoodStream : ExtractorApi() {
 }
 
 
+
+
+
+
 class SendvidExtractor : ExtractorApi() {
     override val name = "Sendvid"
     override val mainUrl = "https://sendvid.com"

@@ -163,14 +163,14 @@ data class TmdbDetailResponse(
     val release_date    : String?,
     val first_air_date  : String?,
     val vote_average    : Double?,
-    val genres          : List<TmdbGenre>?,
-    val credits         : TmdbCredits?,
-    val recommendations : TmdbMainResponse?,
-    val videos          : TmdbVideoResponse?,
-    val seasons         : List<TmdbSeason>?,
-    val images          : TmdbImageResponse?,
-    val status          : String?,
-    val origin_country  : List<String>?
+    val genres: List<TmdbGenre>?,
+    val credits: TmdbCredits?,
+    val recommendations: TmdbMainResponse?,
+    val videos: TmdbVideoResponse?,
+    val seasons: List<TmdbSeason>?,
+    val images: TmdbImageResponse?,
+    val status: String?,
+    val origin_country: List<String>?
 )
 
 data class TmdbImageResponse(
@@ -178,13 +178,13 @@ data class TmdbImageResponse(
 )
 
 data class TmdbLogo(
-    val file_path : String?,
-    val iso_639_1 : String?
+    val file_path: String?,
+    val iso_639_1: String?
 )
 
 data class TmdbGenre(
-    val id   : Int?,
-    val name : String?
+    val id: Int?,
+    val name: String?
 )
 
 data class TmdbCredits(
@@ -196,16 +196,16 @@ data class TmdbVideoResponse(
 )
 
 data class TmdbVideo(
-    val key  : String?,
-    val site : String?,
-    val type : String?
+    val key: String?,
+    val site: String?,
+    val type: String?
 )
 
 data class TmdbSeason(
-    val season_number : Int?,
-    val episode_count : Int?,
-    val name          : String?,
-    val poster_path   : String?
+    val season_number: Int?,
+    val episode_count: Int?,
+    val name: String?,
+    val poster_path: String?
 )
 
 data class MovixDownloadResponse(val sources: List<DownloadSource>?)
@@ -218,7 +218,10 @@ data class ImdbEpisode(val number: String?, val versions: Map<String, ImdbVersio
 data class ImdbVersion(val players: List<ImdbPlayer>?)
 data class ImdbPlayer(val link: String?)
 
-data class MovixFstreamResponse(val links: Map<String, List<FstreamLink>>?, val episodes: Map<String, FstreamEpisode>?)
+data class MovixFstreamResponse(
+    val links: Map<String, List<FstreamLink>>?,
+    val episodes: Map<String, FstreamEpisode>?
+)
 
 data class FstreamLink(val url: String?)
 

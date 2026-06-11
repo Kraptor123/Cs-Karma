@@ -8,16 +8,17 @@ import com.lagradost.cloudstream3.SubtitleFile
 object Kokoflix {
     suspend fun invoke(
         url: String,
-        subtitleCallback: (SubtitleFile) -> Unit,
+        mainurl: String,
+        subtitlecallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
         try {
-            val response = app.get(url, referer = "https://movix.rodeo", timeout = 10)
-            val realEmbedUrl = response.url
-            Log.d("MOVIX", "Kokoflix bulunan url: $realEmbedUrl")
-            loadExtractor(realEmbedUrl, url, subtitleCallback, callback)
+            val response = app.get(url, referer = mainurl, timeout = 10)
+            val realembedurl = response.url
+            Log.d("Kokoflix", realembedurl)
+            loadExtractor(realembedurl, url, subtitlecallback, callback)
         } catch (e: Exception) {
-            Log.d("MOVIX", "Kokoflix redirect hata verdi: ${e.message}")
+            Log.d("Kokoflix", e.toString())
         }
     }
 }

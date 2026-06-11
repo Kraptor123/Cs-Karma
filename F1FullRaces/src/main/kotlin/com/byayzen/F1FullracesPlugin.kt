@@ -15,8 +15,11 @@ class F1FullracesPlugin: Plugin() {
         registerExtractorAPI(com.byayzen.MixDrop())
         registerExtractorAPI(MixDropBz())
         registerExtractorAPI(MixDropAg())
+        registerExtractorAPI(LulusStream())
         registerExtractorAPI(MixDropCh())
         registerExtractorAPI(MixDropTo())
         registerExtractorAPI(MixDrop977())
+        registerExtractorAPI(Luluvdo())
+        registerExtractorAPI(Luluvdoo())
     }
 }

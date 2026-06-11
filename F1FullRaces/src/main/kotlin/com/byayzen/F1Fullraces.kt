@@ -17,7 +17,7 @@ class F1Fullraces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Live)
+    override val supportedTypes = setOf(TvType.Live, TvType.Others)
 
     override val mainPage = mainPageOf(
         mainUrl to "Latest",
@@ -76,7 +76,7 @@ class F1Fullraces : MainAPI() {
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        return newMovieLoadResponse(title, url, TvType.Others, url) {
             this.posterUrl = poster
         }
     }
@@ -95,9 +95,9 @@ class F1Fullraces : MainAPI() {
             val src = iframe.attr("src")
             val rawText = iframe.parent()?.ownText()?.trim() ?: ""
             val name = when {
-                rawText.contains("Pre-Race", true) -> "Yarış Öncesi Analiz"
-                rawText.contains("Race Session", true) -> "Yarış Seansı"
-                rawText.contains("Post-Race", true) -> "Yarış Sonrası Analiz"
+                rawText.contains("Pre-Race", true) -> "Pre-Race"
+                rawText.contains("Race Session", true) -> "Race-Session"
+                rawText.contains("Post-Race", true) -> "Post-Race"
                 else -> "Yarış Seansı"
             }
             Log.d("f1fullraces", src)
