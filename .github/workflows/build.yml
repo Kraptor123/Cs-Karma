@@ -11,6 +11,9 @@ on:
       - main
     paths-ignore:
       - '*.md'
+      - '.github/workflows/**'
+      - 'repo.json'
+      - 'DomainCheck.py'
 
 permissions:
   contents: write
