@@ -163,15 +163,27 @@ class DramaFlix : MainAPI() {
         val dfsig = ticketResponse.cookies["dfsig"]?.let { "dfsig=$it" }
         val currentCookie = listOfNotNull(dfexp, dfsig).joinToString("; ")
 
+        val subtitleHeaders = mutableMapOf<String, String>(
+            "Referer" to mainUrl
+        )
+        if (currentCookie.isNotEmpty()) {
+            subtitleHeaders["Cookie"] = currentCookie
+        }
+
         bolum.subtitles?.forEach { altyazi ->
             val label = altyazi.label ?: altyazi.language
             val fixedlabel = if (label.uppercase() == "TR") "Türkçe" else label
+            Log.d("ayzen", fixedlabel)
             subtitleCallback.invoke(
-                newSubtitleFile(fixedlabel, altyazi.url)
+                newSubtitleFile(fixedlabel, altyazi.url) {
+                    this.headers = subtitleHeaders
+                }
             )
+            Log.d("ayzen", altyazi.url)
         }
 
         bolum.url?.let { link ->
+            Log.d("ayzen", link)
             callback.invoke(
                 newExtractorLink(
                     source = this.name,
@@ -188,6 +200,8 @@ class DramaFlix : MainAPI() {
         }
         return true
     }
+
+
 
     @Suppress("PropertyName")
     data class Seri(
