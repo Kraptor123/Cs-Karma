@@ -40,12 +40,6 @@ You can install the repository by clicking the logo down below on the device whe
         </a>
     </td>
      <td align="center">
-      <a href="https://github.com/kerimmkirac">
-        <img src="https://avatars.githubusercontent.com/u/127618379?v=4" width="80;" alt="Kerimmkirac"/><br />
-        <sub><b>kerimmkirac</b></sub>
-        </a>
-    </td>
-     <td align="center">
       <a href="https://github.com/trup40">
         <img src="https://avatars.githubusercontent.com/u/34142302?v=4" width="80;" alt="Eagle"/><br />
         <sub><b>Eagle</b></sub>
