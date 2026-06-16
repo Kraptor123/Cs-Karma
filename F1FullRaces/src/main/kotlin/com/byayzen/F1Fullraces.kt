@@ -58,7 +58,9 @@ class F1Fullraces : MainAPI() {
 
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        val data = if (posterUrl != null) "${href}@@@$posterUrl" else href
+
+        return newMovieSearchResponse(title, data, TvType.Movie) {
             this.posterUrl = posterUrl
         }
     }
@@ -72,11 +74,17 @@ class F1Fullraces : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val parts = url.split("@@@")
+        val realUrl = parts[0]
+        val passedPoster = parts.getOrNull(1)
+
+        val document = app.get(realUrl).document
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val poster = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
-        return newMovieLoadResponse(title, url, TvType.Others, url) {
+        val poster = if (passedPoster != null && passedPoster != "null") passedPoster
+        else fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
+
+        return newMovieLoadResponse(title, realUrl, TvType.Others, realUrl) {
             this.posterUrl = poster
         }
     }
@@ -91,44 +99,52 @@ class F1Fullraces : MainAPI() {
         val document = app.get(data).document
         val jobs = mutableListOf<Job>()
 
-        document.select("div#netu iframe[src*='lulu']").forEach { iframe ->
-            val src = iframe.attr("src")
-            val rawText = iframe.parent()?.ownText()?.trim() ?: ""
-            val name = when {
-                rawText.contains("Pre-Race", true) -> "Pre-Race"
-                rawText.contains("Race Session", true) -> "Race-Session"
-                rawText.contains("Post-Race", true) -> "Post-Race"
-                else -> "Yarış Seansı"
+        document.select("div[id^=07b022]").forEach { div ->
+            val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
+            if (decodedId.isNotBlank()) {
+                val url = "https://mixdrop.co/f/$decodedId"
+                val name = div.findPreviousLabel() ?: "Yarış Seansı"
+                Log.d("f1fullraces", url)
+                jobs += launch {
+                    loadCustomExtractor(url, data, name, subtitleCallback, callback)
+                }
             }
+        }
+
+        document.select("iframe[src^='https://drive.google.com/']").forEach { iframe ->
+            val src = iframe.attr("src")
+            val name = iframe.findPreviousLabel() ?: "Yarış Seansı"
             Log.d("f1fullraces", src)
             jobs += launch {
                 loadCustomExtractor(src, data, name, subtitleCallback, callback)
             }
         }
 
-        document.select("div#mixdrop div[id^=07b022]").forEach { div ->
-            val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
-            if (decodedId.isNotBlank()) {
-                val url = "https://mixdrop.co/f/$decodedId"
-                Log.d("f1fullraces", url)
-                jobs += launch {
-                    loadCustomExtractor(url, data, "Yarış Seansı", subtitleCallback, callback)
-                }
-            }
-        }
-
-        document.select("div#drive a[href], div#gofile a[href], div#mega a[href]").forEach { link ->
+        document.select("a[href^='https://mega.nz/']").forEach { link ->
             val href = link.attr("href")
-            if (href.isNotBlank()) {
-                Log.d("f1fullraces", href)
-                jobs += launch {
-                    loadCustomExtractor(href, data, "Yarış Seansı", subtitleCallback, callback)
-                }
+            val name = link.findPreviousLabel() ?: "Yarış Seansı"
+            Log.d("f1fullraces", href)
+            jobs += launch {
+                loadCustomExtractor(href, data, name, subtitleCallback, callback)
             }
         }
 
         jobs.joinAll()
         return@coroutineScope true
+    }
+
+    private fun Element.findPreviousLabel(): String? {
+        var prev = this.previousElementSibling()
+        while (prev != null) {
+            if (prev.tagName() == "p" && prev.ownText().isNotBlank()) {
+                val text = prev.ownText().trim()
+                if (text.isNotEmpty() && !text.startsWith("<script")) {
+                    return text
+                }
+            }
+            prev = prev.previousElementSibling()
+        }
+        return null
     }
 
     private suspend fun loadCustomExtractor(
