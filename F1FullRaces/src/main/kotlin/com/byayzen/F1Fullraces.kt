@@ -103,7 +103,7 @@ class F1Fullraces : MainAPI() {
             val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
             if (decodedId.isNotBlank()) {
                 val url = "https://mixdrop.co/f/$decodedId"
-                val name = div.findPreviousLabel() ?: "Yarış Seansı"
+                val name = getLabelForElement(div)
                 Log.d("f1fullraces", url)
                 jobs += launch {
                     loadCustomExtractor(url, data, name, subtitleCallback, callback)
@@ -111,26 +111,40 @@ class F1Fullraces : MainAPI() {
             }
         }
 
-        document.select("iframe[src^='https://drive.google.com/']").forEach { iframe ->
+        document.select("div#netu iframe, div#mixdrop iframe").forEach { iframe ->
             val src = iframe.attr("src")
-            val name = iframe.findPreviousLabel() ?: "Yarış Seansı"
-            Log.d("f1fullraces", src)
-            jobs += launch {
-                loadCustomExtractor(src, data, name, subtitleCallback, callback)
+            if (src.isNotBlank()) {
+                val name = getLabelForElement(iframe)
+                Log.d("f1fullraces", src)
+                jobs += launch {
+                    loadCustomExtractor(src, data, name, subtitleCallback, callback)
+                }
             }
         }
 
-        document.select("a[href^='https://mega.nz/']").forEach { link ->
+        document.select("div#drive a[href], div#mega a[href]").forEach { link ->
             val href = link.attr("href")
-            val name = link.findPreviousLabel() ?: "Yarış Seansı"
-            Log.d("f1fullraces", href)
-            jobs += launch {
-                loadCustomExtractor(href, data, name, subtitleCallback, callback)
+            if (href.isNotBlank()) {
+                val name = getLabelForElement(link)
+                Log.d("f1fullraces", href)
+                jobs += launch {
+                    loadCustomExtractor(href, data, name, subtitleCallback, callback)
+                }
             }
         }
 
         jobs.joinAll()
+        Log.d("f1fullraces", "Bitti")
         return@coroutineScope true
+    }
+
+    private fun getLabelForElement(el: Element): String? {
+        val parent = el.parent()
+        if (parent != null && parent.tagName() == "p") {
+            val ownText = parent.ownText()?.trim()
+            if (!ownText.isNullOrBlank()) return ownText
+        }
+        return el.findPreviousLabel()
     }
 
     private fun Element.findPreviousLabel(): String? {
@@ -150,17 +164,18 @@ class F1Fullraces : MainAPI() {
     private suspend fun loadCustomExtractor(
         url: String,
         referer: String,
-        customName: String,
+        customName: String?,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) = coroutineScope {
         loadExtractor(url, referer, subtitleCallback) { link ->
             launch {
                 Log.d("f1fullraces", link.url)
+                val finalName = if (customName.isNullOrBlank()) link.source else "${link.source}-$customName"
                 callback.invoke(
                     newExtractorLink(
                         source = link.source,
-                        name = "${link.source}-$customName",
+                        name = finalName,
                         url = link.url,
                         type = link.type,
                         initializer = {
@@ -180,7 +195,7 @@ class F1Fullraces : MainAPI() {
             decodedChars.joinToString("")
         } catch (e: Exception) {
             Log.d("f1fullraces", "${e.message}")
-            ""
+            "Bitiş"
         }
     }
 }

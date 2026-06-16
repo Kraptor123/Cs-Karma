@@ -1,5 +1,5 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
-version = 8
+version = 10
 
 cloudstream {
     authors     = listOf("ByAyzen")
