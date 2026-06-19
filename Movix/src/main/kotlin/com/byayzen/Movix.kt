@@ -220,7 +220,6 @@ class Movix : MainAPI() {
     ): Boolean = coroutineScope {
         MovixHelper.updatemainurl()
         val currentUrl = mainUrl
-
         Log.d("movix", "Loadlinks domaini: $currentUrl")
 
         val domainsilici = currentUrl
@@ -251,7 +250,7 @@ class Movix : MainAPI() {
             if (isanime && !title.isNullOrBlank()) {
                 launch {
                     launch {
-                        val animelinks = fetchAnimeLinks(mainUrl, apibase, title, type, episode)
+                        val animelinks = fetchAnimeLinks(mainUrl, apibase, title, type, episode, season)
                         MovixLinks.processlinks("Anime", animelinks, mainUrl, subtitleCallback, callback)
                     }
                 }
@@ -261,23 +260,23 @@ class Movix : MainAPI() {
         }
 
         val movieRequests = if (type == "movie") listOf(
-            "FStream" to "$apibase/fstream/$type/$id",
-            "Wiflix" to "$apibase/wiflix/$id",
-            "Cpasmal" to "$apibase/cpasmal/$type/$id",
+            "FStream"   to "$apibase/fstream/$type/$id",
+            "Wiflix"    to "$apibase/wiflix/$id",
+            "Cpasmal"   to "$apibase/cpasmal/$type/$id",
             "Purstream" to "$apibase/purstream/movie/$id/stream",
-            "Frembed" to "https://frembed.click/api/public/v1/movies/$id"
+            "Frembed"   to "https://frembed.click/api/public/v1/movies/$id"
         ) else listOf(
-            "FStream" to "$apibase/fstream/$type/$id/season/$season",
-            "Wiflix" to "$apibase/wiflix/$id/$season",
-            "Cpasmal" to "$apibase/cpasmal/$type/$id/season/$season/episode/$episode",
+            "FStream"   to "$apibase/fstream/$type/$id/season/$season",
+            "Wiflix"    to "$apibase/wiflix/$id/$season",
+            "Cpasmal"   to "$apibase/cpasmal/$type/$id/season/$season/episode/$episode",
             "Purstream" to "$apibase/purstream/tv/$id/stream$query",
-            "Frembed" to "https://frembed.click/api/public/v1/tv/$id?sa=$season&epi=$episode"
+            "Frembed"   to "https://frembed.click/api/public/v1/tv/$id?sa=$season&epi=$episode"
         )
 
         val requests = mutableListOf(
-            "Movix" to "$apibase/links/$type/$id$query",
+            "Movix"     to "$apibase/links/$type/$id$query",
             "MovixTmdb" to "$apibase/tmdb/$type/$id$query",
-            "IMDB" to "$apibase/imdb/$type/$id"
+            "IMDB"      to "$apibase/imdb/$type/$id"
         ) + movieRequests
 
         launch {
@@ -289,16 +288,17 @@ class Movix : MainAPI() {
                 try {
                     Log.d("movix", targeturl)
                     val response = app.get(targeturl, headers = apiheaders, timeout = 15).text
+
                     if (MovixLinks.isvalidresponse(response)) {
                         when (brandname) {
-                            "Purstream" -> MovixLinks.parsepurstream(response, callback)
-                            "MovixTmdb" -> MovixLinks.parsetmdb(response, mainUrl, subtitleCallback, callback)
-                            "Movix" -> MovixLinks.parselinks(response, type, mainUrl, subtitleCallback, callback)
-                            "Cpasmal" -> MovixLinks.parsecpasmal(response, mainUrl, subtitleCallback, callback)
-                            "IMDB" -> MovixLinks.parseimdb(response, episode, mainUrl, subtitleCallback, callback)
-                            "FStream" -> MovixLinks.parsefstream(response, type, episode, mainUrl, subtitleCallback, callback)
-                            "Frembed" -> MovixLinks.parsefrembed(response, mainUrl, subtitleCallback, callback)
-                            else -> MovixLinks.processlinks(brandname, emptyList(), mainUrl, subtitleCallback, callback)
+                            "Purstream"  -> MovixLinks.parsepurstream(response, callback)
+                            "MovixTmdb"  -> MovixLinks.parsetmdb(response, mainUrl, subtitleCallback, callback)
+                            "Movix"      -> MovixLinks.parselinks(response, type, mainUrl, subtitleCallback, callback)
+                            "Cpasmal"    -> MovixLinks.parsecpasmal(response, mainUrl, subtitleCallback, callback)
+                            "IMDB"       -> MovixLinks.parseimdb(response, episode, mainUrl, subtitleCallback, callback)
+                            "FStream"    -> MovixLinks.parsefstream(response, type, episode, mainUrl, subtitleCallback, callback)
+                            "Frembed"    -> MovixLinks.parsefrembed(response, mainUrl, subtitleCallback, callback)
+                            else         -> MovixLinks.processlinks(brandname, emptyList(), mainUrl, subtitleCallback, callback)
                         }
                     }
                 } catch (e: Exception) {
