@@ -2,19 +2,16 @@
 
 package com.byayzen
 
-import android.net.Uri.encode
 import com.byayzen.MovixAnimeExtractor.fetchAnimeLinks
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
-import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 
 class Movix : MainAPI() {
@@ -26,14 +23,6 @@ class Movix : MainAPI() {
     override var lang = "fr"
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
-
-    private inline fun <reified T : Any> tryParseJson(json: String?): T? {
-        return try {
-            json?.let { mapper.readValue<T>(it) }
-        } catch (e: Exception) {
-            null
-        }
-    }
 
     override val mainPage = mainPageOf(
         "movie/now_playing" to "Nouveaux Films",
@@ -261,14 +250,14 @@ class Movix : MainAPI() {
 
         val movieRequests = if (type == "movie") listOf(
             "FStream"   to "$apibase/fstream/$type/$id",
-            "Wiflix"    to "$apibase/wiflix/$id",
+            "Wiflix"    to "$apibase/wiflix/$type/$id",
             "Cpasmal"   to "$apibase/cpasmal/$type/$id",
             "Purstream" to "$apibase/purstream/movie/$id/stream",
             "Frembed"   to "https://frembed.click/api/public/v1/movies/$id"
         ) else listOf(
             "FStream"   to "$apibase/fstream/$type/$id/season/$season",
-            "Wiflix"    to "$apibase/wiflix/$id/$season",
-            "Cpasmal"   to "$apibase/cpasmal/$type/$id/season/$season/episode/$episode",
+            "Wiflix"    to "$apibase/wiflix/$type/$id/$season",
+            "Cpasmal"   to "$apibase/cpasmal/$type/$id/$season/$episode",
             "Purstream" to "$apibase/purstream/tv/$id/stream$query",
             "Frembed"   to "https://frembed.click/api/public/v1/tv/$id?sa=$season&epi=$episode"
         )
@@ -279,20 +268,35 @@ class Movix : MainAPI() {
             "IMDB"      to "$apibase/imdb/$type/$id"
         ) + movieRequests
 
+        val dramaRequest = if (type == "tv") {
+            listOf("Drama" to "$apibase/drama/$type/$id$query")
+        } else emptyList()
+
+        val allRequests = requests + dramaRequest
+
         launch {
             MovixLinks.videolinks(apibase, type, id, season, episode, query, apiheaders, mainUrl, tmdbbase, tmdbkey, callback)
         }
 
-        requests.map { (brandname, targeturl) ->
+        allRequests.map { (brandname, targeturl) ->
             async {
                 try {
                     Log.d("movix", targeturl)
-                    val response = app.get(targeturl, headers = apiheaders, timeout = 15).text
+                    val res = app.get(targeturl, headers = apiheaders, timeout = 15)
+                    var response = res.text
+
+                    if (res.code == 301 || res.code == 302) {
+                        res.headers["location"]?.let { loc ->
+                            response = app.get(loc, headers = apiheaders, timeout = 15).text
+                        }
+                    }
 
                     if (MovixLinks.isvalidresponse(response)) {
                         when (brandname) {
-                            "Purstream"  -> MovixLinks.parsepurstream(response, callback)
+                            "Purstream" -> MovixLinks.parsepurstream(response, app.baseClient, subtitleCallback, callback)
                             "MovixTmdb"  -> MovixLinks.parsetmdb(response, mainUrl, subtitleCallback, callback)
+                            "Wiflix"     -> MovixLinks.parsewiflix(response, type, episode, mainUrl, subtitleCallback, callback)
+                            "Drama"      -> MovixLinks.parsedrama(response, mainUrl, subtitleCallback, callback)
                             "Movix"      -> MovixLinks.parselinks(response, type, mainUrl, subtitleCallback, callback)
                             "Cpasmal"    -> MovixLinks.parsecpasmal(response, mainUrl, subtitleCallback, callback)
                             "IMDB"       -> MovixLinks.parseimdb(response, episode, mainUrl, subtitleCallback, callback)

@@ -47,5 +47,6 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Vidaraa())
         registerExtractorAPI(Bryantenunder())
         registerExtractorAPI(SendvidExtractor())
+        registerExtractorAPI(MailRu())
     }
 }

@@ -9,10 +9,12 @@ import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 import com.lagradost.cloudstream3.app
 import android.content.Context
 import android.content.SharedPreferences
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
+import okhttp3.Request
 
 
 object MovixHelper {
@@ -252,6 +254,33 @@ data class MovixAnimeStreamingLink(
     val players: List<String>?
 )
 
+data class MovixWiflixResponse(
+    val success: Boolean?,
+    val episodes: Map<String, WiflixEpisode>?,
+    val movie: Map<String, List<WiflixLink>>?
+)
+
+data class WiflixEpisode(
+    val vf: List<WiflixLink>?,
+    val vostfr: List<WiflixLink>?
+)
+
+data class WiflixLink(
+    val name: String?,
+    val url: String?,
+    val type: String?
+)
+
+data class MovixDramaResponse(
+    val success: Boolean?,
+    val data: List<DramaLink>?
+)
+
+data class DramaLink(
+    val name: String?,
+    val link: String?
+)
+
 
 suspend fun loadcustomextractor(
     brand: String,
@@ -317,5 +346,24 @@ suspend fun loadcustomextractor(
         }
     } catch (e: Exception) {
         Log.d("Movix", e.message.toString())
+    }
+}
+
+
+
+
+fun Videovarmiyokmu(url: String, client: OkHttpClient): Boolean {
+    return try {
+        val headRequest = Request.Builder().head().url(url).build()
+        val headResponse = client.newCall(headRequest).execute()
+        val isOk = headResponse.isSuccessful
+        headResponse.close()
+        if (!isOk) {
+            Log.d("VideoKontrol", "Video bulunamadi: $url")
+        }
+        isOk
+    } catch (e: Exception) {
+        Log.d("VideoKontrol", "Hata: ${e.message}")
+        false
     }
 }

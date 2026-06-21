@@ -31,7 +31,14 @@ object FrembedExtractor {
                 "X-Requested-With" to "XMLHttpRequest"
             )
 
-            val response = app.get(apiUrl, headers = headers).text
+            val res = app.get(apiUrl, headers = headers)
+            var response = res.text
+            if (res.code == 301 || res.code == 302) {
+                res.headers["location"]?.let { loc ->
+                    response = app.get(loc, headers = headers).text
+                }
+            }
+
             val linkPattern = """"(link\d+(?:vostfr|vo)?)"\s*:\s*"([^"]+)"""".toRegex()
             val matches = linkPattern.findAll(response)
 

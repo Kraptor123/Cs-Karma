@@ -1,6 +1,10 @@
 package com.byayzen
 
 import android.util.Log
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.network.*
@@ -579,6 +583,86 @@ class BllEmbedseek : VidStack() { override var mainUrl = "https://bll.embedseek.
 class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
 
 class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }
+
+private val mapper = jacksonObjectMapper()
+
+open class MailRu : ExtractorApi() {
+    override val name = "MailRu"
+    override val mainUrl = "https://my.mail.ru"
+    override val requiresReferer = false
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val initialreq = app.get(url)
+        val responsetext = initialreq.text
+        val videokey = initialreq.cookies["video_key"] ?: ""
+
+        val metadataregex = """"metadataUrl"\s*:\s*"([^"]+)"""".toRegex()
+        val metamatch = metadataregex.find(responsetext)
+        val extractedmetapath = metamatch?.groupValues?.get(1) ?: return
+
+        val fullmetaurl =
+            if (extractedmetapath.startsWith("//")) "https:$extractedmetapath" else extractedmetapath
+
+        val timestamp = System.currentTimeMillis()
+        val finalajaxurl = if (fullmetaurl.contains("?")) {
+            "$fullmetaurl&_=$timestamp&ajax_call=1&ext=1"
+        } else {
+            "$fullmetaurl?_=$timestamp&ajax_call=1&ext=1"
+        }
+
+        val outputrequest = app.get(
+            finalajaxurl,
+            headers = mapOf(
+                "Accept" to "application/json, text/javascript, */*; q=0.01",
+                "Referer" to url,
+                "X-Requested-With" to "XMLHttpRequest",
+                "Sec-GPC" to "1",
+                "Sec-Fetch-Dest" to "empty",
+                "Sec-Fetch-Mode" to "cors",
+                "Sec-Fetch-Site" to "same-origin"
+            ),
+            cookies = mapOf("video_key" to videokey)
+        )
+
+        val videodata = try {
+            mapper.readValue<MailRuData>(outputrequest.text)
+        } catch (e: Exception) {
+            null
+        }
+
+        videodata?.videos?.forEach { video ->
+            val videourl = if (video.url.startsWith("//")) "https:${video.url}" else video.url
+
+            callback.invoke(
+                newExtractorLink(
+                    source = this.name,
+                    name = this.name,
+                    url = videourl,
+                ) {
+                    this.headers = mapOf("Cookie" to "video_key=$videokey")
+                    this.quality = getQualityFromName(video.key)
+                }
+            )
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class MailRuData(
+        @JsonProperty("videos") val videos: List<MailRuVideoData>? = null
+    )
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class MailRuVideoData(
+        @JsonProperty("url") val url: String = "",
+        @JsonProperty("key") val key: String = ""
+    )
+}
+
 
 
 
