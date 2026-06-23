@@ -49,12 +49,11 @@ class TVGarden : MainAPI() {
                         val name = channel.optString("name", "")
 
                         if (name.lowercase().contains(query.lowercase())) {
-                            val streamUrls = channel.optJSONArray("stream_urls")
-                            val youtubeUrls = channel.optJSONArray("youtube_urls")
-
                             val streamUrl = when {
-                                (streamUrls?.length() ?: 0) > 0 -> streamUrls?.getString(0)
-                                (youtubeUrls?.length() ?: 0) > 0 -> youtubeUrls?.getString(0)
+                                (channel.optJSONObject("sources")?.optJSONArray("streams")?.length() ?: 0) > 0 -> 
+                                    channel.getJSONObject("sources").getJSONArray("streams").getString(0)
+                                (channel.optJSONObject("sources")?.optJSONArray("youtube")?.length() ?: 0) > 0 -> 
+                                    channel.getJSONObject("sources").getJSONArray("youtube").getString(0)
                                 else -> null
                             }
 
@@ -81,12 +80,11 @@ class TVGarden : MainAPI() {
             for (i in 0 until channelsArray.length()) {
                 val channel = channelsArray.getJSONObject(i)
                 val name = channel.optString("name", "")
-                val streamUrls = channel.optJSONArray("stream_urls")
-                val youtubeUrls = channel.optJSONArray("youtube_urls")
-
                 val streamUrl = when {
-                    (streamUrls?.length() ?: 0) > 0 -> streamUrls?.getString(0)
-                    (youtubeUrls?.length() ?: 0) > 0 -> youtubeUrls?.getString(0)
+                    (channel.optJSONObject("sources")?.optJSONArray("streams")?.length() ?: 0) > 0 -> 
+                        channel.getJSONObject("sources").getJSONArray("streams").getString(0)
+                    (channel.optJSONObject("sources")?.optJSONArray("youtube")?.length() ?: 0) > 0 -> 
+                        channel.getJSONObject("sources").getJSONArray("youtube").getString(0)
                     else -> null
                 }
 
@@ -110,8 +108,8 @@ class TVGarden : MainAPI() {
                 val channelsArray = JSONArray(response)
                 for (i in 0 until channelsArray.length()) {
                     val channel = channelsArray.getJSONObject(i)
-                    val streamUrls = channel.optJSONArray("stream_urls")
-                    val youtubeUrls = channel.optJSONArray("youtube_urls")
+                    val streamUrls = channel.optJSONObject("sources")?.optJSONArray("streams")
+                    val youtubeUrls = channel.optJSONObject("sources")?.optJSONArray("youtube")
 
                     val matchFound = (0 until (streamUrls?.length() ?: 0)).any { streamUrls?.getString(it) == url } ||
                             (0 until (youtubeUrls?.length() ?: 0)).any { youtubeUrls?.getString(it) == url }
@@ -153,7 +151,7 @@ class TVGarden : MainAPI() {
             }
             true
         } catch (e: Exception) {
-            Log.d("TVGarden", "Link yukleme hatasi: ${e.message}")
+            Log.e("TVGarden", "Link yukleme hatasi: ${e.message}")
             false
         }
     }
