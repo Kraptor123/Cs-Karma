@@ -3,6 +3,8 @@
 package com.byayzen
 
 import com.byayzen.MovixAnimeExtractor.fetchAnimeLinks
+import com.byayzen.MovixLinks.videolinks
+import com.byayzen.Nakastream.Nakaoynat
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -13,6 +15,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class Movix : MainAPI() {
     override var mainUrl: String
@@ -175,7 +179,7 @@ class Movix : MainAPI() {
                         e.still_path?.let { "$tmdbimg500$it" } ?: poster
                         this.date = e.air_date?.let {
                             try {
-                                java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                                SimpleDateFormat("yyyy-MM-dd", Locale.US)
                                     .parse(it)?.time
                             } catch (ex: Exception) {
                                 null
@@ -239,13 +243,26 @@ class Movix : MainAPI() {
             if (isanime && !title.isNullOrBlank()) {
                 launch {
                     launch {
-                        val animelinks = fetchAnimeLinks(mainUrl, apibase, title, type, episode, season)
-                        MovixLinks.processlinks("Anime", animelinks, mainUrl, subtitleCallback, callback)
+                        val animelinks = fetchAnimeLinks(
+                            mainUrl,
+                            apibase,
+                            title,
+                            type,
+                            episode,
+                            season
+                        )
+                        MovixLinks.processlinks(
+                            "Anime",
+                            animelinks,
+                            mainUrl,
+                            subtitleCallback,
+                            callback
+                        )
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.d("movix", "Tmdb fetch error: ${e.message}")
+            Log.d("movix", "Tmdb linklerinde hata var: ${e.message}")
         }
 
         val movieRequests = if (type == "movie") listOf(
@@ -275,7 +292,11 @@ class Movix : MainAPI() {
         val allRequests = requests + dramaRequest
 
         launch {
-            MovixLinks.videolinks(apibase, type, id, season, episode, query, apiheaders, mainUrl, tmdbbase, tmdbkey, callback)
+            videolinks(apibase, type, id, season, episode, query, apiheaders, mainUrl, tmdbbase, tmdbkey, callback)
+        }
+
+        launch {
+            Nakaoynat(id, type, season?.toIntOrNull(), episode?.toIntOrNull(), subtitleCallback, callback)
         }
 
         allRequests.map { (brandname, targeturl) ->
