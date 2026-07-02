@@ -101,7 +101,7 @@ object Nakastream {
                 )
             }
         } catch (e: Exception) {
-            Log.d(logTag, "Hata: $e")
+            Log.d(lognick, "Hata: $e")
         }
     }
 }
