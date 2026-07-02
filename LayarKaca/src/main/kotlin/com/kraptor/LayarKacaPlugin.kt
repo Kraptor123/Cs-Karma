@@ -15,5 +15,7 @@ class LayarKacaPlugin: Plugin() {
         registerExtractorAPI(Cloudhownetwork())
         registerExtractorAPI(Furher2())
         registerExtractorAPI(Turbovidhls())
+        registerExtractorAPI(Shortink())
+        registerExtractorAPI(AbyssExtractor())
     }
 }

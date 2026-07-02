@@ -62,6 +62,7 @@ class Temel : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
+        Log.d(name, "Load aşaması: $url")
         val document = app.get(url).document
 
         val title           = document.selectFirst("h1")?.text()?.trim() ?: return null
@@ -69,22 +70,56 @@ class Temel : MainAPI() {
         val description     = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
         val year            = document.selectFirst("div.extra span.C a")?.text()?.trim()?.toIntOrNull()
         val tags            = document.select("div.sgeneros a").map { it.text() }
-        val rating          = document.selectFirst("span.dt_rating_vgs")?.text()?.trim()?.toIntOrNull()
+        val scoreText       = document.selectFirst("span.dt_rating_vgs")?.text()?.trim()
         val duration        = document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
         val recommendations = document.select("div.srelacionados article").mapNotNull { it.toRecommendationResult() }
         val actors          = document.select("span.valor a").map { Actor(it.text()) }
-        val trailer         = Regex("""embed/(.*)\?rel""").find(document.html())?.groupValues?.get(1)?.let { "https://www.youtube.com/embed/$it" }
+        val trailer         = Regex("""embed\/(.*)\?rel""").find(document.html())?.groupValues?.get(1)?.let { "https://www.youtube.com/embed/$it" }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
-            this.posterUrl       = poster
-            this.plot            = description
-            this.year            = year
-            this.tags            = tags
-            this.score           = Score.from10(rating)
-            this.duration        = duration
-            this.recommendations = recommendations
-            addActors(actors)
-            addTrailer(trailer)
+        val isTvSeries = document.select("div.episodios li, div.season-list, table.episodes").isNotEmpty()
+
+        return if (isTvSeries) {
+            val episodes = document.select("div.episodios li a, div.season-list a").mapNotNull { epElement ->
+                val epUrl = fixUrlNull(epElement.attr("href")) ?: return@mapNotNull null
+                val epName = epElement.text()?.trim() ?: "Bölüm"
+                val season = epElement.selectFirst(".se-t, .season")?.text()?.trim()?.toIntOrNull() ?: 1
+                val episode = epElement.selectFirst(".num-ep, .episode")?.text()?.trim()?.toIntOrNull() ?: 1
+                val epDate = epElement.selectFirst(".ep-date, .date")?.text()?.trim()
+
+                newEpisode(epUrl) {
+                    this.name = epName
+                    this.season = season
+                    this.episode = episode
+                    if (!epDate.isNullOrEmpty()) {
+                        this.addDate(epDate)
+                    }
+                }
+            }
+            Log.d(name, "Bölüm var: ${episodes.size}")
+
+            newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+                this.posterUrl       = poster
+                this.plot            = description
+                this.year            = year
+                this.tags            = tags
+                this.score           = Score.from10(scoreText)
+                this.duration        = duration
+                this.recommendations = recommendations
+                addActors(actors)
+                addTrailer(trailer)
+            }
+        } else {
+            newMovieLoadResponse(title, url, TvType.Movie, url) {
+                this.posterUrl       = poster
+                this.plot            = description
+                this.year            = year
+                this.tags            = tags
+                this.score           = Score.from10(scoreText)
+                this.duration        = duration
+                this.recommendations = recommendations
+                addActors(actors)
+                addTrailer(trailer)
+            }
         }
     }
 
@@ -92,8 +127,13 @@ class Temel : MainAPI() {
         val title     = this.selectFirst("a img")?.attr("alt") ?: return null
         val href      = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("a img")?.attr("data-src"))
+        val isTvSeries = this.selectFirst(".type, .episodios, .serie-tag") != null
 
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+        return if (isTvSeries) {
+            newTvSeriesSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+        } else {
+            newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+        }
     }
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {

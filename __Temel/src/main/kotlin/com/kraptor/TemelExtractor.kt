@@ -8,7 +8,7 @@ import com.lagradost.cloudstream3.utils.*
 
 open class TemelExtractor : ExtractorApi() {
     override val name = "Temel"
-    override val mainUrl = "https://"
+    override val mainUrl = "https://ornek.com"
     override val requiresReferer = true
 
     override suspend fun getUrl(
