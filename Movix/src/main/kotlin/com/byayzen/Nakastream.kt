@@ -1,4 +1,4 @@
-package com.byayzen
+/*package com.byayzen
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -105,3 +105,5 @@ object Nakastream {
         }
     }
 }
+
+*/

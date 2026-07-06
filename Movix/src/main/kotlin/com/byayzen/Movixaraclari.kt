@@ -11,52 +11,32 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import com.lagradost.cloudstream3.app
-import android.content.Context
-import android.content.SharedPreferences
-import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import okhttp3.Request
 
 
+const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
+const val tmdblang = "fr-FR"
+const val tmdbbase = "https://api.themoviedb.org/3"
+const val tmdbimg500  = "https://image.tmdb.org/t/p/w500"
+const val tmdbimg1280 = "https://image.tmdb.org/t/p/w1280"
+const val tmdbimg185  = "https://image.tmdb.org/t/p/w185"
+
+
 object MovixHelper {
-    val prefname = "movix_prefs"
-    val domainkey = "movix_domain"
     @Volatile var cachedUrl: String? = null
 
     suspend fun updatemainurl(): String {
         cachedUrl?.let { return it }
 
-        val prefs = CloudStreamApp.context?.getSharedPreferences(prefname, Context.MODE_PRIVATE)
-        val savedurl = prefs?.getString(domainkey, null)
-
-        if (savedurl != null) {
-            cachedUrl = savedurl
-            ioSafe {
-                try {
-                    if (app.get(savedurl, timeout = 3).code !in 200..299) {
-                        domainal(prefs)
-                    }
-                } catch (e: Exception) {
-                    Log.d("MovixHelper", e.message.toString())
-                    domainal(prefs)
-                }
-            }
-            return savedurl
-        }
-
-        return domainal(prefs)
-    }
-
-    private suspend fun domainal(prefs: SharedPreferences?): String {
         try {
             val html = app.get("https://movix.online/", timeout = 5).text
-            val pattern = """(?:La seule adresse active de Movix est\s+<a\s+href="https://|(?:"url"\s*:\s*"https://)|(?:<title>.*?\b))(movix\.[a-z0-9]+)"""
+            val pattern = """La seule adresse active de Movix est\s+<a\s+href="https://(movix\.[a-z0-9]+)"""
                 .toRegex(RegexOption.IGNORE_CASE)
             val match = pattern.find(html)
 
             if (match != null) {
                 val domain = "https://" + match.groupValues[1].trim()
                 cachedUrl = domain
-                prefs?.edit()?.putString(domainkey, domain)?.apply()
                 return domain
             }
         } catch (e: Exception) {
@@ -68,12 +48,6 @@ object MovixHelper {
 
 
 
-const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
-const val tmdblang = "fr-FR"
-const val tmdbbase = "https://api.themoviedb.org/3"
-const val tmdbimg500  = "https://image.tmdb.org/t/p/w500"
-const val tmdbimg1280 = "https://image.tmdb.org/t/p/w1280"
-const val tmdbimg185  = "https://image.tmdb.org/t/p/w185"
 
 data class DownloadSource(val src: String?, val quality: String?, val language: String?, val m3u8: String?)
 
@@ -86,17 +60,6 @@ data class CpasmalRes(
 )
 
 data class FstreamEpisode(val languages: Map<String, List<FstreamLink>>?)
-data class MovixMovieLinksResponse(
-    val data: MovixLinkData?
-)
-
-data class MovixTvLinksResponse(
-    val data: List<MovixLinkData>?
-)
-
-data class MovixLinkData(
-    val links: List<String>?
-)
 
 data class MovixTmdbResponse(
     val iframe_src      : String?               = null,
@@ -254,21 +217,24 @@ data class MovixAnimeStreamingLink(
     val players: List<String>?
 )
 
+
 data class MovixWiflixResponse(
-    val success: Boolean?,
-    val episodes: Map<String, WiflixEpisode>?,
-    val movie: Map<String, List<WiflixLink>>?
+    val success: Boolean?                = null,
+    val players: MovixWiflixPlayers?     = null
 )
 
-data class WiflixEpisode(
-    val vf: List<WiflixLink>?,
-    val vostfr: List<WiflixLink>?
+
+data class MovixWiflixPlayers(
+    val vf: List<MovixWiflixLink>?      = null,
+    val vostfr: List<MovixWiflixLink>?  = null
 )
 
-data class WiflixLink(
-    val name: String?,
-    val url: String?,
-    val type: String?
+
+data class MovixWiflixLink(
+    val name: String?    = null,
+    val url: String?     = null,
+    val episode: Int?    = null,
+    val type: String?    = null
 )
 
 data class MovixDramaResponse(

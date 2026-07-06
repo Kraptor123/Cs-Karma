@@ -6,6 +6,9 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.Qualities
+import kotlinx.serialization.json.Json.Default.parseToJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
@@ -76,14 +79,39 @@ object MovixLinks {
         callback: (ExtractorLink) -> Unit
     ) {
         val links = mutableListOf<String>()
-        if (type == "movie") {
-            tryParseJson<MovixMovieLinksResponse>(response)?.data?.links?.let(links::addAll)
-        } else {
-            tryParseJson<MovixTvLinksResponse>(response)?.data?.forEach { data ->
-                data.links?.let(links::addAll)
+        Log.d("movix_links", "Parsing started for type: $type")
+        Regex("https?://[^\"]+").findAll(response).map { it.value }.let(links::addAll)
+        val distinctLinks = links.distinct().filter { it.isNotBlank() }
+        Log.d("movix_links", "Found ${distinctLinks.size} unique links for type: $type")
+        processlinks("Movix", distinctLinks, mainUrl, subtitlecallback, callback)
+    }
+
+
+    suspend fun parseJ1F(
+        response: String,
+        mainUrl: String,
+        subtitlecallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        Log.d("Movix_J1F", "J1F başladı")
+        val links = mutableListOf<String>()
+        try {
+            val json    = parseToJsonElement(response).jsonObject
+            val players = json["players"]?.jsonObject ?: return
+            val vf      = players["vf"]?.jsonArray
+            val vostfr  = players["vostfr"]?.jsonArray
+            listOfNotNull(vf, vostfr).flatten().forEach { element ->
+                val encodedUrl = element.jsonObject["url"]?.toString()?.trim('"')
+                if (!encodedUrl.isNullOrBlank()) {
+                    val decodedUrl = base64Decode(encodedUrl)
+                    if (decodedUrl.isNotBlank()) links.add(decodedUrl)
+                }
             }
+        } catch (e: Exception) {
+            Log.d("Movix_J1F", "J1F hata verdi: ${e.message}")
         }
-        processlinks("Movix", links.distinct().filter { it.isNotBlank() }, mainUrl, subtitlecallback, callback)
+        Log.d("Movix_J1F", "J1F bitti. Bulunan linkler ${links.size}, bu kadar link bulundu.")
+        processlinks("J1F", links.distinct(), mainUrl, subtitlecallback, callback)
     }
 
     suspend fun parsecpasmal(
@@ -157,6 +185,8 @@ object MovixLinks {
         processlinks("Frembed", links.distinct().filter { it.isNotBlank() }, mainUrl, subtitlecallback, callback)
     }
 
+
+
     suspend fun parsewiflix(
         response: String,
         type: String,
@@ -166,18 +196,22 @@ object MovixLinks {
         callback: (ExtractorLink) -> Unit
     ) {
         val links = mutableListOf<String>()
+        Log.d("movix", "Wiflix parsing started for type: $type")
         tryParseJson<MovixWiflixResponse>(response)?.let { res ->
+            val allLinks = mutableListOf<MovixWiflixLink>()
+            allLinks.addAll(res.players?.vf ?: emptyList())
+            allLinks.addAll(res.players?.vostfr ?: emptyList())
             if (type == "movie") {
-                res.movie?.values?.flatten()?.forEach { it.url?.let(links::add) }
+                allLinks.forEach { it.url?.let(links::add) }
             } else {
-                val epData = res.episodes?.entries?.find {
-                    it.key == episode || it.key.toIntOrNull() == episode?.toIntOrNull()
-                }?.value
-                epData?.vf?.forEach { it.url?.let(links::add) }
-                epData?.vostfr?.forEach { it.url?.let(links::add) }
+                allLinks.filter {
+                    it.episode?.toString() == episode || it.episode == episode?.toIntOrNull()
+                }.forEach { it.url?.let(links::add) }
             }
         }
-        processlinks("Wiflix", links.distinct().filter { it.isNotBlank() }, mainUrl, subtitlecallback, callback)
+        val distinctLinks = links.distinct().filter { it.isNotBlank() }
+        Log.d("movix", "Wiflix parsing finished. Found ${distinctLinks.size} unique links.")
+        processlinks("Wiflix", distinctLinks, mainUrl, subtitlecallback, callback)
     }
 
     suspend fun parsedrama(
@@ -261,6 +295,8 @@ object MovixLinks {
             Log.d("movix", link)
             if (link.contains("kokoflix.lol") || link.contains("kakaflix.lol")) {
                 Kokoflix.invoke(link, mainUrl, subtitlecallback, callback)
+            } else if (link.contains("onregardeou.site")) {
+                OnRegardeOu.invoke(link, mainUrl, subtitlecallback, callback)
             } else {
                 loadcustomextractor(cleanbrand, link, mainUrl, subtitlecallback, callback)
             }

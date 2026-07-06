@@ -19,6 +19,7 @@ import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.extractors.FileMoon
 import com.lagradost.cloudstream3.extractors.FilemoonV2
+import com.lagradost.cloudstream3.extractors.LuluStream
 import com.lagradost.cloudstream3.extractors.Voe
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -83,6 +84,7 @@ class Vidaraa : ExtractorApi() {
 
 class Ralphy : Voe() { override var mainUrl = "https://ralphysuccessfull.org" }
 class Bryantenunder : Voe() { override var mainUrl = "https://bryantenunder.com" }
+class Pamelachangemission : Voe() { override var mainUrl = "https://pamelachangemission.com" }
 
 open class Uqload : ExtractorApi() {
     override var name = "Uqload"
@@ -247,24 +249,46 @@ open class VidHidePro : ExtractorApi() {
             "User-Agent" to USER_AGENT
         )
 
-        val response = app.get(getEmbedUrl(url), referer = referer)
-        val script = if (!getPacked(response.text).isNullOrEmpty()) {
-            var result = getAndUnpack(response.text)
-            if (result.contains("var links")) {
-                result = result.substringAfter("var links")
-            }
-            result
-        } else {
-            response.document.selectFirst("script:containsData(sources:)")?.data()
-        } ?: return
+        val embedUrl = getEmbedUrl(url)
+        Log.d("vidhide", embedUrl)
 
-        Regex(":\\s*\"(.*?m3u8.*?)\"").findAll(script).forEach { m3u8Match ->
-            generateM3u8(
-                name,
-                fixUrl(m3u8Match.groupValues[1]),
-                referer = "$mainUrl/",
-                headers = headers
-            ).forEach(callback)
+        try {
+            val response = app.get(embedUrl, referer = referer)
+            Log.d("vidhide", "${response.code}|${response.text.length}")
+
+            val responseText = response.text
+            val packed = getPacked(responseText)
+            val script = if (!packed.isNullOrEmpty()) {
+                var result = getAndUnpack(responseText)
+                if (result.contains("var links")) {
+                    result = result.substringAfter("var links")
+                }
+                result
+            } else {
+                response.document.selectFirst("script:containsData(sources:)")?.data()
+            }
+
+            if (script == null) {
+                return
+            }
+
+            Log.d("vidhide", script.length.toString())
+            val regex = Regex(":\\s*\"(.*?m3u8.*?)\"")
+            val matches = regex.findAll(script).toList()
+            Log.d("vidhide", matches.size.toString())
+
+            matches.forEach { m3u8Match ->
+                val m3u8Url = fixUrl(m3u8Match.groupValues[1])
+                Log.d("vidhide", m3u8Url)
+                generateM3u8(
+                    name,
+                    m3u8Url,
+                    referer = "$mainUrl/",
+                    headers = headers
+                ).forEach(callback)
+            }
+        } catch (e: Exception) {
+            Log.d("Vidhide", e.message ?: "null")
         }
     }
 
@@ -279,7 +303,6 @@ open class VidHidePro : ExtractorApi() {
 }
 
 class RyderJet : VidHidePro() { override var mainUrl = "https://ryderjet.com" }
-class LuluVdo : VidHidePro() { override var mainUrl = "https://luluvdo.com" }
 class VtbeTo : VidHidePro() { override var mainUrl = "https://vtbe.to" }
 class SaveFiles : VidHidePro() { override var mainUrl = "https://savefiles.com" }
 class DhcPlay : VidHidePro() { override var mainUrl = "https://dhcplay.com" }
@@ -295,6 +318,8 @@ class DhtPre : VidHidePro() { override var mainUrl = "https://dhtpre.com" }
 class PeytonePre : VidHidePro() { override var mainUrl = "https://peytonepre.com" }
 class MovearnPre : VidHidePro() { override var mainUrl = "https://movearnpre.com" }
 class Dintezuvio : VidHidePro() { override var mainUrl = "https://dintezuvio.com" }
+
+class Morencius : VidHidePro() { override var mainUrl = "https://morencius.com" }
 
 open class Vidzy : ExtractorApi() {
     override val name = "Vidzy"
@@ -321,7 +346,7 @@ open class Vidzy : ExtractorApi() {
         Log.d("Vidzy", "$script")
         Regex("""src\s*:\s*"([^"]+m3u8[^"]*)"""").findAll(script).forEach { m3u8Match ->
             val m3u8Url = fixUrl(m3u8Match.groupValues[1])
-            Log.d("Vidzy", "Extracted M3U8: $m3u8Url")
+            Log.d("VidzySon", "M3U8: $m3u8Url")
 
             callback(
                 newExtractorLink(
@@ -576,12 +601,22 @@ class SendvidExtractor : ExtractorApi() {
 
 class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
 
+class Serix : VidStack() { override var mainUrl = "https://serix.upns.live" }
+
+class Flemmix : VidStack() { override var mainUrl = "https://flemmix.upns.pro" }
+
 class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
+
+class Dismoiceline : VidStack() { override var mainUrl = "https://dismoiceline.uns.bio" }
+
+class Doremifasol : VidStack() { override var mainUrl = "https://doremifasol.ezplayer.me" }
+class MarcusP2P : VidStack() { override var mainUrl = "https://marcus.p2pstream.vip" }
 
 class BllEmbedseek : VidStack() { override var mainUrl = "https://bll.embedseek.com" }
 
 class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
 
+class LuluVdo : LuluStream() { override var mainUrl = "https://luluvdo.com" }
 class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }
 
 private val mapper = jacksonObjectMapper()

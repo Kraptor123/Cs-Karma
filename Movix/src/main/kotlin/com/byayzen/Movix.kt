@@ -4,7 +4,7 @@ package com.byayzen
 
 import com.byayzen.MovixAnimeExtractor.fetchAnimeLinks
 import com.byayzen.MovixLinks.videolinks
-import com.byayzen.Nakastream.Nakaoynat
+//import com.byayzen.Nakastream.Nakaoynat
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -26,7 +26,7 @@ class Movix : MainAPI() {
     override val hasMainPage = true
     override var lang = "fr"
     override val hasQuickSearch = true
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
 
     override val mainPage = mainPageOf(
         "movie/now_playing" to "Nouveaux Films",
@@ -181,7 +181,7 @@ class Movix : MainAPI() {
                             try {
                                 SimpleDateFormat("yyyy-MM-dd", Locale.US)
                                     .parse(it)?.time
-                            } catch (ex: Exception) {
+                            } catch (_: Exception) {
                                 null
                             }
                         }
@@ -211,6 +211,12 @@ class Movix : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
+        val subCallback: (SubtitleFile) -> Unit = { sub ->
+            val langName = SubtitleHelper.fromTagToEnglishLanguageName(sub.lang) ?: sub.lang
+            launch {
+                subtitleCallback(newSubtitleFile(langName, sub.url))
+            }
+        }
         MovixHelper.updatemainurl()
         val currentUrl = mainUrl
         Log.d("movix", "Loadlinks domaini: $currentUrl")
@@ -255,7 +261,7 @@ class Movix : MainAPI() {
                             "Anime",
                             animelinks,
                             mainUrl,
-                            subtitleCallback,
+                            subCallback,
                             callback
                         )
                     }
@@ -268,6 +274,7 @@ class Movix : MainAPI() {
         val movieRequests = if (type == "movie") listOf(
             "FStream"   to "$apibase/fstream/$type/$id",
             "Wiflix"    to "$apibase/wiflix/$type/$id",
+            "J1F"       to "$apibase/j1f/$type/$id",
             "Cpasmal"   to "$apibase/cpasmal/$type/$id",
             "Purstream" to "$apibase/purstream/movie/$id/stream",
             "Frembed"   to "https://frembed.click/api/public/v1/movies/$id"
@@ -295,9 +302,9 @@ class Movix : MainAPI() {
             videolinks(apibase, type, id, season, episode, query, apiheaders, mainUrl, tmdbbase, tmdbkey, callback)
         }
 
-        launch {
-            Nakaoynat(id, type, season?.toIntOrNull(), episode?.toIntOrNull(), subtitleCallback, callback)
-        }
+      /*  launch {
+            Nakaoynat(id, type, season?.toIntOrNull(), episode?.toIntOrNull(), subCallback, callback)
+        }*/
 
         allRequests.map { (brandname, targeturl) ->
             async {
@@ -314,16 +321,18 @@ class Movix : MainAPI() {
 
                     if (MovixLinks.isvalidresponse(response)) {
                         when (brandname) {
-                            "Purstream" -> MovixLinks.parsepurstream(response, app.baseClient, subtitleCallback, callback)
-                            "MovixTmdb"  -> MovixLinks.parsetmdb(response, mainUrl, subtitleCallback, callback)
-                            "Wiflix"     -> MovixLinks.parsewiflix(response, type, episode, mainUrl, subtitleCallback, callback)
-                            "Drama"      -> MovixLinks.parsedrama(response, mainUrl, subtitleCallback, callback)
-                            "Movix"      -> MovixLinks.parselinks(response, type, mainUrl, subtitleCallback, callback)
-                            "Cpasmal"    -> MovixLinks.parsecpasmal(response, mainUrl, subtitleCallback, callback)
-                            "IMDB"       -> MovixLinks.parseimdb(response, episode, mainUrl, subtitleCallback, callback)
-                            "FStream"    -> MovixLinks.parsefstream(response, type, episode, mainUrl, subtitleCallback, callback)
-                            "Frembed"    -> MovixLinks.parsefrembed(response, mainUrl, subtitleCallback, callback)
-                            else         -> MovixLinks.processlinks(brandname, emptyList(), mainUrl, subtitleCallback, callback)
+                            "Purstream" -> MovixLinks.parsepurstream(response, app.baseClient, subCallback, callback)
+                            "MovixTmdb"  -> MovixLinks.parsetmdb(response, mainUrl, subCallback, callback)
+                            "Wiflix"     -> MovixLinks.parsewiflix(response, type, episode, mainUrl, subCallback, callback)
+                            "Drama"      -> MovixLinks.parsedrama(response, mainUrl, subCallback, callback)
+                            "Movix"      -> MovixLinks.parselinks(response, type, mainUrl, subCallback, callback)
+                            "Cpasmal"    -> MovixLinks.parsecpasmal(response, mainUrl, subCallback, callback)
+                            "IMDB"       -> MovixLinks.parseimdb(response, episode, mainUrl, subCallback, callback)
+                            "FStream"    -> MovixLinks.parsefstream(response, type, episode, mainUrl, subCallback, callback)
+                            "Frembed"    -> MovixLinks.parsefrembed(response, mainUrl, subCallback, callback)
+                            "J1F"        -> MovixLinks.parseJ1F(response, mainUrl, subCallback, callback)
+                            else         -> MovixLinks.processlinks(brandname, emptyList(), mainUrl, subCallback, callback)
+
                         }
                     }
                 } catch (e: Exception) {
@@ -334,4 +343,4 @@ class Movix : MainAPI() {
 
         true
     }
-    }
+}

@@ -48,5 +48,12 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Bryantenunder())
         registerExtractorAPI(SendvidExtractor())
         registerExtractorAPI(MailRu())
+        registerExtractorAPI(Morencius())
+        registerExtractorAPI(Serix())
+        registerExtractorAPI(Flemmix())
+        registerExtractorAPI(Pamelachangemission())
+        registerExtractorAPI(Doremifasol())
+        registerExtractorAPI(MarcusP2P())
+        registerExtractorAPI(Dismoiceline())
     }
 }
