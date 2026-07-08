@@ -15,8 +15,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 
 class TVGarden : MainAPI() {
-    override var mainUrl = "https://famelack.com"
-    override var name = "FamelackTV"
+    override var mainUrl = "https://tvgarden.world"
+    override var name = "TVGarden"
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
