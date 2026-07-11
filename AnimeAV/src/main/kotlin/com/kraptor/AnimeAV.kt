@@ -61,10 +61,11 @@ class AnimeAV : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        if (request.data.contains("$mainUrl")){
+        if (request.data.contains("$mainUrl")) {
             val document = app.get(request.data).document
 
-            val home = document.select("section:has(h2:contains(episo)) div.grid article").mapNotNull { it.toMainPageResult() }
+            val home = document.select("section:has(h2:contains(episo)) div.grid article")
+                .mapNotNull { it.toMainPageResult() }
 
             return newHomePageResponse(HomePageList(request.name, home, true), false)
         } else {
@@ -73,14 +74,16 @@ class AnimeAV : MainAPI() {
             } else {
                 app.get("$categoryUrl${request.data.lowercase()}&page=$page").document
             }
-            val home = document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
+            val home = document.select("div.grid.grid-cols-2 article.group\\/item")
+                .mapNotNull { it.toMainPageResult() }
 
             return newHomePageResponse(request.name, home)
         }
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
-        val title = this.selectFirst("h3")?.text() ?: this.selectFirst("span.sr-only")?.text() ?: return null
+        val title = this.selectFirst("h3")?.text() ?: this.selectFirst("span.sr-only")?.text()
+        ?: return null
         val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
@@ -95,7 +98,8 @@ class AnimeAV : MainAPI() {
         }
 
         val aramaCevap =
-            document.select("div.grid.grid-cols-2 article.group\\/item").mapNotNull { it.toMainPageResult() }
+            document.select("div.grid.grid-cols-2 article.group\\/item")
+                .mapNotNull { it.toMainPageResult() }
 
         return newSearchResponseList(aramaCevap, hasNext = true)
     }
@@ -111,48 +115,41 @@ class AnimeAV : MainAPI() {
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
         val description = document.selectFirst("div.entry.text-lead p")?.text()?.trim()
-        val year = document.selectFirst("div.text-sm span:contains(0)")?.text()?.trim()?.toIntOrNull()
+        val year =
+            document.selectFirst("div.text-sm span:contains(0)")?.text()?.trim()?.toIntOrNull()
         val tags = document.select("div.flex-wrap.gap-2 a[href*=genre]").map { it.text() }
-        val rating = document.selectFirst("div.flex-wrap div.text-lead")?.text()?.trim()?.toIntOrNull()
-        val duration = document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
-        val recommendations = document.select("article.bg-mute").mapNotNull { it.toRecommendationResult() }
+        val rating =
+            document.selectFirst("div.flex-wrap div.text-lead")?.text()?.trim()?.toIntOrNull()
+        val duration =
+            document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
+        val recommendations =
+            document.select("article.bg-mute").mapNotNull { it.toRecommendationResult() }
         val actors = document.select("span.valor a").map { Actor(it.text()) }
         val trailer = Regex("""embed\/(.*)\?rel""").find(document.html())?.groupValues?.get(1)
             ?.let { "https://www.youtube.com/embed/$it" }
 
-        val sveltekitScript = document.selectFirst("script:containsData(sveltekit)")?.data() ?: ""
+        val sveltekitScript =
+            document.selectFirst("script:containsData(sveltekit)")?.data() ?: return null
 
-        val totalEp = Regex(pattern = "episodesCount:([0-9]+)", options = setOf(RegexOption.IGNORE_CASE)).find(sveltekitScript)?.groupValues[1]?.toIntOrNull()
-            ?: 1
-        val mediaId = Regex(pattern = "\\{media:\\{id:([0-9]+)", options = setOf(RegexOption.IGNORE_CASE)).find(sveltekitScript)?.groupValues[1]
+        val slug = requestUrl.substringAfterLast("/")
+        val mediaId =
+            Regex("""media:\{id:(\d+)""").find(sveltekitScript)?.groupValues?.get(1) ?: return null
 
-        val episodeElements = document.select("article.group\\/item")
-        val episodes = if (episodeElements.isNotEmpty()) {
-            episodeElements.mapNotNull { element ->
-                val href = fixUrl(element.selectFirst("a")?.attr("href") ?: return@mapNotNull null)
-                val epNumStr = element.selectFirst("span.text-lead")?.text()?.trim() ?: return@mapNotNull null
-                val epNum = epNumStr.toIntOrNull() ?: 0
-                val posterUrl = element.selectFirst("img")?.attr("src")
-
-                newEpisode(href) {
+        val episodesIndex = sveltekitScript.indexOf("episodes:[")
+        val episodes = if (episodesIndex != -1) {
+            Regex("""\{id:\d+,number:(\d+)\}""").findAll(sveltekitScript.substring(episodesIndex))
+                .mapNotNull {
+                    it.groupValues[1].toIntOrNull()
+                }.map { epNum ->
+                newEpisode(fixUrl("/media/$slug/$epNum")) {
                     this.name = "Episode $epNum"
-                    this.posterUrl = posterUrl
                     this.episode = epNum
                     this.season = 1
+                    this.posterUrl = "https://cdn.animeav1.com/screenshots/$mediaId/$epNum.jpg"
                 }
-            }
+            }.toList()
         } else {
-            (0..totalEp).map { episodeNum ->
-                val href = "$requestUrl/$episodeNum"
-                val posterUrl = "https://cdn.animeav1.com/screenshots/$mediaId/$episodeNum.jpg"
-
-                newEpisode(href) {
-                    this.name = "Episode $episodeNum"
-                    this.posterUrl = posterUrl
-                    this.episode = episodeNum
-                    this.season = 1
-                }
-            }
+            emptyList()
         }
 
         return newAnimeLoadResponse(title, requestUrl, TvType.Anime, true) {
@@ -184,35 +181,54 @@ class AnimeAV : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val script = document.selectFirst("script:containsData(__sveltekit)")?.data() ?: return false
 
-        val embedsData = script.substringAfter("embeds:{", "").substringBefore("},downloads", "")
+        val script = document.select("script").mapNotNull { it.data() }
+            .firstOrNull { it.contains("embeds:") }
+            ?: return false
 
-        if (embedsData.isEmpty()) return false
+        val embedsData = script.substringAfter("embeds:{").substringBefore("},downloads")
+        if (embedsData.isBlank()) return false
 
-        listOf("DUB", "SUB").forEach { type ->
-            val listPattern = Regex("""$type:\[(.*?)\]""")
-            val listMatch = listPattern.find(embedsData)?.groupValues?.get(1)
+        val itemPattern = Regex("""server:"([^"]+)",url:"([^"]+)"""")
+        val matches = itemPattern.findAll(embedsData).toList()
 
-            if (listMatch != null) {
-                val itemPattern = Regex("""\{server:"([^"]+)",\s*url:"([^"]+)"""")
+        var hasLinks = false
 
-                itemPattern.findAll(listMatch).forEach { match ->
-                    val server = match.groupValues[1]
-                    var url = match.groupValues[2]
+        matches.forEach { match ->
+            val server = match.groupValues[1]
+            var url = match.groupValues[2]
+            if (url.startsWith("//")) url = "https:$url"
+            if (url.isBlank()) return@forEach
 
-                    if (url.startsWith("//")) {
-                        url = "https:$url"
+            if (server.equals("HLS", ignoreCase = true)) {
+                val m3u8Url = url.replace("/play/", "/m3u8/")
+                callback(
+                    newExtractorLink(
+                        source = this.name,
+                        name = "AnimeAV1 - HLS",
+                        url = m3u8Url,
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.quality = Qualities.Unknown.value
+                        this.headers = mutableMapOf(
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0"
+                        )
                     }
-
-                    if (url.isNotBlank()) {
-                        loadCustomExtractor("${this.name} - $server - $type", url, "$mainUrl/", subtitleCallback, callback)
-                    }
-                }
+                )
+                hasLinks = true
+            } else {
+                loadCustomExtractor(
+                    name = "$server - ${this.name}",
+                    url = url,
+                    referer = "$mainUrl/",
+                    subtitleCallback = subtitleCallback,
+                    callback = callback
+                )
+                hasLinks = true
             }
         }
 
-        return true
+        return hasLinks
     }
 
     suspend fun loadCustomExtractor(
