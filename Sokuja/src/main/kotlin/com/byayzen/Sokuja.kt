@@ -10,7 +10,7 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import org.json.JSONArray
 
 class Sokuja : MainAPI() {
-    override var mainUrl = "https://x5.sokuja.uk"
+    override var mainUrl = "https://x6.sokuja.uk"
     override var name = "Sokuja"
     override val hasMainPage = true
     override var lang = "id"
