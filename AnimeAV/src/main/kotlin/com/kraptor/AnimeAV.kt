@@ -189,36 +189,22 @@ class AnimeAV : MainAPI() {
         val embedsData = script.substringAfter("embeds:{").substringBefore("},downloads")
         if (embedsData.isBlank()) return false
 
-        val itemPattern = Regex("""server:"([^"]+)",url:"([^"]+)"""")
-        val matches = itemPattern.findAll(embedsData).toList()
-
         var hasLinks = false
 
-        matches.forEach { match ->
-            val server = match.groupValues[1]
-            var url = match.groupValues[2]
-            if (url.startsWith("//")) url = "https:$url"
-            if (url.isBlank()) return@forEach
+        for (type in listOf("SUB", "DUB")) {
+            val typeData = embedsData.substringAfter("$type:[", "").substringBefore("]")
+            if (typeData.isBlank()) continue
 
-            if (server.equals("HLS", ignoreCase = true)) {
-                val m3u8Url = url.replace("/play/", "/m3u8/")
-                callback(
-                    newExtractorLink(
-                        source = this.name,
-                        name = "AnimeAV1 - HLS",
-                        url = m3u8Url,
-                        type = ExtractorLinkType.M3U8
-                    ) {
-                        this.quality = Qualities.Unknown.value
-                        this.headers = mutableMapOf(
-                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0"
-                        )
-                    }
-                )
-                hasLinks = true
-            } else {
+            val itemPattern = Regex("""server:"([^"]+)",url:"([^"]+)"""")
+            itemPattern.findAll(typeData).forEach { match ->
+                val server = match.groupValues[1]
+                var url = match.groupValues[2]
+                if (url.startsWith("//")) url = "https:$url"
+                Log.d("AnimeAV", "Linkler : server=$server, type=$type, url=$url")
+                if (url.isBlank()) return@forEach
+                val name = "$server - $type"
                 loadCustomExtractor(
-                    name = "$server - ${this.name}",
+                    name = name,
                     url = url,
                     referer = "$mainUrl/",
                     subtitleCallback = subtitleCallback,

@@ -11,7 +11,7 @@ class AnimeAVPlugin: Plugin() {
         registerMainAPI(AnimeAV())
         registerExtractorAPI(Mp4Upload())
         registerExtractorAPI(PixelDrain())
-        registerExtractorAPI(PlayerZilla())
+        registerExtractorAPI(AnimeAVHLS())
         registerExtractorAPI(AnimeavUPNS())
     }
 }
