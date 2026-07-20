@@ -4,230 +4,191 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.utils.AppUtils
+import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import kotlinx.coroutines.*
-import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
+import org.jsoup.nodes.Element
 
 class GnulaHD : MainAPI() {
-    override var mainUrl = "https://ww3.gnulahd.nu"
-    override var name = "GnulaHD"
+    override var mainUrl        = "https://ww3.gnulahd.nu"
+    override var name           = "GnulaHD"
+    override var lang           = "mx"
+    override val hasMainPage    = true
+    override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
-    override var lang = "mx"
-    override val hasMainPage = true
+
+    private val tag = "gnula_${name}"
+
 
     override val mainPage = mainPageOf(
         "$mainUrl/ver/?type=Pelicula&order=latest" to "Últimas Películas",
         "$mainUrl/ver/?type=Serie&order=latest" to "Últimas Series",
-        "$mainUrl/ver/?type=Anime&order=latest" to "Últimos Animes",
+        "$mainUrl/ver/anime/" to "Últimos Animes",
         "$mainUrl/ver/?type=Pelicula&order=popular" to "Películas Populares",
-        "$mainUrl/ver/?type=Serie&order=popular" to "Series Populares",
+        "$mainUrl/ver/?type=Serie&order=popular" to "Series Populares"
     )
+
+    private fun requestHeaders(referer: String) = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept"     to "*/*",
+        "Referer"    to referer
+    )
+
+    private fun newSearchResponseByType(title: String, href: String, posterRaw: String?, type: TvType): SearchResponse {
+        val poster = fixUrlNull(posterRaw)
+        return when (type) {
+            TvType.TvSeries -> newTvSeriesSearchResponse(title, href, type) { this.posterUrl = poster }
+            TvType.Anime    -> newAnimeSearchResponse(title, href, type) { this.posterUrl = poster }
+            else            -> newMovieSearchResponse(title, href, type) { this.posterUrl = poster }
+        }
+    }
+
+    private fun Element.toCardSearchResponse(type: TvType): SearchResponse? {
+        val title  = this.attr("title").ifEmpty { return null }
+        val href   = this.attr("href").ifEmpty { return null }
+        val poster = this.selectFirst("img")?.attr("src")?.substringBefore("?")
+
+        return newSearchResponseByType(title, fixUrl(href), poster, type)
+    }
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val url = if (page <= 1) {
             request.data
+        } else if (request.data.contains("?")) {
+            "${request.data}&page=$page"
         } else {
-            if (request.data.contains("?")) {
-                "${request.data}&page=$page"
-            } else {
-                "${request.data.removeSuffix("/")}/page/$page/"
-            }
+            "${request.data.removeSuffix("/")}?page=$page"
         }
 
-        val response = app.get(
-            url,
-            headers = mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            ),
-            timeout = 45
-        )
+        val home = app.get(url).document.select("div.gnrd-grid a.gnrd-card")
+            .mapNotNull { it.toCardSearchResponse(TvType.Movie) }
 
-        val document = response.document
-        val elements = document.select("div.postbody div.listupd article.bs")
-
-        val home = elements.mapNotNull {
-            it.toSearchResult()
-        }
-
-        val hasNext = document.select("div.hpage a.r").isNotEmpty() ||
-                document.select("div.pagination a.next").isNotEmpty()
-
-        return newHomePageResponse(request.name, home, hasNext)
+        return newHomePageResponse(request.name, home, hasNext = true)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val url = "$mainUrl/?s=$query"
+        val url     = "$mainUrl/wp-json/gnrd/v1/search?q=$query"
+        val results = JSONObject(app.get(url, headers = requestHeaders("$mainUrl/ver/anime/")).text).getJSONArray("results")
 
-        val response = app.get(
-            url,
-            referer = mainUrl,
-            headers = mapOf(
-                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-        )
-
-        val document = response.document
-        val elements = document.select("div.listupd article.bs")
-
-        return elements.mapNotNull {
-            it.toSearchResult()
-        }
-    }
-
-    private fun Element.toSearchResult(): SearchResponse? {
-        val titleElement = this.selectFirst("div.bsx > a")
-        var title = titleElement?.attr("title")?.trim() ?: ""
-
-        if (title.isEmpty()) {
-            title = this.selectFirst("div.tt h2")?.text()?.trim() ?: "Unknown Title"
-        }
-
-        if (this.hasClass("styleegg")) return null
-
-        val typeText = this.selectFirst("div.typez")?.text() ?: ""
-        val type = when {
-            typeText.contains("Serie", true) -> TvType.TvSeries
-            typeText.contains("Anime", true) -> TvType.Anime
-            else -> TvType.Movie
-        }
-
-        val aTag = this.selectFirst("div.bsx > a") ?: return null
-        val href = fixUrl(aTag.attr("href"))
-
-        if (href.contains("/blog/")) return null
-
-        if (title.contains("Mejores", ignoreCase = true) || title.contains(
-                "Cronología",
-                ignoreCase = true
-            )
-        ) {
-            return null
-        }
-
-        val imgElement = this.selectFirst("img.ts-post-image")
-            ?: this.selectFirst("img.wp-post-image")
-            ?: this.selectFirst("div.limit img")
-
-        val rawPoster = imgElement?.attr("src")?.ifEmpty { null }
-            ?: imgElement?.attr("data-src")?.ifEmpty { null }
-            ?: imgElement?.attr("data-lazy-src")?.ifEmpty { null }
-
-        val posterUrl = rawPoster?.substringBefore("?")
-
-        return when (type) {
-            TvType.TvSeries -> newTvSeriesSearchResponse(title, href, TvType.TvSeries) {
-                this.posterUrl = fixUrlNull(posterUrl)
+        return (0 until results.length()).mapNotNull { i ->
+            val item    = results.getJSONObject(i)
+            val title   = item.getString("title").ifEmpty { return@mapNotNull null }
+            val href    = item.getString("url").ifEmpty { return@mapNotNull null }
+            val poster  = item.optString("img").ifEmpty { null }?.substringBefore("?")
+            val typeRaw = item.optString("type", "Pelicula")
+            val type = when {
+                typeRaw.contains("Serie", true) -> TvType.TvSeries
+                typeRaw.contains("Anime", true) -> TvType.Anime
+                else -> TvType.Movie
             }
 
-            TvType.Anime -> newAnimeSearchResponse(title, href, TvType.Anime) {
-                this.posterUrl = fixUrlNull(posterUrl)
-            }
-
-            else -> newMovieSearchResponse(title, href, TvType.Movie) {
-                this.posterUrl = fixUrlNull(posterUrl)
-            }
+            newSearchResponseByType(title, fixUrl(href), poster, type)
         }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        val response = app.get(url, timeout = 60)
-        val document = response.document
+        Log.d(tag, "Load: $url")
+        val document = app.get(url, timeout = 60).document
 
-        val title = document.selectFirst("h1.gnpv-title")?.text()?.trim() ?: return null
+        val titleElement = document.selectFirst("h1.gnrd-fi-title")
+        val title = titleElement?.selectFirst("span.gnrd-sr")?.text()?.trim()?.ifEmpty { titleElement.text()?.trim() }
+            ?: return null
+        val logoUrl = titleElement.selectFirst("img.gnrd-fi-logo")?.attr("src")
 
-        val poster = document.selectFirst("div.gnpv-poster img")?.attr("src")
-            ?: document.selectFirst("meta[property=og:image]")?.attr("content")
+        val posterUrl   = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content")?.substringBefore("?"))
+        val description = document.selectFirst("p.gnrd-fi-syn")?.text()?.trim()
 
-        val posterurl = fixUrlNull(poster?.substringBefore("?"))
+        val eyebrow = document.selectFirst("span.gnrd-eyebrow")?.text()
+        val year = (eyebrow ?: document.selectFirst("div.qf:has(span.qf-l:contains(Año)) span.qf-v")?.text())
+            ?.let { Regex("\\d{4}").find(it)?.value }?.toIntOrNull()
 
-        val description = document.selectFirst("div.gnpv-syn-text")?.text()?.trim()
-            ?: document.selectFirst("meta[property=og:description]")?.attr("content")
+        val duration = document.selectFirst("div.qf:has(span.qf-l:contains(Duración)) span.qf-v")?.text()
+            ?.replace(Regex("\\D"), "")?.toIntOrNull()
 
-        val badge = document.selectFirst("div.gnpv-badge")?.text() ?: ""
-        val year = Regex("\\d{4}").find(badge)?.value?.toIntOrNull()
+        val tags = document.select("div.gnrd-fi-genres a, div.gnrd-info-row:has(span.gnrd-info-k:contains(Géneros)) a").map { it.text() }
 
-        val durationtext =
-            document.selectFirst("span.gnpv-pill:contains(hr), span.gnpv-pill:contains(min)")
-                ?.text()
-        val duration = durationtext?.replace(Regex("\\D"), "")?.toIntOrNull()
+        val isAnime  = eyebrow?.contains("Anime", true) == true
+        val isSeries = isAnime || document.selectFirst("div.eplister, div.gnrd-eplist") != null
+        val tvtype   = if (isAnime) TvType.Anime else if (isSeries) TvType.TvSeries else TvType.Movie
 
-        val actors = document.select("div.gnpv-mb-item:contains(Reparto) a").map { it.text() }
-        val tags = document.select("div.gnpv-genres a").map { it.text() }
+        val score      = document.selectFirst("span.gnrd-m-rating meta[itemprop=ratingValue]")?.attr("content")?.toDoubleOrNull()
+        val actors     = document.select("a.gnrd-castc .gnrd-castc-name").map { it.text() }
+        val trailerUrl = document.selectFirst("div.gnrd-trailer")?.attr("data-yt")?.ifEmpty { null }
+            ?.let { "https://www.youtube.com/watch?v=$it" }
 
-        val isanime = tags.any { it.contains("Anime", true) }
-        val isseries =
-            badge.contains("Serie", true) || isanime || document.selectFirst("div.eplister") != null
+        val recommendations = document.select("a.gnrd-card").mapNotNull { it.toCardSearchResponse(tvtype) }
 
-        val tvtype = if (isanime) TvType.Anime else if (isseries) TvType.TvSeries else TvType.Movie
+        if (isSeries) {
+            val episodeElements = document.select("div.eplister ul li, a.gnrd-epc")
+            val episodes = episodeElements.mapNotNull { li ->
+                val a = if (li.tagName() == "a") li else li.selectFirst("a") ?: return@mapNotNull null
 
-        val scoretext = document.selectFirst("span.gnpv-rating")?.text()?.replace("★", "")?.trim()
-        val scoreval = scoretext?.toDoubleOrNull()
+                val epId    = a.attr("data-id")
+                val href    = if (epId.isNotEmpty()) epId else fixUrl(a.attr("href"))
+                val epNum   = a.selectFirst("div.epl-num, span.gnrd-epc-n")?.text()?.trim() ?: ""
+                val epName  = a.selectFirst("div.epl-title, span.gnrd-epc-title")?.text()?.trim()
+                val epThumb = a.selectFirst("div.gnrd-epc-thumb")?.attr("style")?.let { style ->
+                    Regex("url\\(['\"]?(.*?)['\"]?\\)").find(style)?.groupValues?.get(1)
+                }
 
-        val recommendations = document.select("a.gnpv-related-card").mapNotNull {
-            val rectitle =
-                it.selectFirst("span.gnpv-related-title")?.text() ?: return@mapNotNull null
-            val rechref = fixUrl(it.attr("href"))
-            val recposter = it.selectFirst("img")?.attr("src")
+                val match      = Regex("(\\d+)x(\\d+)").find(epNum)
+                val season     = match?.groupValues?.get(1)?.toIntOrNull() ?: 1
+                val episodeNum = match?.groupValues?.get(2)?.toIntOrNull()
+                val finalName  = if (match != null) epName else (epName ?: epNum)
 
-            newMovieSearchResponse(rectitle, rechref, TvType.Movie) {
-                this.posterUrl = recposter
-            }
-        }
-
-        if (isseries) {
-            val episodes = document.select("div.eplister ul li").mapNotNull { li ->
-                val a = li.selectFirst("a") ?: return@mapNotNull null
-                val href = fixUrl(a.attr("href"))
-                val epnumtext = a.selectFirst("div.epl-num")?.text()?.trim() ?: ""
-                val eptitle = a.selectFirst("div.epl-title")?.text()?.trim()
-
-                val regex = Regex("(\\d+)x(\\d+)")
-                val match = regex.find(epnumtext)
-
-                if (match != null) {
-                    val s = match.groupValues[1].toIntOrNull()
-                    val e = match.groupValues[2].toIntOrNull()
-
-                    newEpisode(href) {
-                        this.name = eptitle
-                        this.season = s
-                        this.episode = e
-                        this.posterUrl = posterurl
-                    }
-                } else {
-                    newEpisode(href) {
-                        this.name = eptitle ?: epnumtext
-                        this.season = 1
-                        this.posterUrl = posterurl
-                    }
+                newEpisode(href) {
+                    this.name      = finalName
+                    this.season    = season
+                    this.episode   = episodeNum
+                    this.posterUrl = epThumb ?: posterUrl
                 }
             }.reversed()
 
-            return newTvSeriesLoadResponse(title, url, tvtype, episodes) {
-                this.posterUrl = posterurl
-                this.plot = description
-                this.year = year
-                this.duration = duration
-                this.score = Score.from(scoreval, 10)
-                this.tags = tags
-                this.recommendations = recommendations
-                this.addActors(actors)
+            return if (tvtype == TvType.Anime) {
+                newAnimeLoadResponse(title, url, tvtype) {
+                    this.posterUrl       = posterUrl
+                    this.plot            = description
+                    this.year            = year
+                    this.duration        = duration
+                    this.score           = Score.from(score, 10)
+                    this.tags            = tags
+                    this.recommendations = recommendations
+                    this.logoUrl         = logoUrl
+                    addActors(actors)
+                    addEpisodes(DubStatus.Subbed, episodes)
+                    addTrailer(trailerUrl)
+                }
+            } else {
+                newTvSeriesLoadResponse(title, url, tvtype, episodes) {
+                    this.posterUrl       = posterUrl
+                    this.plot            = description
+                    this.year            = year
+                    this.duration        = duration
+                    this.score           = Score.from(score, 10)
+                    this.tags            = tags
+                    this.recommendations = recommendations
+                    this.logoUrl         = logoUrl
+                    addActors(actors)
+                    addTrailer(trailerUrl)
+                }
             }
-        } else {
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
-                this.posterUrl = posterurl
-                this.plot = description
-                this.year = year
-                this.duration = duration
-                this.score = Score.from(scoreval, 10)
-                this.tags = tags
-                this.recommendations = recommendations
-                this.addActors(actors)
-            }
+        }
+
+        val movieId = document.selectFirst("div.gnrd-player, #player")?.attr("data-id")
+        return newMovieLoadResponse(title, url, tvtype, movieId ?: url) {
+            this.posterUrl       = posterUrl
+            this.plot            = description
+            this.year            = year
+            this.duration        = duration
+            this.score           = Score.from(score, 10)
+            this.tags            = tags
+            this.recommendations = recommendations
+            this.logoUrl         = logoUrl
+            addActors(actors)
+            addTrailer(trailerUrl)
         }
     }
 
@@ -237,36 +198,47 @@ class GnulaHD : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("Ayzen", data)
-        val res = app.get(data).text
-        val regex = Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""")
-        val match = regex.find(res)
+        Log.d(tag, data)
+        val headers = requestHeaders("$mainUrl/")
 
-        if (match != null) {
-            val json = match.groupValues[2]
-            Log.d("Ayzen", json)
+        val id   = data.removeSuffix("/").substringAfterLast("/")
+        val isId = id.isNotEmpty() && id.all { it.isDigit() }
+
+        val jsonString = if (isId) {
+            val idUrl = "$mainUrl/wp-json/gnrd/v1/ep-player?id=$id"
             try {
-                val langs = AppUtils.parseJson<List<GnulaLang>>(json)
-
-                langs.forEach { langobj ->
-                    val label = langobj.label
-                    langobj.servers.forEach { srv ->
-                        val src = srv.src
-                        if (src.isNotBlank()) {
-                            var cleanurl = src.replace("\\/", "/")
-                            if (cleanurl.startsWith("//")) {
-                                cleanurl = "https:$cleanurl"
-                            }
-                            Log.d("Ayzen", cleanurl)
-                            loadCustomExtractor(label, cleanurl, data, subtitleCallback, callback)
-                        }
-                    }
-                }
+                JSONObject(app.get(idUrl, headers = headers).text).optJSONArray("langs")?.toString()
             } catch (e: Exception) {
-                Log.d("Ayzen", e.toString())
+                null
+            }
+        } else if (data.startsWith("http")) {
+            val res = app.get(data, headers = headers).text
+            Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""").find(res)?.groupValues?.get(2)
+        } else null
+
+        val langs = jsonString?.let {
+            try {
+                AppUtils.parseJson<List<GnulaLang>>(it)
+            } catch (e: Exception) {
+                null
             }
         }
-        return true
+
+        langs?.forEach { langObj ->
+            val label = langObj.label
+            langObj.servers.forEach { srv ->
+                val src = srv.src
+                if (src.isNotBlank() && !src.contains("aviso.mp4")) {
+                    var cleanUrl = src.replace("\\/", "/")
+                    if (cleanUrl.startsWith("//")) cleanUrl = "https:$cleanUrl"
+
+                    Log.d(tag, cleanUrl)
+                    loadCustomExtractor(label, cleanUrl, data, subtitleCallback, callback)
+                }
+            }
+        }
+
+        return langs != null
     }
 
     private suspend fun loadCustomExtractor(
@@ -275,23 +247,23 @@ class GnulaHD : MainAPI() {
         referer: String? = null,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
-        quality: Int? = null,
+        quality: Int? = null
     ) {
-        Log.d("Ayzen", url)
+        Log.d(tag, url)
         loadExtractor(url, referer, subtitleCallback) { ex ->
             if (ex.url.isNotBlank() && (ex.url.startsWith("http") || ex.url.startsWith("https"))) {
-                Log.d("Ayzen", ex.url)
+                Log.d(tag, ex.url)
                 CoroutineScope(Dispatchers.IO).launch {
                     callback.invoke(
                         newExtractorLink(
                             source = "${ex.source} - $label",
-                            name = "${ex.name} - $label",
-                            url = ex.url,
-                            type = ex.type
+                            name   = "${ex.name} - $label",
+                            url    = ex.url,
+                            type   = ex.type
                         ) {
-                            this.quality = quality ?: ex.quality
-                            this.referer = ex.referer
-                            this.headers = ex.headers
+                            this.quality       = quality ?: ex.quality
+                            this.referer       = ex.referer
+                            this.headers       = ex.headers
                             this.extractorData = ex.extractorData
                         }
                     )
