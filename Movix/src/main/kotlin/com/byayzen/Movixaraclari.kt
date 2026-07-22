@@ -14,28 +14,26 @@ import com.lagradost.cloudstream3.app
 import okhttp3.Request
 
 
-const val tmdbkey  = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
+const val tmdbkey = "f3d757824f08ea2cff45eb8f47ca3a1e" // Website's own api key.
 const val tmdblang = "fr-FR"
 const val tmdbbase = "https://api.themoviedb.org/3"
-const val tmdbimg500  = "https://image.tmdb.org/t/p/w500"
+const val tmdbimg500 = "https://image.tmdb.org/t/p/w500"
 const val tmdbimg1280 = "https://image.tmdb.org/t/p/w1280"
-const val tmdbimg185  = "https://image.tmdb.org/t/p/w185"
+const val tmdbimg185 = "https://image.tmdb.org/t/p/w185"
 
 
 object MovixHelper {
-    @Volatile var cachedUrl: String? = null
+    @Volatile
+    var cachedUrl: String? = null
 
     suspend fun updatemainurl(): String {
         cachedUrl?.let { return it }
-
         try {
-            val html = app.get("https://movix.online/", timeout = 5).text
-            val pattern = """La seule adresse active de Movix est\s+<a\s+href="https://(movix\.[a-z0-9]+)"""
-                .toRegex(RegexOption.IGNORE_CASE)
-            val match = pattern.find(html)
-
-            if (match != null) {
-                val domain = "https://" + match.groupValues[1].trim()
+            val response = app.get("https://movix.online/address.json", timeout = 5)
+                .parsedSafe<MovixAddressResponse>()
+            val domain = response?.active?.firstOrNull()?.url?.trim()
+            if (!domain.isNullOrBlank()) {
+                Log.d("MovixHelper", "Gelen domain: $domain")
                 cachedUrl = domain
                 return domain
             }
@@ -47,9 +45,12 @@ object MovixHelper {
 }
 
 
-
-
-data class DownloadSource(val src: String?, val quality: String?, val language: String?, val m3u8: String?)
+data class DownloadSource(
+    val src: String?,
+    val quality: String?,
+    val language: String?,
+    val m3u8: String?
+)
 
 data class GenericSource(
     val url: String?
@@ -62,14 +63,14 @@ data class CpasmalRes(
 data class FstreamEpisode(val languages: Map<String, List<FstreamLink>>?)
 
 data class MovixTmdbResponse(
-    val iframe_src      : String?               = null,
-    val player_links    : List<MovixPlayerLink>? = null,
-    val current_episode : MovixCurrentEpisode?  = null
+    val iframe_src: String? = null,
+    val player_links: List<MovixPlayerLink>? = null,
+    val current_episode: MovixCurrentEpisode? = null
 )
 
 data class MovixCurrentEpisode(
-    val iframe_src   : String?               = null,
-    val player_links : List<MovixPlayerLink>? = null
+    val iframe_src: String? = null,
+    val player_links: List<MovixPlayerLink>? = null
 )
 
 data class MovixPlayerLink(
@@ -77,39 +78,39 @@ data class MovixPlayerLink(
 )
 
 data class TmdbMainResponse(
-    val results       : List<TmdbResult>,
-    val page          : Int?,
-    val total_pages   : Int?,
-    val total_results : Int?
+    val results: List<TmdbResult>,
+    val page: Int?,
+    val total_pages: Int?,
+    val total_results: Int?
 )
 
 data class TmdbResult(
-    val id             : Int?,
-    val title          : String?,
-    val name           : String?,
-    val original_title : String?,
-    val original_name  : String?,
-    val poster_path    : String?,
-    val backdrop_path  : String?,
-    val media_type     : String?,
-    val vote_average   : Double?
+    val id: Int?,
+    val title: String?,
+    val name: String?,
+    val original_title: String?,
+    val original_name: String?,
+    val poster_path: String?,
+    val backdrop_path: String?,
+    val media_type: String?,
+    val vote_average: Double?
 )
 
 data class TmdbCast(
-    val name         : String?,
-    val profile_path : String?,
-    val character    : String?
+    val name: String?,
+    val profile_path: String?,
+    val character: String?
 )
 
 data class TmdbEpisode(
-    val episode_number : Int?,
-    val season_number  : Int?,
-    val name           : String?,
-    val overview       : String?,
-    val still_path     : String?,
-    val vote_average   : Double?,
-    val runtime        : Int?,
-    val air_date       : String?
+    val episode_number: Int?,
+    val season_number: Int?,
+    val name: String?,
+    val overview: String?,
+    val still_path: String?,
+    val vote_average: Double?,
+    val runtime: Int?,
+    val air_date: String?
 )
 
 data class TmdbSeasonDetail(
@@ -117,17 +118,17 @@ data class TmdbSeasonDetail(
 )
 
 data class TmdbDetailResponse(
-    val id              : Int?,
-    val title           : String?,
-    val name            : String?,
-    val original_title  : String?,
-    val original_name   : String?,
-    val overview        : String?,
-    val poster_path     : String?,
-    val backdrop_path   : String?,
-    val release_date    : String?,
-    val first_air_date  : String?,
-    val vote_average    : Double?,
+    val id: Int?,
+    val title: String?,
+    val name: String?,
+    val original_title: String?,
+    val original_name: String?,
+    val overview: String?,
+    val poster_path: String?,
+    val backdrop_path: String?,
+    val release_date: String?,
+    val first_air_date: String?,
+    val vote_average: Double?,
     val genres: List<TmdbGenre>?,
     val credits: TmdbCredits?,
     val recommendations: TmdbMainResponse?,
@@ -219,22 +220,22 @@ data class MovixAnimeStreamingLink(
 
 
 data class MovixWiflixResponse(
-    val success: Boolean?                = null,
-    val players: MovixWiflixPlayers?     = null
+    val success: Boolean? = null,
+    val players: MovixWiflixPlayers? = null
 )
 
 
 data class MovixWiflixPlayers(
-    val vf: List<MovixWiflixLink>?      = null,
-    val vostfr: List<MovixWiflixLink>?  = null
+    val vf: List<MovixWiflixLink>? = null,
+    val vostfr: List<MovixWiflixLink>? = null
 )
 
 
 data class MovixWiflixLink(
-    val name: String?    = null,
-    val url: String?     = null,
-    val episode: Int?    = null,
-    val type: String?    = null
+    val name: String? = null,
+    val url: String? = null,
+    val episode: Int? = null,
+    val type: String? = null
 )
 
 data class MovixDramaResponse(
@@ -245,6 +246,14 @@ data class MovixDramaResponse(
 data class DramaLink(
     val name: String?,
     val link: String?
+)
+
+data class MovixAddressResponse(
+    val active: List<MovixActiveDomain>? = null
+)
+
+data class MovixActiveDomain(
+    val url: String? = null
 )
 
 
@@ -263,7 +272,7 @@ suspend fun loadcustomextractor(
         val isVideoUrl = url.contains(".m3u") || url.contains(".mp4") || url.contains(".mkv")
         if (isVideoUrl) {
             val isSibnet = url.contains("sibnet.ru")
-            
+
             if (brand == "Anime" && !isSibnet) {
                 if (app.get(url, referer = referer, timeout = 5).code == 200) {
                     callback.invoke(
@@ -277,7 +286,7 @@ suspend fun loadcustomextractor(
                     return@coroutineScope
                 }
             }
-            
+
             if (url.contains(".m3u8") || url.contains(".mp4") || url.contains(".mkv")) {
                 if (app.get(url, referer = referer, timeout = 5).code == 200) {
                     callback.invoke(
@@ -314,8 +323,6 @@ suspend fun loadcustomextractor(
         Log.d("Movix", e.message.toString())
     }
 }
-
-
 
 
 fun Videovarmiyokmu(url: String, client: OkHttpClient): Boolean {
