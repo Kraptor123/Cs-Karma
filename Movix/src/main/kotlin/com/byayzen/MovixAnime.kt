@@ -14,10 +14,11 @@ object MovixAnimeExtractor {
         type: String,
         episode: String?,
         season: String? = null
-    ): List<String> {
+    ): List<Pair<String, String>> {
         val animeApiHeaders = mapOf("Origin" to mainUrl)
         val encoded = Uri.encode(title)
-        val url = apibase.substringBeforeLast("/") + "/anime/search/$encoded?includeSeasons=true&includeEpisodes=true"
+        val url =
+            apibase.substringBeforeLast("/") + "/anime/search/$encoded?includeSeasons=true&includeEpisodes=true"
         Log.d("MovixAnime", url)
 
         return try {
@@ -34,28 +35,33 @@ object MovixAnimeExtractor {
         type: String,
         episode: String?,
         season: String?
-    ): List<String> {
-        val extracted = mutableListOf<String>()
+    ): List<Pair<String, String>> {
+        val extracted = mutableListOf<Pair<String, String>>()
         Log.d("MovixAnime", "Ep: $episode, Season: $season")
 
         tryParseJson<List<MovixAnimeResponse>>(response)?.forEach { anime ->
             anime.seasons?.forEach { s ->
                 val seasonName = s.name.orEmpty()
-                val isSeasonMatch = season == null || seasonName == season || seasonName.filter { it.isDigit() } == season
+                val isSeasonMatch =
+                    season == null || seasonName == season || seasonName.filter { it.isDigit() } == season
                 if (!isSeasonMatch) return@forEach
 
                 s.episodes?.forEach { ep ->
                     val epIndex = ep.index?.toString()
-                    val isEpisodeMatch = episode == null || epIndex == episode || episode.toIntOrNull() == epIndex?.toIntOrNull()
+                    val isEpisodeMatch =
+                        episode == null || epIndex == episode || episode.toIntOrNull() == epIndex?.toIntOrNull()
                     if (isEpisodeMatch) {
                         Log.d("MovixAnime", "Alınan bölüm?: $epIndex")
                         ep.streaming_links?.forEach { sl ->
-                            sl.players?.let(extracted::addAll)
+                            val lang = sl.language ?: ""
+                            sl.players?.forEach { player ->
+                                extracted.add(player to lang)
+                            }
                         }
                     }
                 }
             }
         }
-        return extracted.distinct().filter { it.isNotBlank() }
+        return extracted.distinct()
     }
 }

@@ -58,11 +58,11 @@ class Vidaraa : ExtractorApi() {
                 "User-Agent" to USER_AGENT
             )
         )
-        
+
         val resText = response.text
         Log.d("Vidaraa", "Res: $resText")
         val streamurl = JSONObject(resText).optString("streaming_url")
-        
+
         if (streamurl.isNotBlank()) {
             val check = app.get(streamurl, referer = "$mainUrl/", timeout = 5)
             Log.d("Vidaraa", "Code: ${check.code}")
@@ -82,9 +82,17 @@ class Vidaraa : ExtractorApi() {
     }
 }
 
-class Ralphy : Voe() { override var mainUrl = "https://ralphysuccessfull.org" }
-class Bryantenunder : Voe() { override var mainUrl = "https://bryantenunder.com" }
-class Pamelachangemission : Voe() { override var mainUrl = "https://pamelachangemission.com" }
+class Ralphy : Voe() {
+    override var mainUrl = "https://ralphysuccessfull.org"
+}
+
+class Bryantenunder : Voe() {
+    override var mainUrl = "https://bryantenunder.com"
+}
+
+class Pamelachangemission : Voe() {
+    override var mainUrl = "https://pamelachangemission.com"
+}
 
 open class Uqload : ExtractorApi() {
     override var name = "Uqload"
@@ -122,7 +130,10 @@ open class Uqload : ExtractorApi() {
             val videoUrl = m3u8Urls.firstOrNull() ?: mp4Urls.firstOrNull() ?: return
 
             val streamHeaders = buildMap {
-                put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0")
+                put(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0"
+                )
                 put("Accept", "*/*")
                 put("Accept-Language", "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7")
                 put("Origin", mainUrl)
@@ -149,7 +160,7 @@ open class Uqload : ExtractorApi() {
         } catch (e: Exception) {
         }
     }
-    }
+}
 
 class UqloadIo : Uqload() {
     override var mainUrl = "https://uqload.io"
@@ -181,12 +192,14 @@ open class DoodStream : ExtractorApi() {
             headers = mapOf("User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0")
         ).text
 
-        val md5Regex = Regex("/pass_md5/([^/]*)/([^/']*)")
-        val md5Match = md5Regex.find(response)
-        val md5Path = md5Match?.value.toString()
-        val expiry = md5Match?.groupValues?.getOrNull(1) ?: ""
-        val token = md5Match?.groupValues?.getOrNull(2) ?: ""
-        val md5Url = mainUrl + md5Path
+        val md5Match = Regex("/pass_md5/([^/]*)/([^/']*)").find(response)
+        val (md5Url, expiry, token) = md5Match?.let {
+            Triple(
+                mainUrl + it.value,
+                it.groupValues.getOrNull(1) ?: "",
+                it.groupValues.getOrNull(2) ?: ""
+            )
+        } ?: Triple("", "", "")
 
         val md5Response = app.get(
             md5Url,
@@ -302,24 +315,73 @@ open class VidHidePro : ExtractorApi() {
     }
 }
 
-class RyderJet : VidHidePro() { override var mainUrl = "https://ryderjet.com" }
-class VtbeTo : VidHidePro() { override var mainUrl = "https://vtbe.to" }
-class SaveFiles : VidHidePro() { override var mainUrl = "https://savefiles.com" }
-class DhcPlay : VidHidePro() { override var mainUrl = "https://dhcplay.com" }
-class FileLionsLive : VidHidePro() { override var mainUrl = "https://filelions.live" }
-class FileLionsOnline : VidHidePro() { override var mainUrl = "https://filelions.online" }
-class FileLionsTo : VidHidePro() { override var mainUrl = "https://filelions.to" }
-class KinogerBe : VidHidePro() { override val mainUrl = "https://kinoger.be" }
-class VidHideHub : VidHidePro() { override val mainUrl = "https://vidhidehub.com" }
-class VidHideVip : VidHidePro() { override val mainUrl = "https://vidhidevip.com" }
-class VidHidePre : VidHidePro() { override val mainUrl = "https://vidhidepre.com" }
-class SmoothPre : VidHidePro() { override var mainUrl = "https://smoothpre.com" }
-class DhtPre : VidHidePro() { override var mainUrl = "https://dhtpre.com" }
-class PeytonePre : VidHidePro() { override var mainUrl = "https://peytonepre.com" }
-class MovearnPre : VidHidePro() { override var mainUrl = "https://movearnpre.com" }
-class Dintezuvio : VidHidePro() { override var mainUrl = "https://dintezuvio.com" }
+class RyderJet : VidHidePro() {
+    override var mainUrl = "https://ryderjet.com"
+}
 
-class Morencius : VidHidePro() { override var mainUrl = "https://morencius.com" }
+class VtbeTo : VidHidePro() {
+    override var mainUrl = "https://vtbe.to"
+}
+
+class SaveFiles : VidHidePro() {
+    override var mainUrl = "https://savefiles.com"
+}
+
+class DhcPlay : VidHidePro() {
+    override var mainUrl = "https://dhcplay.com"
+}
+
+class FileLionsLive : VidHidePro() {
+    override var mainUrl = "https://filelions.live"
+}
+
+class FileLionsOnline : VidHidePro() {
+    override var mainUrl = "https://filelions.online"
+}
+
+class FileLionsTo : VidHidePro() {
+    override var mainUrl = "https://filelions.to"
+}
+
+class KinogerBe : VidHidePro() {
+    override val mainUrl = "https://kinoger.be"
+}
+
+class VidHideHub : VidHidePro() {
+    override val mainUrl = "https://vidhidehub.com"
+}
+
+class VidHideVip : VidHidePro() {
+    override val mainUrl = "https://vidhidevip.com"
+}
+
+class VidHidePre : VidHidePro() {
+    override val mainUrl = "https://vidhidepre.com"
+}
+
+class SmoothPre : VidHidePro() {
+    override var mainUrl = "https://smoothpre.com"
+}
+
+class DhtPre : VidHidePro() {
+    override var mainUrl = "https://dhtpre.com"
+}
+
+class PeytonePre : VidHidePro() {
+    override var mainUrl = "https://peytonepre.com"
+}
+
+class MovearnPre : VidHidePro() {
+    override var mainUrl = "https://movearnpre.com"
+}
+
+class Dintezuvio : VidHidePro() {
+    override var mainUrl = "https://dintezuvio.com"
+}
+
+class Morencius : VidHidePro() {
+    override var mainUrl = "https://morencius.com"
+}
 
 open class Vidzy : ExtractorApi() {
     override val name = "Vidzy"
@@ -454,7 +516,9 @@ open class VeevToExtractor : ExtractorApi() {
         try {
             val initialResponse = app.get(url, referer = "$mainUrl/")
             val pageHtml = initialResponse.text
-            val mediaId = initialResponse.url.split("/").lastOrNull { it.isNotEmpty() } ?: url.split("/").lastOrNull { it.isNotEmpty() } ?: ""
+            val mediaId =
+                initialResponse.url.split("/").lastOrNull { it.isNotEmpty() } ?: url.split("/")
+                    .lastOrNull { it.isNotEmpty() } ?: ""
 
             val regex = Regex("""[\.\s'](?:fc|_vvto\[[^\]]*)(?:['\]]*)?\s*[:=]\s*['"]([^'"]+)""")
             val encodedStrings = regex.findAll(pageHtml).map { it.groupValues[1] }.toList()
@@ -472,7 +536,12 @@ open class VeevToExtractor : ExtractorApi() {
             val tArrays = buildArray(ch)
             if (tArrays.isEmpty()) return
 
-            val apiUrl = "$mainUrl/dl?op=player_api&cmd=gi&file_code=${URLEncoder.encode(mediaId, "UTF-8")}&ch=${URLEncoder.encode(ch, "UTF-8")}&ie=1"
+            val apiUrl = "$mainUrl/dl?op=player_api&cmd=gi&file_code=${
+                URLEncoder.encode(
+                    mediaId,
+                    "UTF-8"
+                )
+            }&ch=${URLEncoder.encode(ch, "UTF-8")}&ie=1"
             val jsonResponse = JSONObject(app.get(apiUrl, referer = url).text)
 
             if (jsonResponse.optString("status") != "success") return
@@ -559,10 +628,6 @@ class GoodStream : ExtractorApi() {
 }
 
 
-
-
-
-
 class SendvidExtractor : ExtractorApi() {
     override val name = "Sendvid"
     override val mainUrl = "https://sendvid.com"
@@ -576,9 +641,12 @@ class SendvidExtractor : ExtractorApi() {
     ) {
         val response = app.get(url, referer = referer).text
 
-        val videoUrl = Regex("""property="og:video"\s+content="(.*?)"""").find(response)?.groupValues?.get(1)
-            ?: Regex("""<source\s+src="(.*?)"\s+type="video/mp4"""").find(response)?.groupValues?.get(1)
-            ?: Regex("""var\s+video_source\s+=\s+"(.*?)"""").find(response)?.groupValues?.get(1)
+        val videoUrl =
+            Regex("""property="og:video"\s+content="(.*?)"""").find(response)?.groupValues?.get(1)
+                ?: Regex("""<source\s+src="(.*?)"\s+type="video/mp4"""").find(response)?.groupValues?.get(
+                    1
+                )
+                ?: Regex("""var\s+video_source\s+=\s+"(.*?)"""").find(response)?.groupValues?.get(1)
 
         videoUrl?.let { link ->
             callback.invoke(
@@ -597,27 +665,57 @@ class SendvidExtractor : ExtractorApi() {
 }
 
 
+class Coflix : VidStack() {
+    override var mainUrl = "https://coflix.upn.one"
+}
 
+class Serix : VidStack() {
+    override var mainUrl = "https://serix.upns.live"
+}
 
-class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
+class Flemmix : VidStack() {
+    override var mainUrl = "https://flemmix.upns.pro"
+}
 
-class Serix : VidStack() { override var mainUrl = "https://serix.upns.live" }
+class Embedseek : VidStack() {
+    override var mainUrl = "https://movix1.embedseek.com"
+}
 
-class Flemmix : VidStack() { override var mainUrl = "https://flemmix.upns.pro" }
+class Dismoiceline : VidStack() {
+    override var mainUrl = "https://dismoiceline.uns.bio"
+}
 
-class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
+class Neocine : VidStack() {
+    override var mainUrl = "https://neocine.embedseek.com"
+}
 
-class Dismoiceline : VidStack() { override var mainUrl = "https://dismoiceline.uns.bio" }
+class flemmix : VidStack() {
+    override var mainUrl = "https://flemmix.upns.pro"
+}
 
-class Doremifasol : VidStack() { override var mainUrl = "https://doremifasol.ezplayer.me" }
-class MarcusP2P : VidStack() { override var mainUrl = "https://marcus.p2pstream.vip" }
+class Doremifasol : VidStack() {
+    override var mainUrl = "https://doremifasol.ezplayer.me"
+}
 
-class BllEmbedseek : VidStack() { override var mainUrl = "https://bll.embedseek.com" }
+class MarcusP2P : VidStack() {
+    override var mainUrl = "https://marcus.p2pstream.vip"
+}
 
-class Lukefirst : FilemoonV2() { override var mainUrl = "https://lukefirst.lol" }
+class BllEmbedseek : VidStack() {
+    override var mainUrl = "https://bll.embedseek.com"
+}
 
-class LuluVdo : LuluStream() { override var mainUrl = "https://luluvdo.com" }
-class Bysebuho : FilemoonV2() { override var mainUrl = "https://bysebuho.com" }
+class Lukefirst : FilemoonV2() {
+    override var mainUrl = "https://lukefirst.lol"
+}
+
+class LuluVdo : LuluStream() {
+    override var mainUrl = "https://luluvdo.com"
+}
+
+class Bysebuho : FilemoonV2() {
+    override var mainUrl = "https://bysebuho.com"
+}
 
 private val mapper = jacksonObjectMapper()
 

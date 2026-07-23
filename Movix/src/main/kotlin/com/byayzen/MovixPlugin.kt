@@ -55,5 +55,7 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Doremifasol())
         registerExtractorAPI(MarcusP2P())
         registerExtractorAPI(Dismoiceline())
+        registerExtractorAPI(Neocine())
+        registerExtractorAPI(flemmix())
     }
 }

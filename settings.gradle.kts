@@ -2,7 +2,7 @@ rootProject.name = "CloudstreamPlugins"
 
 // This file sets what projects are included. All new projects should get automatically included unless specified in "disabled" variable.
 
-val disabled = listOf("__Temel", "__PlayerTest", "ExampleProvider")
+val disabled = listOf("__Temel", "__PlayerTest", "ExampleProvider", "__New")
 
 File(rootDir, ".").eachDir { dir ->
     val buildFile = File(dir, "build.gradle.kts")

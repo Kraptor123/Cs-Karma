@@ -134,6 +134,7 @@ data class TmdbDetailResponse(
     val recommendations: TmdbMainResponse?,
     val videos: TmdbVideoResponse?,
     val seasons: List<TmdbSeason>?,
+    val seasons_details: List<TmdbSeasonDetail>? = null,
     val images: TmdbImageResponse?,
     val status: String?,
     val origin_country: List<String>?
@@ -221,7 +222,8 @@ data class MovixAnimeStreamingLink(
 
 data class MovixWiflixResponse(
     val success: Boolean? = null,
-    val players: MovixWiflixPlayers? = null
+    val players: MovixWiflixPlayers? = null,
+    val episodes: Map<String, MovixWiflixPlayers>? = null
 )
 
 
@@ -256,6 +258,23 @@ data class MovixActiveDomain(
     val url: String? = null
 )
 
+data class MovixSwiftflowResponse(
+    val success: Boolean? = null,
+    val episodes: Map<String, MovixSwiftflowEpisode>? = null
+)
+
+data class MovixSwiftflowEpisode(
+    val vf: List<MovixSwiftflowLink>? = null,
+    val vostfr: List<MovixSwiftflowLink>? = null
+)
+
+data class MovixSwiftflowLink(
+    val name: String? = null,
+    val url: String? = null,
+    val type: String? = null,
+    val label: String? = null
+)
+
 
 suspend fun loadcustomextractor(
     brand: String,
@@ -264,6 +283,8 @@ suspend fun loadcustomextractor(
     subtitlecallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ) = coroutineScope {
+    val upperBrand = brand.uppercase()
+
     try {
         if (url.contains("frembed.click")) {
             FrembedExtractor.getLinks(url, subtitlecallback, callback)
@@ -273,12 +294,13 @@ suspend fun loadcustomextractor(
         if (isVideoUrl) {
             val isSibnet = url.contains("sibnet.ru")
 
-            if (brand == "Anime" && !isSibnet) {
+            if (upperBrand.startsWith("ANIME") && !isSibnet) {
                 if (app.get(url, referer = referer, timeout = 5).code == 200) {
+                    val extractorName = if (url.contains("sibnet.ru")) "Sibnet" else if (url.contains("sendvid")) "Sendvid" else if (url.contains("vidmoly")) "Vidmoly" else "Video"
                     callback.invoke(
                         newExtractorLink(
-                            source = brand,
-                            name = brand,
+                            source = upperBrand,
+                            name = "$upperBrand | $extractorName",
                             url = url,
                             type = if (url.contains(".m3u")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                         ) { this.referer = referer }
@@ -291,8 +313,8 @@ suspend fun loadcustomextractor(
                 if (app.get(url, referer = referer, timeout = 5).code == 200) {
                     callback.invoke(
                         newExtractorLink(
-                            source = brand,
-                            name = brand,
+                            source = upperBrand,
+                            name = "$upperBrand | Video",
                             url = url,
                             type = if (url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                         ) { this.referer = referer }
@@ -306,8 +328,8 @@ suspend fun loadcustomextractor(
             launch {
                 callback.invoke(
                     newExtractorLink(
-                        brand,
-                        if (link.name.isBlank()) brand else "$brand - ${link.name}",
+                        upperBrand,
+                        "$upperBrand | ${link.name.ifBlank { "Video" }}",
                         link.url,
                     ) {
                         this.quality = link.quality

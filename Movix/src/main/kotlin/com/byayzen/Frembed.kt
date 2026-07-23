@@ -15,7 +15,7 @@ object FrembedExtractor {
         try {
             val isMovie = url.contains("/movie/")
             val id = url.substringAfterLast("/")
-            
+
             val apiUrl = if (isMovie) {
                 "https://frembed.click/api/films?id=$id&idType=tmdb"
             } else {
@@ -47,10 +47,12 @@ object FrembedExtractor {
                 if (path.isNotBlank() && path.startsWith("/api/stream")) {
                     val streamUrl = "https://frembed.click$path"
                     val streamHeaders = headers.toMutableMap()
-                    streamHeaders["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-                    val redirectResponse = app.get(streamUrl, headers = streamHeaders, allowRedirects = false)
+                    streamHeaders["Accept"] =
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    val redirectResponse =
+                        app.get(streamUrl, headers = streamHeaders, allowRedirects = false)
                     val finalUrl = redirectResponse.headers["location"]
-                    
+
                     if (!finalUrl.isNullOrBlank()) {
                         Log.d("Frembed", "Final Extractor URL: $finalUrl")
                         loadExtractor(finalUrl, streamUrl, subtitleCallback, callback)
