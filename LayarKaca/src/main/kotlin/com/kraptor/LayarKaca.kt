@@ -19,7 +19,7 @@ class LayarKaca : MainAPI() {
     override val hasQuickSearch       = false
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
-    private var seriesUrl = "https://series.lk21.de"
+    private var seriesUrl = "https://tv6.nontondrama.my"
 
     override val mainPage = mainPageOf(
         "${mainUrl}/populer"  to "Popular",
