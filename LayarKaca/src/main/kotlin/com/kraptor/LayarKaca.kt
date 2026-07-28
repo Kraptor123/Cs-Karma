@@ -93,6 +93,7 @@ class LayarKaca : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse {
+        Log.d("kraptor_$name", "Loading URL: $url")
         val fixUrl = getProperLink(url)
         val document = app.get(fixUrl).documentLarge
         val title = document.selectFirst("div.movie-info h1")?.text()?.trim().toString()
@@ -131,7 +132,7 @@ class LayarKaca : MainAPI() {
                     val seasonArr = root.getJSONArray(seasonKey)
                     for (i in 0 until seasonArr.length()) {
                         val ep = seasonArr.getJSONObject(i)
-                        val href = fixUrl("$mainUrl/" + ep.getString("slug"))
+                        val href = fixUrl("$seriesUrl/" + ep.getString("slug"))
                         val episodeNo = ep.optInt("episode_no")
                         val seasonNo = ep.optInt("s")
                         episodes.add(
@@ -170,12 +171,12 @@ class LayarKaca : MainAPI() {
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
         Log.d("kraptor_$name", "data = ${data}")
-        val document = app.get(data).document
+        val currentBaseUrl = if (data.startsWith(seriesUrl)) seriesUrl else mainUrl
+        val document = app.get(data).documentLarge
 
         val videolar = document.select("ul#player-list a")
 
         videolar.forEach { video ->
-
             val player = video.attr("href")
 
             Log.d("kraptor_$name", "player = ${player}")
@@ -187,25 +188,13 @@ class LayarKaca : MainAPI() {
             if (iframe.contains("https://short.icu")) {
                 val iframe =  app.get(iframe, allowRedirects = true).url
                 Log.d("kraptor_$name", "iframe » $iframe")
-                loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
-            } else
+                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+            } else {
                 Log.d("kraptor_$name", "iframe » $iframe")
-            loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
-
+                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+            }
         }
         return true
-    }
-
-    private suspend fun fetchURL(url: String): String {
-        val res = app.get(url, allowRedirects = false)
-        val href = res.headers["location"]
-
-        return if (href != null) {
-            val it = URI(href)
-            "${it.scheme}://${it.host}"
-        } else {
-            url
-        }
     }
 
     fun getBaseUrl(url: String?): String {
