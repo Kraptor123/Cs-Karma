@@ -11,5 +11,6 @@ class DoramasLatinoXPlugin: Plugin() {
         registerMainAPI(DoramasLatinoX())
         registerExtractorAPI(DoramasLatinoXExtractor())
         registerExtractorAPI(OkRuSSL())
+        registerExtractorAPI(AbyssExtractor())
     }
 }
