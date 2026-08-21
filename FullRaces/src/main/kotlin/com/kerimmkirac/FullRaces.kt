@@ -29,7 +29,15 @@ class FullRaces : MainAPI() {
         val document = app.get("${request.data}/?page$page").document
         val home = document.select("div.short_item").mapNotNull { it.toMainPageResult() }
 
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(
+            listOf(
+                HomePageList(
+                    name = request.name,
+                    list = home,
+                    isHorizontalImages = true
+                )
+            )
+        )
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
@@ -106,7 +114,7 @@ class FullRaces : MainAPI() {
         Log.d("STF", "data » $data")
         val document = app.get(data).document
 
-        val sources = document.select("nav.gp-bar a.gp-src").mapNotNull {
+        val sources  = document.select("nav.gp-bar a.gp-src, div.fullstory a.su-button").mapNotNull {
             it.attr("href").ifEmpty { null }?.let(::httpsify)
         }
 
