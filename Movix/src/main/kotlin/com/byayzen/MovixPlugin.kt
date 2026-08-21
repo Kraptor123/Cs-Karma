@@ -8,6 +8,7 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class MovixPlugin: Plugin() {
     override fun load() {
         registerMainAPI(Movix())
+        registerExtractorAPI(BlinkFluxExtractor())
         registerExtractorAPI(Uqload())
         registerExtractorAPI(UqloadIo())
         registerExtractorAPI(DoodStream())
@@ -56,6 +57,8 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(MarcusP2P())
         registerExtractorAPI(Dismoiceline())
         registerExtractorAPI(Neocine())
-        registerExtractorAPI(flemmix())
+        registerExtractorAPI(Johnbeyondnation())
+        registerExtractorAPI(Uqloadvc())
+        registerExtractorAPI(Ansembed())
     }
 }

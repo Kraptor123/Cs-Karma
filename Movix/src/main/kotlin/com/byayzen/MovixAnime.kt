@@ -22,7 +22,8 @@ object MovixAnimeExtractor {
         Log.d("MovixAnime", url)
 
         return try {
-            val response = app.get(url, headers = animeApiHeaders, timeout = 15).text
+            val res = app.get(url, headers = animeApiHeaders, timeout = 15)
+            val response = try { res.body.string() } catch (_: Exception) { res.text }
             extractAnimePlayers(response, type, episode, season)
         } catch (e: Exception) {
             Log.d("MovixAnime", e.message.toString())

@@ -328,11 +328,12 @@ class Movix : MainAPI() {
                 try {
                     Log.d("movix", targeturl)
                     val res = app.get(targeturl, headers = apiheaders, timeout = 15)
-                    var response = res.text
+                    var response = try { res.body.string() } catch (_: Exception) { res.text }
 
                     if (res.code == 301 || res.code == 302) {
                         res.headers["location"]?.let { loc ->
-                            response = app.get(loc, headers = apiheaders, timeout = 15).text
+                            val locRes = app.get(loc, headers = apiheaders, timeout = 15)
+                            response = try { locRes.body.string() } catch (_: Exception) { locRes.text }
                         }
                     }
 
@@ -402,7 +403,14 @@ class Movix : MainAPI() {
                             )
 
                             "J1F" -> MovixLinks.parseJ1F(response, mainUrl, subCallback, callback)
-                            //"SwiftFlow"  -> MovixLinks.parseswiftflow(response, type, episode, mainUrl, subCallback, callback)
+                            "SwiftFlow" -> MovixLinks.parseswiftflow(
+                                response,
+                                type,
+                                episode,
+                                mainUrl,
+                                subCallback,
+                                callback
+                            )
                             else -> MovixLinks.processlinks(
                                 brandname,
                                 emptyList(),

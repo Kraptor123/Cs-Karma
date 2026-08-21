@@ -20,6 +20,7 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.extractors.FileMoon
 import com.lagradost.cloudstream3.extractors.FilemoonV2
 import com.lagradost.cloudstream3.extractors.LuluStream
+import com.lagradost.cloudstream3.extractors.Vidmoly
 import com.lagradost.cloudstream3.extractors.Voe
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -88,6 +89,10 @@ class Ralphy : Voe() {
 
 class Bryantenunder : Voe() {
     override var mainUrl = "https://bryantenunder.com"
+}
+
+class Johnbeyondnation : Voe() {
+    override var mainUrl = "https://johnbeyondnation.com"
 }
 
 class Pamelachangemission : Voe() {
@@ -168,6 +173,10 @@ class UqloadIo : Uqload() {
 
 class Uqloadcx : Uqload() {
     override var mainUrl = "https://uqload.cx"
+}
+
+class Uqloadvc : Uqload() {
+    override var mainUrl = "https://uqload.vc"
 }
 
 class Uqloadto : Uqload() {
@@ -385,7 +394,7 @@ class Morencius : VidHidePro() {
 
 open class Vidzy : ExtractorApi() {
     override val name = "Vidzy"
-    override val mainUrl = "https://vidzy.live"
+    override val mainUrl = "https://vidzy.cc"
     override val requiresReferer = true
 
     override suspend fun getUrl(
@@ -394,51 +403,54 @@ open class Vidzy : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val response = app.get(getEmbedUrl(url), referer = referer)
-        val script = if (!getPacked(response.text).isNullOrEmpty()) {
-            var result = getAndUnpack(response.text)
-            if (result.contains("var links")) {
-                result = result.substringAfter("var links")
-            }
-            result
-        } else {
-            response.document.selectFirst("script:containsData(sources:)")?.data()
-        } ?: return
+        val embedUrl = getEmbedUrl(url)
+        val response = app.get(embedUrl, referer = referer)
 
-        Log.d("Vidzy", "$script")
-        Regex("""src\s*:\s*"([^"]+m3u8[^"]*)"""").findAll(script).forEach { m3u8Match ->
-            val m3u8Url = fixUrl(m3u8Match.groupValues[1])
-            Log.d("VidzySon", "M3U8: $m3u8Url")
+        val targetScript = response.document.select("script").firstOrNull {
+            it.data().contains("sources:") && it.data().contains("m3u8")
+        }?.data() ?: return
 
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = name,
-                    url = m3u8Url,
-                    type = ExtractorLinkType.M3U8
-                ) {
-                    this.referer = "$mainUrl/"
-                    this.quality = Qualities.Unknown.value
-                    this.headers = mapOf(
-                        "Sec-Fetch-Dest" to "empty",
-                        "Sec-Fetch-Mode" to "cors",
-                        "Sec-Fetch-Site" to "cross-site",
-                        "Origin" to mainUrl,
-                        "User-Agent" to USER_AGENT
-                    )
-                }
-            )
+        val encoded = Regex("""\}\)\("([A-Za-z0-9+/=]+)"\)""").findAll(targetScript)
+            .firstOrNull()?.groupValues?.get(1) ?: return
+
+        val hostname = Regex("""https?://([^/]+)""").find(embedUrl)?.groupValues?.get(1) ?: return
+        var H = 0
+        for (c in hostname) H = (H + c.code) and 0xFF
+
+        val decoded = Base64.decode(encoded, Base64.DEFAULT)
+        val reversed = decoded.reversedArray()
+        val result = StringBuilder()
+        for (i in reversed.indices) {
+            val kk = (0x3d + i * 89 + H) and 0xFF
+            result.append(((reversed[i].toInt() and 0xFF) xor kk).toChar())
         }
+
+        val m3u8Url = result.toString()
+        if (!m3u8Url.startsWith("http")) return
+
+        callback(
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = m3u8Url,
+                type = ExtractorLinkType.M3U8
+            ) {
+                this.referer = "$mainUrl/"
+                this.quality = Qualities.Unknown.value
+                this.headers = mapOf(
+                    "Sec-Fetch-Dest" to "empty",
+                    "Sec-Fetch-Mode" to "cors",
+                    "Sec-Fetch-Site" to "same-site",
+                    "Origin" to mainUrl,
+                    "User-Agent" to USER_AGENT
+                )
+            }
+        )
     }
 
     private fun getEmbedUrl(url: String): String {
-        return when {
-            url.contains("/d/") -> url.replace("/d/", "/v/")
-            url.contains("/download/") -> url.replace("/download/", "/v/")
-            url.contains("/file/") -> url.replace("/file/", "/v/")
-            url.contains("/embed-") -> url
-            else -> url.replace("/f/", "/v/")
-        }
+        val fileCode = Regex("""(?:/d/|/download/|/file/|/f/|/v/|/embed-)([a-z0-9]+)""").find(url)?.groupValues?.get(1) ?: return url
+        return "$mainUrl/embed-$fileCode.html"
     }
 }
 
@@ -639,14 +651,16 @@ class SendvidExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val response = app.get(url, referer = referer).text
+        val response = app.get(url, referer = referer)
+        Log.d("Sendvid", "URL: $url | ResponseCode: ${response.code}")
+        val responseText = response.text
 
         val videoUrl =
-            Regex("""property="og:video"\s+content="(.*?)"""").find(response)?.groupValues?.get(1)
-                ?: Regex("""<source\s+src="(.*?)"\s+type="video/mp4"""").find(response)?.groupValues?.get(
-                    1
-                )
-                ?: Regex("""var\s+video_source\s+=\s+"(.*?)"""").find(response)?.groupValues?.get(1)
+            Regex("""property="og:video"\s+content="(.*?)"""").find(responseText)?.groupValues?.get(1)
+                ?: Regex("""<source\s+src="(.*?)"\s+type="video/mp4"""").find(responseText)?.groupValues?.get(1)
+                ?: Regex("""var\s+video_source\s+=\s+"(.*?)"""").find(responseText)?.groupValues?.get(1)
+
+        Log.d("Sendvid", "Video url: $videoUrl")
 
         videoUrl?.let { link ->
             callback.invoke(
@@ -689,10 +703,6 @@ class Neocine : VidStack() {
     override var mainUrl = "https://neocine.embedseek.com"
 }
 
-class flemmix : VidStack() {
-    override var mainUrl = "https://flemmix.upns.pro"
-}
-
 class Doremifasol : VidStack() {
     override var mainUrl = "https://doremifasol.ezplayer.me"
 }
@@ -715,6 +725,10 @@ class LuluVdo : LuluStream() {
 
 class Bysebuho : FilemoonV2() {
     override var mainUrl = "https://bysebuho.com"
+}
+
+class Ansembed : Vidmoly() {
+    override var mainUrl = "https://ansembed.net"
 }
 
 private val mapper = jacksonObjectMapper()

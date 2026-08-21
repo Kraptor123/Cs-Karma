@@ -184,22 +184,26 @@ object MovixLinks {
         subtitlecallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val links = mutableListOf<String>()
+        Log.d("movix", "FStream Gelen response: $response")
+        val links         = mutableListOf<String>()
         val fixedresponse = response.replace("\"players\":", "\"links\":")
         tryParseJson<MovixFstreamResponse>(fixedresponse)?.let { res ->
             if (type == "movie") {
                 res.links?.values?.flatten()?.forEach { it.url?.let(links::add) }
             } else {
-                val epmap = res.episodes
+                val epmap    = res.episodes
                 val targetEp = epmap?.entries?.find {
                     it.key == episode || it.key.toIntOrNull() == episode?.toIntOrNull()
                 }?.value
                 targetEp?.languages?.values?.flatten()?.forEach { it.url?.let(links::add) }
             }
         }
+        val finalLinks = links.distinct().filter { it.isNotBlank() }
+        Log.d("movix", "FStream Bulunan Link Sayısı: ${finalLinks.size}")
+        finalLinks.forEach { Log.d("movix", "FStream Linki: $it") }
         processlinks(
             "FStream",
-            links.distinct().filter { it.isNotBlank() },
+            finalLinks,
             mainUrl,
             subtitlecallback,
             callback
@@ -225,7 +229,7 @@ object MovixLinks {
         )
     }
 
-    /*suspend fun parseswiftflow(
+    suspend fun parseswiftflow(
         response: String,
         type: String,
         episode: String?,
@@ -233,23 +237,48 @@ object MovixLinks {
         subtitlecallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val links = mutableListOf<String>()
+        val linksWithDetails = mutableListOf<Pair<MovixSwiftflowLink, String>>()
+        Log.d("Movix", "SwiftFlow başladı: $type, episode: $episode")
         tryParseJson<MovixSwiftflowResponse>(response)?.let { res ->
-            val epKey = episode ?: "1"
-            val targetEp = res.episodes?.get(epKey) ?: res.episodes?.get(
-                epKey.toIntOrNull()?.toString() ?: "1"
-            )
-            targetEp?.vf?.forEach { it.url?.let(links::add) }
-            targetEp?.vostfr?.forEach { it.url?.let(links::add) }
+            if (type == "movie") {
+                res.vf?.forEach { linksWithDetails.add(it to "VF") }
+                res.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+                res.players?.vf?.forEach { linksWithDetails.add(it to "VF") }
+                res.players?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+
+                val ep1 = res.episodes?.get("1") ?: res.episodes?.get("01") ?: res.episodes?.values?.firstOrNull()
+                ep1?.vf?.forEach { linksWithDetails.add(it to "VF") }
+                ep1?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+            } else {
+                val epKey = episode ?: "1"
+                val targetEp = res.episodes?.get(epKey)
+                    ?: res.episodes?.get(epKey.toIntOrNull()?.toString() ?: "1")
+                    ?: res.episodes?.entries?.find { it.key.toIntOrNull() == epKey.toIntOrNull() }?.value
+
+                targetEp?.vf?.forEach { linksWithDetails.add(it to "VF") }
+                targetEp?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+            }
         }
-        processlinks(
-            "SwiftFlow",
-            links.distinct().filter { it.isNotBlank() },
-            mainUrl,
-            subtitlecallback,
-            callback
-        )
-    }*/
+
+        val distinctItems = linksWithDetails.distinctBy { it.first.url }.filter { !it.first.url.isNullOrBlank() }
+        if (distinctItems.isEmpty()) {
+            Log.d("Movix", "[SwiftFlow] Hiç link bulunamadı.")
+            return
+        }
+
+        Log.d("Movix", "[SwiftFlow] Bulunan link sayısı: ${distinctItems.size}")
+        distinctItems.forEach { (item, lang) ->
+            val linkUrl = item.url ?: return@forEach
+            val label = item.label?.trim()
+            val brandName = buildString {
+                append("SwiftFlow")
+                if (lang.isNotBlank()) append(" | $lang")
+                if (!label.isNullOrBlank()) append(" ($label)")
+            }
+            Log.d("Movix", "[SwiftFlow] İşleniyor: $linkUrl ($brandName)")
+            loadcustomextractor(brandName, linkUrl, mainUrl, subtitlecallback, callback)
+        }
+    }
 
 
     suspend fun parsewiflix(
@@ -388,7 +417,8 @@ object MovixLinks {
                 OnRegardeOu.invoke(link, mainUrl, subtitlecallback, callback)
                 Log.d("Movix", "[$brand] Bulundu (OnRegardeOu): $link")
             } else {
-                loadcustomextractor(cleanbrand, link, mainUrl, subtitlecallback, callback)
+                val referer = if (brand == "FStream") mainUrl else ""
+                loadcustomextractor(cleanbrand, link, referer, subtitlecallback, callback)
                 Log.d("Movix", "[$brand] İşleniyor: $link")
             }
         }

@@ -12,13 +12,12 @@ object Kokoflix {
         subtitlecallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        try {
-            val response = app.get(url, referer = mainurl, timeout = 10)
-            val realembedurl = response.url
-            Log.d("Kokoflix", realembedurl)
-            loadExtractor(realembedurl, url, subtitlecallback, callback)
-        } catch (e: Exception) {
-            Log.d("Kokoflix", e.toString())
-        }
+        val response     = app.get(url, referer = mainurl, timeout = 10, allowRedirects = false)
+        val realembedurl = response.headers["location"]?.ifEmpty { null }
+            ?: response.headers["Location"]?.ifEmpty { null }
+            ?: response.url
+
+        Log.d("Kokoflix", realembedurl)
+        loadExtractor(realembedurl, url, subtitlecallback, callback)
     }
 }

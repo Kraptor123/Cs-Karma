@@ -5,6 +5,8 @@ import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.getQualityFromName
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.coroutines.coroutineScope
@@ -260,7 +262,14 @@ data class MovixActiveDomain(
 
 data class MovixSwiftflowResponse(
     val success: Boolean? = null,
-    val episodes: Map<String, MovixSwiftflowEpisode>? = null
+    val tmdb_id: Any? = null,
+    val title: String? = null,
+    val source: String? = null,
+    val season: Any? = null,
+    val episodes: Map<String, MovixSwiftflowEpisode>? = null,
+    val vf: List<MovixSwiftflowLink>? = null,
+    val vostfr: List<MovixSwiftflowLink>? = null,
+    val players: MovixSwiftflowEpisode? = null
 )
 
 data class MovixSwiftflowEpisode(
@@ -296,7 +305,7 @@ suspend fun loadcustomextractor(
 
             if (upperBrand.startsWith("ANIME") && !isSibnet) {
                 if (app.get(url, referer = referer, timeout = 5).code == 200) {
-                    val extractorName = if (url.contains("sibnet.ru")) "Sibnet" else if (url.contains("sendvid")) "Sendvid" else if (url.contains("vidmoly")) "Vidmoly" else "Video"
+                    val extractorName = if (url.contains("sibnet.ru")) "Sibnet" else if (url.contains("sendvid")) "Sendvid" else if (url.contains("vidmoly") || url.contains("ansembed")) "Vidmoly" else "Video"
                     callback.invoke(
                         newExtractorLink(
                             source = upperBrand,
@@ -326,13 +335,19 @@ suspend fun loadcustomextractor(
 
         loadExtractor(url, referer, subtitlecallback) { link ->
             launch {
+                val qualityVal = if (link.quality != Qualities.Unknown.value && link.quality > 0) {
+                    link.quality
+                } else {
+                    val parsedQ = getQualityFromName(upperBrand)
+                    if (parsedQ != Qualities.Unknown.value) parsedQ else Qualities.Unknown.value
+                }
                 callback.invoke(
                     newExtractorLink(
                         upperBrand,
                         "$upperBrand | ${link.name.ifBlank { "Video" }}",
                         link.url,
                     ) {
-                        this.quality = link.quality
+                        this.quality = qualityVal
                         this.type = link.type
                         this.referer = link.referer
                         this.headers = link.headers
