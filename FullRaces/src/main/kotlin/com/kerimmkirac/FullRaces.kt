@@ -15,11 +15,11 @@ class FullRaces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie)
+    override val supportedTypes = setOf(TvType.Movie, TvType.Others)
 
     override val mainPage = mainPageOf(
+        mainUrl to "F1 Races",
         "${mainUrl}/2026" to "2026",
-        "${mainUrl}" to "F1 Races",
         "${mainUrl}/f2-full-races" to "F2 Races",
         "${mainUrl}/f3-full-races" to "F3 Races",
         "${mainUrl}/nascar" to "Nascar Races"
@@ -38,7 +38,7 @@ class FullRaces : MainAPI() {
         val href = fixUrlNull(anchor.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("div.poster img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        return newMovieSearchResponse(title, href, TvType.Others) {
             this.posterUrl = posterUrl
         }
     }
@@ -56,7 +56,7 @@ class FullRaces : MainAPI() {
         val href = fixUrlNull(anchor.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("div.fhkds54sa img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        return newMovieSearchResponse(title, href, TvType.Others) {
             this.posterUrl = posterUrl
         }
     }
@@ -68,26 +68,33 @@ class FullRaces : MainAPI() {
         val document = app.get(url).document
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val poster = fixUrlNull(document.selectFirst("div.full_img img")?.attr("src"))
-
-
+        val poster =
+            fixUrlNull(document.selectFirst("div.full_img img")?.attr("src")?.ifEmpty { null })
         val description =
-            document.select("div[align=center]").joinToString("\n") { it.text().trim() }
+            document.select("div.gp-top p, div.gp-top h2").joinToString("\n") { it.text().trim() }
 
+        val recommendation =
+            document.select("div.full_info table.infTable td.infTd table.eewwffa2").mapNotNull {
+                it.toRecommendationResult()
+            }
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        return newMovieLoadResponse(title, url, TvType.Others, url) {
             this.posterUrl = poster
             this.plot = description
+            this.recommendations = recommendation
         }
     }
 
-
     private fun Element.toRecommendationResult(): SearchResponse? {
-        val title = this.selectFirst("a img")?.attr("alt") ?: return null
-        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("a img")?.attr("data-src"))
+        val href = fixUrlNull(this.selectFirst("div.wxxxx34hg a")?.attr("href")?.ifEmpty { null })
+            ?: return null
+        val img = this.selectFirst("div.wxxxx34hg a img") ?: return null
+        val title = img.attr("alt").ifEmpty { return null }.trim()
+        val posterUrl = fixUrlNull(img.attr("src").ifEmpty { null })
 
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(title, href, TvType.Others) {
+            this.posterUrl = posterUrl
+        }
     }
 
     override suspend fun loadLinks(
@@ -99,17 +106,13 @@ class FullRaces : MainAPI() {
         Log.d("STF", "data » $data")
         val document = app.get(data).document
 
-        val iframeUrls = document.select("div.video-responsive iframe").mapNotNull {
-            it.attr("src").let { src ->
-                if (src.startsWith("//")) "https:$src" else src
-            }.takeIf { cleanedSrc ->
-                cleanedSrc.startsWith("http")
-            }
+        val sources = document.select("nav.gp-bar a.gp-src").mapNotNull {
+            it.attr("href").ifEmpty { null }?.let(::httpsify)
         }
 
-        for (iframe in iframeUrls) {
-            Log.d("STF", "Found iframe » $iframe")
-            loadExtractor(iframe, data, subtitleCallback, callback)
+        for (source in sources) {
+            Log.d("STF", "Source » $source")
+            loadExtractor(source, data, subtitleCallback, callback)
         }
 
         return true
