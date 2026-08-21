@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import kotlinx.coroutines.*
 import org.json.JSONObject
 import org.jsoup.nodes.Element
@@ -200,45 +201,56 @@ class GnulaHD : MainAPI() {
     ): Boolean {
         Log.d(tag, data)
         val headers = requestHeaders("$mainUrl/")
+        val slug = data.removeSuffix("/").substringAfterLast("/")
+        val isId = slug.isNotEmpty() && slug.all { it.isDigit() }
 
-        val id   = data.removeSuffix("/").substringAfterLast("/")
-        val isId = id.isNotEmpty() && id.all { it.isDigit() }
-
-        val jsonString = if (isId) {
-            val idUrl = "$mainUrl/wp-json/gnrd/v1/ep-player?id=$id"
+        val langs: List<GnulaLang>? = if (isId) {
+            val url = "$mainUrl/wp-json/gnrd/v1/ep-player?id=$slug"
             try {
-                JSONObject(app.get(idUrl, headers = headers).text).optJSONArray("langs")?.toString()
+                JSONObject(app.get(url, headers = headers).text)
+                    .optJSONArray("langs")?.toString()
+                    ?.let { parseJson<List<GnulaLang>>(it) }
+            } catch (e: Exception) { null }
+        } else if (data.startsWith("http")) {
+            try {
+                val html = app.get(data, headers = headers).text
+                val pid = Regex("""_gnrdPid\s*=\s*(\d+)""").find(html)?.groupValues?.get(1) ?: return false
+                val tok = Regex("""_gnrdTok\s*=\s*"([^"]+)"""").find(html)?.groupValues?.get(1) ?: return false
+
+                val apiUrl = "$mainUrl/wp-json/gnrd/v1/player?id=$pid&t=${java.net.URLEncoder.encode(tok, "UTF-8")}"
+                val pField = JSONObject(app.get(apiUrl, headers = headers).text).optString("p")
+
+                if (pField.isNotEmpty()) decryptPlayerData(pField) else null
             } catch (e: Exception) {
+                Log.e(tag, "PlayerData Bozuk", )
                 null
             }
-        } else if (data.startsWith("http")) {
-            val res = app.get(data, headers = headers).text
-            Regex("""var\s+(_gnpv_ep_langs|_gd)\s*=\s*(\[.*]);""").find(res)?.groupValues?.get(2)
         } else null
 
-        val langs = jsonString?.let {
-            try {
-                AppUtils.parseJson<List<GnulaLang>>(it)
-            } catch (e: Exception) {
-                null
-            }
-        }
-
-        langs?.forEach { langObj ->
-            val label = langObj.label
-            langObj.servers.forEach { srv ->
-                val src = srv.src
-                if (src.isNotBlank() && !src.contains("aviso.mp4")) {
-                    var cleanUrl = src.replace("\\/", "/")
-                    if (cleanUrl.startsWith("//")) cleanUrl = "https:$cleanUrl"
-
-                    Log.d(tag, cleanUrl)
-                    loadCustomExtractor(label, cleanUrl, data, subtitleCallback, callback)
+        langs?.forEach { lang ->
+            lang.servers.forEach { srv ->
+                var url = srv.src.replace("\\/", "/")
+                if (url.startsWith("//")) url = "https:$url"
+                if (url.isNotBlank() && !url.contains("aviso.mp4")) {
+                    loadCustomExtractor(lang.label, url, data, subtitleCallback, callback)
                 }
             }
         }
 
         return langs != null
+    }
+
+    private fun decryptPlayerData(encoded: String): List<GnulaLang>? {
+        return try {
+            val raw = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+            val key = byteArrayOf(103, 78, 55, 100)
+            val dec = ByteArray(raw.size) { i -> (raw[i].toInt() xor key[i % 4].toInt()).toByte() }
+            val obj = JSONObject(String(dec, Charsets.UTF_8))
+            obj.optJSONArray("langs")?.toString()?.let { AppUtils.parseJson(it) }
+        } catch (e: Exception) {
+            Log.e(tag, "Şifreleme çözülmedi.", )
+            null
+        }
     }
 
     private suspend fun loadCustomExtractor(
