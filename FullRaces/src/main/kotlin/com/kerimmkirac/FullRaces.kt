@@ -19,9 +19,12 @@ class FullRaces : MainAPI() {
 
     override val mainPage = mainPageOf(
         "${mainUrl}" to "F1 Races",
-        "${mainUrl}/f2" to "F2 Races",
-        "${mainUrl}/f3" to "F3 Races",
-        "${mainUrl}/nascar" to "Nascar Races"
+        "${mainUrl}/f2-full-races" to "F2 Races",
+        "${mainUrl}/f3-full-races" to "F3 Races",
+        "${mainUrl}/nascar" to "Nascar Races",
+        "${mainUrl}/indycar" to "Indycar Races",
+        "${mainUrl}/formula-e" to "Formula E Races",
+        "${mainUrl}/2026" to "2026 Races",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
