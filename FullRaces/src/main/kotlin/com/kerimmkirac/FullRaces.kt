@@ -98,8 +98,8 @@ class FullRaces : MainAPI() {
         Log.d("STF", "data » $data")
         val document = app.get(data).document
 
-        val iframeUrls = document.select("div.video-responsive iframe").mapNotNull {
-            it.attr("src").let { src ->
+        val iframeUrls = document.select("div.video-responsive iframe, a.gp-src").mapNotNull {
+            it.attr("src").ifBlank { it.attr("href") }.let { src ->
                 if (src.startsWith("//")) "https:$src" else src
             }.takeIf { cleanedSrc ->
                 cleanedSrc.startsWith("http")

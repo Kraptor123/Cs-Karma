@@ -8,5 +8,6 @@ import android.content.Context
 class FullRacesPlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(FullRaces())
+        FileMoonExtractor.DOMAINS.forEach { registerExtractorAPI(FileMoonExtractor(it)) }
     }
 }

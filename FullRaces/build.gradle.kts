@@ -1,7 +1,7 @@
-version = 3
+version = 4
 
 cloudstream {
-    authors     = listOf("kerimmkirac")
+    authors     = listOf("kraptor123", "kerimmkirac")
     language    = "en"
     description = "Formula 1 is one of the most popular and dramatic sports in the world. You can watch Formula One races replays videos online and enjoy every moment of this exciting sports event. We offer to watch F1 Full Races replays FREE in HD"
     status  = 1 // will be 3 if unspecified
