@@ -31,7 +31,7 @@ class FullRaces : MainAPI() {
         val document = app.get("${request.data}/?page$page").document
         val home = document.select("div.short_item").mapNotNull { it.toMainPageResult() }
 
-        return newHomePageResponse(request.name, home)
+        return newHomePageResponse(HomePageList(request.name, home, true))
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
