@@ -77,7 +77,10 @@ class JPFilms : MainAPI() {
         val response = app.get(url)
         val document = response.document
 
-        val title = document.selectFirst("h1.entry-title")?.text()?.replace(Regex("\\s*\\(\\d{4}\\)$"), "")?.trim() ?: return null
+        val title = document.selectFirst("h1.entry-title")?.text()
+            ?.replace(Regex("\\s*\\(\\d{4}\\)$"), "")
+            ?.replace("Full HD", "", ignoreCase = true)
+            ?.trim() ?: return null
 
         val posterraw = document.selectFirst("img.movie-thumb")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
             ?: document.selectFirst(".movie-poster img")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
@@ -158,54 +161,49 @@ class JPFilms : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val document = app.get(data).document
-        val scripts = document.select("script").map { it.data() }
+        val nonce = document.selectFirst("body")?.attr("data-nonce").orEmpty()
+        val scriptData =
+            document.select("script").map { it.data() }.find { it.contains("var halim_cfg") }
+                ?: return false
 
-        val scriptdata = scripts.find { it.contains("var jsonEpisodes") } ?: return false
-        val jsonstr = scriptdata.substringAfter("var jsonEpisodes = ").substringBefore(";</script>").trim()
-        val currentslug = data.split("/").lastOrNull()?.replace(".html", "") ?: ""
+        val postId =
+            Regex(""""post_id"\s*:\s*(\d+)""").find(scriptData)?.groupValues?.get(1) ?: return false
+        val episodeSlug =
+            Regex(""""episode_slug"\s*:\s*"([^"]+)"""").find(scriptData)?.groupValues?.get(1)
+                ?: "server-1"
+        val serverId =
+            Regex(""""server"\s*:\s*"([^"]+)"""").find(scriptData)?.groupValues?.get(1) ?: "1"
 
-        val matches = Regex("""\{"postId":(\d+),"postUrl":"(.*?)","serverId":(\d+),.*?"episodeSlug":"(.*?)","episodeName":"(.*?)".*?\}""").findAll(jsonstr)
+        val ajaxUrl =
+            "$mainUrl/wp-content/themes/halimmovies/player.php?episode_slug=$episodeSlug&server_id=$serverId&subsv_id=&post_id=$postId&nonce=$nonce&custom_var="
 
-        matches.forEach { match ->
-            val postid = match.groupValues[1]
-            val posturl = match.groupValues[2].replace("\\/", "/")
-            val serverid = match.groupValues[3]
-            val slug = match.groupValues[4]
+        val playerResponse = app.get(
+            ajaxUrl,
+            headers = mapOf(
+                "x-requested-with" to "XMLHttpRequest",
+                "referer" to data
+            )
+        ).text
 
-            if (data == posturl || slug == currentslug || currentslug.contains(slug)) {
-                val ajaxurl = "$mainUrl/wp-content/themes/halimmovies/player.php?episode_slug=$slug&server_id=$serverid&post_id=$postid"
+        val rawStreamUrl =
+            Regex(""""file"\s*:\s*"([^"]+)"""").find(playerResponse)?.groupValues?.get(1)
+                ?: return false
+        val streamUrl = rawStreamUrl.replace("\\/", "/")
 
-                try {
-                    val response = app.get(
-                        ajaxurl,
-                        headers = mapOf(
-                            "x-requested-with" to "XMLHttpRequest",
-                            "referer" to data,
-                            "user-agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        )
-                    ).text
-
-                    val m3u8url = Regex("""<source[^>]+src=["']([^"']+)["']""").find(response)?.groupValues?.get(1)
-                        ?: Jsoup.parse(response).selectFirst("source")?.attr("src")
-
-                    if (m3u8url != null) {
-                        callback.invoke(
-                            newExtractorLink(
-                                name = "JPFilms",
-                                source = "JPFilms",
-                                url = m3u8url,
-                                type = INFER_TYPE
-                            ) {
-                                this.headers = mapOf(
-                                    "Referer" to "$mainUrl/",
-                                    "Origin" to mainUrl
-                                )
-                            }
-                        )
-                    }
-                } catch (e: Exception) { }
+        callback.invoke(
+            newExtractorLink(
+                source = name,
+                name = name,
+                url = streamUrl,
+                type = ExtractorLinkType.M3U8
+            ) {
+                this.headers = mapOf(
+                    "Referer" to "$mainUrl/",
+                    "Origin" to mainUrl
+                )
             }
-        }
+        )
+
         return true
     }
 }

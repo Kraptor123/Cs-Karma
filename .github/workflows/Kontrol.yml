@@ -19,7 +19,7 @@ jobs:
       - name: Depo Kontrolü
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT_TOKEN }}  # PAT kullan
+          token: ${{ github.token }}  # PAT kullan
 
       - name: Python 3.11.8 Yükle
         uses: actions/setup-python@v5

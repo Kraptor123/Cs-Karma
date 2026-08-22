@@ -1,9 +1,9 @@
 // ! Bu araç @ByAyzen tarafından | @cs-karma için yazılmıştır.
-version = 3
+version = 4
 
 cloudstream {
     authors     = listOf("ByAyzen")
-    language    = "en"
+    language    = "ru"
     description = "OKRU Videos."
     status  = 1
     tvTypes = listOf("Movie", "TvSeries") //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,

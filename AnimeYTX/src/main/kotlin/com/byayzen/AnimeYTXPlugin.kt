@@ -24,5 +24,8 @@ class AnimeYTXPlugin: Plugin() {
         registerExtractorAPI(VidStack())
         registerExtractorAPI(Mytsumi())
         registerExtractorAPI(BurstCloud())
+        registerExtractorAPI(AbyssExtractor())
+        registerExtractorAPI(Coflix())
+        registerExtractorAPI(Embedseek())
     }
 }

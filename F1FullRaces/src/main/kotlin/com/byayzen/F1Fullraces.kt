@@ -17,7 +17,7 @@ class F1Fullraces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Live)
+    override val supportedTypes = setOf(TvType.Live, TvType.Others)
 
     override val mainPage = mainPageOf(
         mainUrl to "Latest",
@@ -58,7 +58,9 @@ class F1Fullraces : MainAPI() {
 
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        val data = if (posterUrl != null) "${href}@@@$posterUrl" else href
+
+        return newMovieSearchResponse(title, data, TvType.Movie) {
             this.posterUrl = posterUrl
         }
     }
@@ -72,11 +74,17 @@ class F1Fullraces : MainAPI() {
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val parts = url.split("@@@")
+        val realUrl = parts[0]
+        val passedPoster = parts.getOrNull(1)
+
+        val document = app.get(realUrl).document
 
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val poster = fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        val poster = if (passedPoster != null && passedPoster != "null") passedPoster
+        else fixUrlNull(document.selectFirst("meta[property='og:image']")?.attr("content"))
+
+        return newMovieLoadResponse(title, realUrl, TvType.Others, realUrl) {
             this.posterUrl = poster
         }
     }
@@ -91,60 +99,83 @@ class F1Fullraces : MainAPI() {
         val document = app.get(data).document
         val jobs = mutableListOf<Job>()
 
-        document.select("div#netu iframe[src*='lulu']").forEach { iframe ->
-            val src = iframe.attr("src")
-            val rawText = iframe.parent()?.ownText()?.trim() ?: ""
-            val name = when {
-                rawText.contains("Pre-Race", true) -> "Yarış Öncesi Analiz"
-                rawText.contains("Race Session", true) -> "Yarış Seansı"
-                rawText.contains("Post-Race", true) -> "Yarış Sonrası Analiz"
-                else -> "Yarış Seansı"
-            }
-            Log.d("f1fullraces", src)
-            jobs += launch {
-                loadCustomExtractor(src, data, name, subtitleCallback, callback)
-            }
-        }
-
-        document.select("div#mixdrop div[id^=07b022]").forEach { div ->
+        document.select("div[id^=07b022]").forEach { div ->
             val decodedId = mixdropIdCoz(div.attr("id")).replace("\"", "").trim()
             if (decodedId.isNotBlank()) {
                 val url = "https://mixdrop.co/f/$decodedId"
+                val name = getLabelForElement(div)
                 Log.d("f1fullraces", url)
                 jobs += launch {
-                    loadCustomExtractor(url, data, "Yarış Seansı", subtitleCallback, callback)
+                    loadCustomExtractor(url, data, name, subtitleCallback, callback)
                 }
             }
         }
 
-        document.select("div#drive a[href], div#gofile a[href], div#mega a[href]").forEach { link ->
+        document.select("div#netu iframe, div#mixdrop iframe").forEach { iframe ->
+            val src = iframe.attr("src")
+            if (src.isNotBlank()) {
+                val name = getLabelForElement(iframe)
+                Log.d("f1fullraces", src)
+                jobs += launch {
+                    loadCustomExtractor(src, data, name, subtitleCallback, callback)
+                }
+            }
+        }
+
+        document.select("div#drive a[href], div#mega a[href]").forEach { link ->
             val href = link.attr("href")
             if (href.isNotBlank()) {
+                val name = getLabelForElement(link)
                 Log.d("f1fullraces", href)
                 jobs += launch {
-                    loadCustomExtractor(href, data, "Yarış Seansı", subtitleCallback, callback)
+                    loadCustomExtractor(href, data, name, subtitleCallback, callback)
                 }
             }
         }
 
         jobs.joinAll()
+        Log.d("f1fullraces", "Bitti")
         return@coroutineScope true
+    }
+
+    private fun getLabelForElement(el: Element): String? {
+        val parent = el.parent()
+        if (parent != null && parent.tagName() == "p") {
+            val ownText = parent.ownText()?.trim()
+            if (!ownText.isNullOrBlank()) return ownText
+        }
+        return el.findPreviousLabel()
+    }
+
+    private fun Element.findPreviousLabel(): String? {
+        var prev = this.previousElementSibling()
+        while (prev != null) {
+            if (prev.tagName() == "p" && prev.ownText().isNotBlank()) {
+                val text = prev.ownText().trim()
+                if (text.isNotEmpty() && !text.startsWith("<script")) {
+                    return text
+                }
+            }
+            prev = prev.previousElementSibling()
+        }
+        return null
     }
 
     private suspend fun loadCustomExtractor(
         url: String,
         referer: String,
-        customName: String,
+        customName: String?,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) = coroutineScope {
         loadExtractor(url, referer, subtitleCallback) { link ->
             launch {
                 Log.d("f1fullraces", link.url)
+                val finalName = if (customName.isNullOrBlank()) link.source else "${link.source}-$customName"
                 callback.invoke(
                     newExtractorLink(
                         source = link.source,
-                        name = "${link.source}-$customName",
+                        name = finalName,
                         url = link.url,
                         type = link.type,
                         initializer = {
@@ -164,7 +195,7 @@ class F1Fullraces : MainAPI() {
             decodedChars.joinToString("")
         } catch (e: Exception) {
             Log.d("f1fullraces", "${e.message}")
-            ""
+            "Bitiş"
         }
     }
 }

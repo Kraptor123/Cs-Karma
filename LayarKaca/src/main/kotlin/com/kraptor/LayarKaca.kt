@@ -7,20 +7,19 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import org.json.JSONObject
 import java.net.URI
 
 class LayarKaca : MainAPI() {
-    override var mainUrl              = "https://tv10.lk21official.cc"
+    override var mainUrl              = "https://tv12.lk21official.cc"
     override var name                 = "LayarKaca"
     override val hasMainPage          = true
     override var lang                 = "id"
     override val hasQuickSearch       = false
     override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
-    private var seriesUrl = "https://series.lk21.de"
+    private var seriesUrl = "https://tv6.nontondrama.my"
 
     override val mainPage = mainPageOf(
         "${mainUrl}/populer"  to "Popular",
@@ -60,7 +59,8 @@ class LayarKaca : MainAPI() {
     private fun Element.toMainPageResult(): SearchResponse? {
         val title     = this.selectFirst("h3")?.text() ?: return null
         val href      = fixUrlNull(this.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
+        val img       = this.selectFirst("img")
+        val posterUrl = fixUrlNull(img?.attr("data-src").takeUnless { it.isNullOrEmpty() } ?: img?.attr("src"))
         val score     = this.selectFirst("span[itemprop=ratingValue]")?.text()
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
@@ -93,26 +93,30 @@ class LayarKaca : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse {
+        Log.d("kraptor_$name", "Loading URL: $url")
         val fixUrl = getProperLink(url)
         val document = app.get(fixUrl).documentLarge
-        val baseurl=fetchURL(fixUrl)
         val title = document.selectFirst("div.movie-info h1")?.text()?.trim().toString()
         val poster = document.select("meta[property=og:image]").attr("content")
         val tags = document.select("div.tag-list span").map { it.text() }
-        val posterheaders= mapOf("Referer" to getBaseUrl(poster))
+        val posterheaders = mapOf("Referer" to getBaseUrl(poster))
 
-        val year = Regex("\\d, (\\d+)").find(
-            document.select("div.movie-info h1").text().trim()
-        )?.groupValues?.get(1).toString().toIntOrNull()
+        val yil = Regex("\\d{4}").find(title)?.value?.toIntOrNull()
+
         val tvType = if (document.selectFirst("#season-data") != null) TvType.TvSeries else TvType.Movie
         val description = document.selectFirst("div.meta-info")?.text()?.trim()
         val trailer = document.selectFirst("ul.action-left > li:nth-child(3) > a")?.attr("href")
         val rating = document.selectFirst("div.info-tag strong")?.text()
 
-        val recommendations = document.select("li.slider article").map {
-            val recName = it.selectFirst("h3")?.text()?.trim().toString()
-            val recHref = baseurl+it.selectFirst("a")!!.attr("href")
-            val recPosterUrl = fixUrl(it.selectFirst("img")?.attr("src").toString())
+        val recommendations = document.select("ul.video-list li").map {
+            val recName = it.selectFirst("span.video-title")?.text()?.trim().toString()
+            val rawHref = it.selectFirst("a")?.attr("href").toString()
+            val cleanHref = if (rawHref.startsWith("/")) rawHref else "/$rawHref"
+            val recHref = fixUrl("$mainUrl$cleanHref")
+            val recPosterUrl = fixUrl(
+                it.selectFirst("img")?.attr("data-src")?.ifEmpty { null }
+                    ?: it.selectFirst("img")?.attr("src").toString()
+            )
             newTvSeriesSearchResponse(recName, recHref, TvType.TvSeries) {
                 this.posterUrl = recPosterUrl
                 this.posterHeaders = posterheaders
@@ -128,7 +132,7 @@ class LayarKaca : MainAPI() {
                     val seasonArr = root.getJSONArray(seasonKey)
                     for (i in 0 until seasonArr.length()) {
                         val ep = seasonArr.getJSONObject(i)
-                        val href = fixUrl("$baseurl/"+ep.getString("slug"))
+                        val href = fixUrl("$seriesUrl/" + ep.getString("slug"))
                         val episodeNo = ep.optInt("episode_no")
                         val seasonNo = ep.optInt("s")
                         episodes.add(
@@ -144,7 +148,7 @@ class LayarKaca : MainAPI() {
             newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
                 this.posterHeaders = posterheaders
-                this.year = year
+                this.year = yil
                 this.plot = description
                 this.tags = tags
                 this.score = Score.from10(rating)
@@ -155,7 +159,7 @@ class LayarKaca : MainAPI() {
             newMovieLoadResponse(title, url, TvType.Movie, url) {
                 this.posterUrl = poster
                 this.posterHeaders = posterheaders
-                this.year = year
+                this.year = yil
                 this.plot = description
                 this.tags = tags
                 this.score = Score.from10(rating)
@@ -167,12 +171,12 @@ class LayarKaca : MainAPI() {
 
     override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
         Log.d("kraptor_$name", "data = ${data}")
-        val document = app.get(data).document
+        val currentBaseUrl = if (data.startsWith(seriesUrl)) seriesUrl else mainUrl
+        val document = app.get(data).documentLarge
 
         val videolar = document.select("ul#player-list a")
 
         videolar.forEach { video ->
-
             val player = video.attr("href")
 
             Log.d("kraptor_$name", "player = ${player}")
@@ -184,25 +188,13 @@ class LayarKaca : MainAPI() {
             if (iframe.contains("https://short.icu")) {
                 val iframe =  app.get(iframe, allowRedirects = true).url
                 Log.d("kraptor_$name", "iframe » $iframe")
-                loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
-            } else
+                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+            } else {
                 Log.d("kraptor_$name", "iframe » $iframe")
-            loadExtractor(iframe, "$mainUrl/", subtitleCallback, callback)
-
+                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+            }
         }
         return true
-    }
-
-    private suspend fun fetchURL(url: String): String {
-        val res = app.get(url, allowRedirects = false)
-        val href = res.headers["location"]
-
-        return if (href != null) {
-            val it = URI(href)
-            "${it.scheme}://${it.host}"
-        } else {
-            url
-        }
     }
 
     fun getBaseUrl(url: String?): String {

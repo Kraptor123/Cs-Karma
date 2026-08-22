@@ -17,10 +17,14 @@ import org.json.JSONArray
 
 
 import com.lagradost.cloudstream3.app
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.regex.Pattern
 
 class AnimeYTX : MainAPI() {
-    override var mainUrl = "https://wwv.animeytx.net"
+    private val TAG = "AnimeYTX"
+
+    override var mainUrl = "https://animeyt.cc"
     override var name = "AnimeYTX"
     override val hasMainPage = true
     override var lang = "es"
@@ -115,57 +119,70 @@ class AnimeYTX : MainAPI() {
                 ?.replace("Sub Español - AnimeYT", "")?.trim()
             ?: return null
 
-        val poster = document.selectFirst(".thumb img")?.attr("data-src")
-            ?: document.selectFirst("meta[property=og:image]")?.attr("content")
-        val plot = document.selectFirst(".entry-content[itemprop=description] p")?.text()
-            ?: document.selectFirst("meta[property=og:description]")?.attr("content")
-        val year = Regex("""(\d{4})""").find(
-            document.select(".spe span").firstOrNull { it.text().contains("Estreno:") }?.text()
-                ?: ""
+        val poster = document.selectFirst(".thumb img")?.attr("data-src")?.ifEmpty { null }
+            ?: document.selectFirst("meta[property=og:image]")?.attr("content")?.ifEmpty { null }
+        val plot   = document.selectFirst(".entry-content[itemprop=description] p")?.text()?.trim()
+            ?: document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
+        val year   = Regex("""(\d{4})""").find(
+            document.select(".spe span").firstOrNull { it.text().contains("Estreno:") }?.text() ?: ""
         )?.groupValues?.get(1)?.toIntOrNull()
-        val type = if (url.contains("/tv/")) TvType.Anime else TvType.AnimeMovie
+        val type   = if (url.contains("/tv/")) TvType.Anime else TvType.AnimeMovie
 
-        val status =
-            document.select(".spe span").firstOrNull { it.text().contains("Estado:") }?.text()
-                ?.let {
-                    if (it.contains(
-                            "Finalizado",
-                            true
-                        )
-                    ) ShowStatus.Completed else if (it.contains(
-                            "En curso",
-                            true
-                        )
-                    ) ShowStatus.Ongoing else null
-                }
+        val status = document.select(".spe span").firstOrNull { it.text().contains("Estado:") }?.text()?.let {
+            if (it.contains("Finalizado", true)) ShowStatus.Completed
+            else if (it.contains("En curso", true)) ShowStatus.Ongoing
+            else null
+        }
 
         val cast = document.select(".cvlist .cvitem").mapNotNull { item ->
-            val actorName =
-                item.selectFirst(".cvactor .charname")?.text()?.trim() ?: return@mapNotNull null
-            val charName = item.selectFirst(".cvchar .charname")?.text()?.trim()
-            val actorImg = item.selectFirst(".cvactor img")
-                ?.let { it.attr("data-src").ifEmpty { it.attr("src") } }
+            val actorName = item.selectFirst(".cvactor .charname")?.text()?.trim() ?: return@mapNotNull null
+            val charName  = item.selectFirst(".cvchar .charname")?.text()?.trim()
+            val actorImg  = item.selectFirst(".cvactor img")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }?.ifEmpty { null }
             Actor(actorName, actorImg) to charName
         }
 
         val episodes = document.select(".eplister ul li").mapNotNull { element ->
-            val link = element.selectFirst("a")?.attr("href") ?: return@mapNotNull null
-            val num = element.selectFirst(".epl-num")?.text()?.trim()?.toIntOrNull()
-            val name = element.selectFirst(".epl-title")?.text()?.trim()
+            val link     = element.selectFirst("a")?.attr("href")?.ifEmpty { null } ?: return@mapNotNull null
+            val num      = element.selectFirst(".epl-num")?.text()?.trim()?.toIntOrNull()
+            val name     = element.selectFirst(".epl-title")?.text()?.trim()
+            val dateText = element.selectFirst(".epl-date")?.text()?.trim()
+
+            val formattedDate = dateText?.let {
+                val inputFormat  = SimpleDateFormat("MMMM d, yyyy", Locale("es"))
+                val outputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT)
+                val parsedDate   = inputFormat.parse(it)
+                if (parsedDate != null) outputFormat.format(parsedDate) else null
+            }
 
             newEpisode(link) {
-                this.name = name
-                this.episode = num
+                this.name      = name
+                this.episode   = num
+                this.posterUrl = poster
+                addDate(formattedDate)
             }
         }.reversed()
 
+        val recommendations = document.select("#wpop-items .wpop-weekly li").mapNotNull { element ->
+            val href      = element.selectFirst(".leftseries h4 a")?.attr("href")?.ifEmpty { null } ?: return@mapNotNull null
+            val itemTitle = element.selectFirst(".leftseries h4 a")?.text()
+                ?.replace(Regex("""\(.*?\)"""), "")
+                ?.replace(Regex("""Temporada\s*\d*""", RegexOption.IGNORE_CASE), "")
+                ?.trim()?.ifEmpty { null } ?: return@mapNotNull null
+            val rawImg    = element.selectFirst(".imgseries img")?.let { it.attr("data-src").ifEmpty { it.attr("src") } }?.ifEmpty { null }
+            val itemImg   = rawImg?.replace(Regex("""\?resize=\d+,\d+"""), "?resize=300,400")
+
+            newAnimeSearchResponse(itemTitle, href, type) {
+                this.posterUrl = itemImg
+            }
+        }
+
         return newAnimeLoadResponse(title, url, type) {
-            this.posterUrl = poster
-            this.plot = plot
-            this.year = year
-            this.showStatus = status
-            this.tags = document.select(".genxed a").map { it.text() }
-            this.recommendations = document.select("article.bs").mapNotNull { it.toSearchResult() }
+            this.posterUrl       = poster
+            this.plot            = plot
+            this.year            = year
+            this.showStatus      = status
+            this.tags            = document.select(".genxed a").map { it.text() }
+            this.recommendations = recommendations
             addActors(cast)
             addEpisodes(DubStatus.Subbed, episodes)
         }
@@ -178,8 +195,9 @@ class AnimeYTX : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        var linkFound = false
         try {
-            Log.d("animeytx", data)
+            Log.d(TAG, data)
             val response = app.get(data)
             response.document.select("select.mirror option").forEach { option ->
                 val encodedValue = option.attr("value").takeIf { it.isNotBlank() } ?: return@forEach
@@ -189,65 +207,91 @@ class AnimeYTX : MainAPI() {
                     String(Base64.decode(encodedValue, Base64.DEFAULT))
                 )?.groupValues?.get(1) ?: return@forEach
 
-                if (iframeUrl.contains("vipbanner") || serverName.contains("VIP", true)) return@forEach
+                if (iframeUrl.contains("vipbanner") || serverName.contains(
+                        "VIP",
+                        true
+                    )
+                ) return@forEach
 
                 if (iframeUrl.contains("mytsumi.com")) {
-                    Log.d("animeytx", iframeUrl)
+                    Log.d(TAG, iframeUrl)
 
-                    val initialRes = app.get(iframeUrl, referer = data)
-
-                    val playLink = initialRes.document.select("div.play a").attr("href")
-                    val targetUrl = if (playLink.isNotBlank()) {
-                        Log.d("animeytx", playLink)
-                        playLink
-                    } else {
-                        iframeUrl
-                    }
+                    val containerId =
+                        Regex("""[?&]value=([^&]+)""").find(iframeUrl)?.groupValues?.get(1)
+                            ?: return@forEach
+                    val targetUrl = "https://mytsumi.com/multiplayer/contenedor.php?id=$containerId"
 
                     val pageText = app.get(targetUrl, referer = iframeUrl).text
 
-                    Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""").find(pageText)?.groupValues?.get(1)?.let { json ->
+                    Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""").find(pageText)?.groupValues?.get(
+                        1
+                    )?.let { json ->
                         try {
                             val jsonArray = JSONArray(json)
                             for (i in 0 until jsonArray.length()) {
                                 val tab = jsonArray.getJSONObject(i)
-                                val url = tab.getString("url").replace("\\/", "/")
+                                val url = tab.getString("url").replace("\\/", "")
+                                val isMp4 = tab.optBoolean("is_mp4", false)
+                                val tabName = tab.optString("tab_name", "Mytsumi")
 
                                 if (url.isNotBlank() && url != "about:blank") {
-                                    Log.d("animeytx", "Tab Extractor: $url")
-                                    loadExtractor(url, targetUrl, subtitleCallback, callback)
+                                    Log.d(TAG, "Tab Extractor: $url")
+                                    if (isMp4) {
+                                        callback(
+                                            newExtractorLink(
+                                                source = tabName,
+                                                name = tabName,
+                                                url = url,
+                                                type = ExtractorLinkType.VIDEO
+                                            )
+                                        )
+                                        linkFound = true
+                                    } else {
+                                        loadExtractor(url, targetUrl, subtitleCallback) {
+                                            linkFound = true
+                                            callback(it)
+                                        }
+                                    }
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.d("animeytx", "${e.message}")
+                            Log.d(TAG, "${e.message}")
                         }
                     }
 
-                    Regex("""const\s+downloadsByQuality\s*=\s*(\{.*?\});""").find(pageText)?.groupValues?.get(1)?.let { json ->
+                    Regex("""const\s+downloadsByQuality\s*=\s*(\{.*?\});""").find(pageText)?.groupValues?.get(
+                        1
+                    )?.let { json ->
                         try {
                             val dlJson = JSONObject(json)
                             dlJson.keys().forEach { quality ->
                                 val items = dlJson.getJSONArray(quality)
                                 for (i in 0 until items.length()) {
                                     val item = items.getJSONObject(i)
-                                    val dlUrl = item.getString("download_url").replace("\\/", "/")
-                                    Log.d("animeytx", "Loading Download Link: $dlUrl")
-                                    loadExtractor(dlUrl, targetUrl, subtitleCallback, callback)
+                                    val dlUrl = item.getString("download_url").replace("\\/", "")
+                                    Log.d(TAG, "Loading Download Link: $dlUrl")
+                                    loadExtractor(dlUrl, targetUrl, subtitleCallback) {
+                                        linkFound = true
+                                        callback(it)
+                                    }
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.d("animeytx", "${e.message}")
+                            Log.d(TAG, "${e.message}")
                         }
                     }
 
                 } else {
-                    loadExtractor(iframeUrl, data, subtitleCallback, callback)
+                    loadExtractor(iframeUrl, data, subtitleCallback) {
+                        linkFound = true
+                        callback(it)
+                    }
                 }
             }
         } catch (e: Exception) {
-            Log.d("animeytx", "${e.message}")
+            Log.d(TAG, "${e.message}")
             return false
         }
-        return true
+        return linkFound
     }
 }

@@ -19,7 +19,7 @@ import kotlin.coroutines.resume
 
 open class EmbedSporty(context: Context) : EmbedStreams(context) {
     override val name = "EmbedSporty"
-    override val mainUrl = "https://embedsporty.top"
+    override val mainUrl = "https://embed.st"
 }
 open class EmbedStreams(context: Context) : ExtractorApi() {
     override val name = "EmbedStreams"
@@ -151,25 +151,25 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
     private suspend fun processVideoUrl(videoUrl: String, callback: (ExtractorLink) -> Unit) {
 //       Log.d("kraptor_$name", "Video URL: $videoUrl")
         val kaynakAdı = if (videoUrl.contains("alpha")) {
-            "Alpha-En Güvenilir 720p 30fps"
+            "Alpha-Most Reliable 720p 30fps"
         } else if (videoUrl.contains("bravo")) {
-            "Bravo-Yüksek Fps ama Düşük Bitrate"
+            "Bravo-High FPS but Low Bitrate"
         } else if (videoUrl.contains("charlie")) {
-            "Charlie-Bazen kötü kaliteli yayın verebilir"
+            "Charlie-May sometimes have poor quality"
         } else if (videoUrl.contains("delta")) {
-            "Delta-Yedek, fena değil (gecikme olabilir/yüklenmeyebilir)"
+            "Delta-Backup, not bad (may lag/fail to load)"
         } else if (videoUrl.contains("echo")) {
-            "Echo-İyi sayılabilecek kalite"
+            "Echo-Decent quality"
         } else if (videoUrl.contains("foxtrot")) {
             "Foxtrot"
         } else if (videoUrl.contains("golf")) {
-            "Golf-Yüksek kalite, doğrudan kaynaktan"
+            "Golf-High quality, direct from source"
         } else if (videoUrl.contains("intel")) {
-            "Intel-Geniş etkinlik kapsamı, şüpheli kalite"
+            "Intel-Wide event coverage, questionable quality"
         } else if (videoUrl.contains("admin") || videoUrl.contains("poocloud")) {
-            "Admin-Admin tarafından eklenen"
+            "Admin-Added by admin"
         } else if (videoUrl.contains("hotel")) {
-            "Hotel-Çok yüksek kalite"
+            "Hotel-Very high quality"
         } else {
             "Streamed"
         }

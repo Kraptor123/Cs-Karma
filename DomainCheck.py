@@ -112,13 +112,16 @@ class MainUrlUpdater:
 
     def _sadece_domain_al(self, url, https_tercih=True):
         # URL'den temiz domain kısmını çeker
-        if not url: return None
-        try:
-            parsed = urlparse(url if "://" in url else f"http://{url}")
-            scheme = "https" if https_tercih else parsed.scheme
-            return f"{scheme}://{parsed.netloc}"
-        except Exception:
-            return None
+          if not url: return None
+          try:
+              parsed = urlparse(url if "://" in url else f"http://{url}")
+              scheme = "https" if https_tercih else parsed.scheme
+              netloc = parsed.netloc
+              if netloc.startswith("www."):
+                  netloc = netloc[4:]
+              return f"{scheme}://{netloc}"
+          except Exception:
+              return None
 
     @property
     def mainurl_listesi(self):

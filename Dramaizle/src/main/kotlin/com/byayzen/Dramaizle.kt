@@ -125,29 +125,25 @@ class DramaFlix : MainAPI() {
         }
 
         val tagslist = mutableListOf<String>()
-        series.tags?.let { tagslist.addAll(it) }
+        series.tags?.mapNotNull { it.name }?.let { tagslist.addAll(it) }
         series.platform?.let { tagslist.add(it) }
 
-        val episodes = res.episodes.map { bolum ->
-            val data = bolum.toJson()
-            val thumb = bolum.thumbnail?.let { img ->
-                if (img.contains("awscover.netshort.com")) img.replace(
-                    "https://",
-                    "http://"
-                ) else img
-            }
+        val beleslimit = res.access?.free_episode_limit ?: res.episodes.size
+        val episodes   = res.episodes
+            .filter { (it.episode_number ?: 0) <= beleslimit }
+            .map { bolum ->
+                val data = bolum.toJson()
 
-            newEpisode(data) {
-                this.name = "Bölüm ${bolum.episode_number}"
-                this.episode = bolum.episode_number
-                this.posterUrl = thumb
+                newEpisode(data) {
+                    this.episode   = bolum.episode_number
+                    this.posterUrl = fixUrlNull(poster)
+                }
             }
-        }
 
         return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl = fixUrlNull(poster)
-            this.plot = description
-            this.tags = tagslist
+            this.plot      = description
+            this.tags      = tagslist
         }
     }
 
@@ -158,20 +154,33 @@ class DramaFlix : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val bolum = AppUtils.parseJson<Bolum>(data)
-        val ticketResponse = app.get("$mainUrl/api/cdn-ticket", headers = mapOf("Referer" to "$mainUrl/tr"))
+        val ticketResponse =
+            app.get("$mainUrl/api/cdn-ticket", headers = mapOf("Referer" to "$mainUrl/tr"))
         val dfexp = ticketResponse.cookies["dfexp"]?.let { "dfexp=$it" }
         val dfsig = ticketResponse.cookies["dfsig"]?.let { "dfsig=$it" }
         val currentCookie = listOfNotNull(dfexp, dfsig).joinToString("; ")
 
+        val subtitleHeaders = mutableMapOf<String, String>(
+            "Referer" to mainUrl
+        )
+        if (currentCookie.isNotEmpty()) {
+            subtitleHeaders["Cookie"] = currentCookie
+        }
+
         bolum.subtitles?.forEach { altyazi ->
             val label = altyazi.label ?: altyazi.language
             val fixedlabel = if (label.uppercase() == "TR") "Türkçe" else label
+            Log.d("ayzen", fixedlabel)
             subtitleCallback.invoke(
-                newSubtitleFile(fixedlabel, altyazi.url)
+                newSubtitleFile(fixedlabel, altyazi.url) {
+                    this.headers = subtitleHeaders
+                }
             )
+            Log.d("ayzen", altyazi.url)
         }
 
         bolum.url?.let { link ->
+            Log.d("ayzen", link)
             callback.invoke(
                 newExtractorLink(
                     source = this.name,
@@ -189,36 +198,51 @@ class DramaFlix : MainAPI() {
         return true
     }
 
+
+    data class TagItem(
+        @param:JsonProperty("id")   val id: Int?,
+        @param:JsonProperty("name") val name: String?,
+        @param:JsonProperty("slug") val slug: String?
+    )
+
+    data class Access(
+        @param:JsonProperty("free_episode_limit") val free_episode_limit: Int?,
+        @param:JsonProperty("is_premium")         val is_premium: Boolean?,
+        @param:JsonProperty("reason")             val reason: String?
+    )
+
     @Suppress("PropertyName")
     data class Seri(
-        @param:JsonProperty("id") val id: Int,
-        @param:JsonProperty("slug") val slug: String,
-        @param:JsonProperty("title") val title: String,
-        @param:JsonProperty("description") val description: String?,
-        @param:JsonProperty("cover_image") val cover_image: String,
-        @param:JsonProperty("platform") val platform: String?,
-        @param:JsonProperty("total_episodes") val total_episodes: Int?,
-        @param:JsonProperty("tags") val tags: List<String>?,
-        @param:JsonProperty("createdAt") val createdAt: Long?
+        @param:JsonProperty("id")             val id: Int,
+        @param:JsonProperty("slug")           val slug: String,
+        @param:JsonProperty("title")          val title: String,
+        @param:JsonProperty("description")    val description: String?,
+        @param:JsonProperty("cover_image")     val cover_image: String,
+        @param:JsonProperty("backdrop_image")  val backdrop_image: String?,
+        @param:JsonProperty("platform")        val platform: String?,
+        @param:JsonProperty("total_episodes")  val total_episodes: Int?,
+        @param:JsonProperty("tags")            val tags: List<TagItem>?,
+        @param:JsonProperty("createdAt")       val createdAt: Long?
     )
 
     data class Detay(
-        @param:JsonProperty("series") val series: Seri,
+        @param:JsonProperty("access")   val access: Access?,
+        @param:JsonProperty("series")   val series: Seri,
         @param:JsonProperty("episodes") val episodes: List<Bolum>
     )
 
     @Suppress("PropertyName")
     data class Bolum(
-        @param:JsonProperty("id") val id: Int,
+        @param:JsonProperty("id")             val id: Int,
         @param:JsonProperty("episode_number") val episode_number: Int,
-        @param:JsonProperty("url") val url: String?,
-        @param:JsonProperty("thumbnail") val thumbnail: String?,
-        @param:JsonProperty("subtitles") val subtitles: List<Altyazi>?
+        @param:JsonProperty("url")            val url: String?,
+        @param:JsonProperty("thumbnail")      val thumbnail: String?,
+        @param:JsonProperty("subtitles")      val subtitles: List<Altyazi>?
     )
 
     data class Altyazi(
         @param:JsonProperty("language") val language: String,
-        @param:JsonProperty("url") val url: String,
-        @param:JsonProperty("label") val label: String?
+        @param:JsonProperty("url")      val url: String,
+        @param:JsonProperty("label")    val label: String?
     )
 }

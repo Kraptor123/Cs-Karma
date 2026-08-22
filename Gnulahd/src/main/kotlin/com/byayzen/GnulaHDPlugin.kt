@@ -1,6 +1,7 @@
 package com.byayzen
 
 import com.lagradost.cloudstream3.extractors.FileMoon
+import com.lagradost.cloudstream3.extractors.VidStack
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
@@ -18,5 +19,12 @@ class GnulaHDPlugin: Plugin() {
         registerExtractorAPI(Voe1())
         registerExtractorAPI(CrystalTreatmentEast())
         registerExtractorAPI(Voe())
+        registerExtractorAPI(GDTVid())
     }
+}
+
+
+class GDTVid : VidStack() {
+    override var name = "GDTVid"
+    override var mainUrl = "https://gdtvid.p2pplay.pro"
 }

@@ -21,21 +21,21 @@ class DoramasLatinoX : MainAPI() {
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     override val mainPage = mainPageOf(
-        "https://doramaslatinox.com/movies/" to "Todas las Películas",
-        "https://doramaslatinox.com/estado/completo/" to "Completos",
-        "https://doramaslatinox.com/estado/emision/" to "En Emision",
-        "https://doramaslatinox.com/audio/latino/" to "Latino",
-        "https://doramaslatinox.com/audio/subtitulado" to "Subtitulado",
-        "https://doramaslatinox.com/tipo/dorama/" to "Doramas",
-        "https://doramaslatinox.com/tipo/serie/" to "Series",
-        "https://doramaslatinox.com/pais/corea-del-sur/" to "Corea del Sur",
-        "https://doramaslatinox.com/pais/china/" to "China",
-        "https://doramaslatinox.com/pais/japon/" to "Japón",
-        "https://doramaslatinox.com/pais/tailandia/" to "Tailandia",
-        "https://doramaslatinox.com/pais/taiwan/" to "Taiwán",
-        "https://doramaslatinox.com/pais/singapur/" to "Singapur",
-        "https://doramaslatinox.com/pais/estados-unidos/" to "Estados Unidos",
-        "https://doramaslatinox.com/series/" to "Todas las Series"
+        "$mainUrl/movies/" to "Todas las Películas",
+        "$mainUrl/estado/completo/" to "Completos",
+        "$mainUrl/estado/emision/" to "En Emision",
+        "$mainUrl/audio/latino/" to "Latino",
+        "$mainUrl/audio/subtitulado" to "Subtitulado",
+        "$mainUrl/tipo/dorama/" to "Doramas",
+        "$mainUrl/tipo/serie/" to "Series",
+        "$mainUrl/pais/corea-del-sur/" to "Corea del Sur",
+        "$mainUrl/pais/china/" to "China",
+        "$mainUrl/pais/japon/" to "Japón",
+        "$mainUrl/pais/tailandia/" to "Tailandia",
+        "$mainUrl/pais/taiwan/" to "Taiwán",
+        "$mainUrl/pais/singapur/" to "Singapur",
+        "$mainUrl/pais/estados-unidos/" to "Estados Unidos",
+        "$mainUrl/series/" to "Todas las Series"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse? {
