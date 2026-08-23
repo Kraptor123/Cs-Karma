@@ -26,7 +26,7 @@ class Movix : MainAPI() {
     override val hasMainPage = true
     override var lang = "fr"
     override val hasQuickSearch = true
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime, TvType.Live)
 
     override val mainPage = mainPageOf(
         "movie/now_playing" to "Nouveaux Films",
@@ -63,6 +63,8 @@ class Movix : MainAPI() {
         "tv/9648" to "Mystère TV",
         "tv/10763" to "Actualités",
         "tv/10764" to "Téléréalité",
+        "livetv/catalog/tv/northlive_sport" to "Live TV - Sports",
+        "livetv/catalog/tv/vavoo_france" to "Live TV - France",
     )
 
     private fun TmdbResult.toMainPageResult(type: String): SearchResponse? {
@@ -85,6 +87,22 @@ class Movix : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val d = request.data
+        if (d.startsWith("livetv/catalog/")) {
+            val currentUrl = mainUrl
+            val domainsilici = currentUrl
+                .removePrefix("https://").removePrefix("http://").removePrefix("www.")
+                .removeSuffix("/")
+            val apibase = "https://api.$domainsilici/api"
+            val apiheaders = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",
+                "Origin" to "https://$domainsilici",
+                "Referer" to "https://$domainsilici/"
+            )
+            with(MovixLive) {
+                return getMainPageLive(request, apibase, apiheaders)
+            }
+        }
+
         val t = if (d.contains("movie")) "movie" else "tv"
 
         val url = when {
@@ -117,6 +135,11 @@ class Movix : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
+        if (url.contains("/live/") || url.startsWith("live/")) {
+            with(MovixLive) {
+                return loadLive(url)
+            }
+        }
         val id = url.split("/").last()
         val type = if (url.contains("movie")) "movie" else "tv"
         val currentlang = tmdblang.split("-").first()
@@ -233,10 +256,21 @@ class Movix : MainAPI() {
             if (type == "tv" && season != null && episode != null) "?season=$season&episode=$episode" else ""
 
         val apiheaders = mapOf(
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:149.0) Gecko/20100101 Firefox/149.0",
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:154.0) Gecko/20100101 Firefox/154.0",
             "Origin" to "https://$domainsilici",
             "Referer" to "https://$domainsilici/"
         )
+
+        if (data.contains("/live/") || data.startsWith("live/")) {
+            return@coroutineScope MovixLive.loadLiveLinks(
+                data,
+                apibase,
+                apiheaders,
+                currentUrl,
+                subCallback,
+                callback
+            )
+        }
 
         try {
             val tmdbres =

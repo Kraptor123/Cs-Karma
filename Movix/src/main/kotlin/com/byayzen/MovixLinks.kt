@@ -238,7 +238,7 @@ object MovixLinks {
         callback: (ExtractorLink) -> Unit
     ) {
         val linksWithDetails = mutableListOf<Pair<MovixSwiftflowLink, String>>()
-        Log.d("Movix", "SwiftFlow başladı: $type, episode: $episode")
+        Log.d("Movix", "$type | $episode")
         tryParseJson<MovixSwiftflowResponse>(response)?.let { res ->
             if (type == "movie") {
                 res.vf?.forEach { linksWithDetails.add(it to "VF") }
@@ -262,11 +262,10 @@ object MovixLinks {
 
         val distinctItems = linksWithDetails.distinctBy { it.first.url }.filter { !it.first.url.isNullOrBlank() }
         if (distinctItems.isEmpty()) {
-            Log.d("Movix", "[SwiftFlow] Hiç link bulunamadı.")
             return
         }
 
-        Log.d("Movix", "[SwiftFlow] Bulunan link sayısı: ${distinctItems.size}")
+        Log.d("Movix", "${distinctItems.size}")
         distinctItems.forEach { (item, lang) ->
             val linkUrl = item.url ?: return@forEach
             val label = item.label?.trim()
@@ -275,7 +274,7 @@ object MovixLinks {
                 if (lang.isNotBlank()) append(" | $lang")
                 if (!label.isNullOrBlank()) append(" ($label)")
             }
-            Log.d("Movix", "[SwiftFlow] İşleniyor: $linkUrl ($brandName)")
+            Log.d("Movix", "$linkUrl")
             loadcustomextractor(brandName, linkUrl, mainUrl, subtitlecallback, callback)
         }
     }
