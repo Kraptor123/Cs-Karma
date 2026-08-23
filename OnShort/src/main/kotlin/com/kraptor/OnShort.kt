@@ -1,4 +1,4 @@
-// ! This Extension Made By @kraptor for GizliKeyif
+// ! This Extension Made By @kraptor for csKarma
 
 package com.kraptor
 
@@ -42,7 +42,11 @@ class OnShort : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get("${request.data}").document
+        val document = if (page==1){
+            app.get("${request.data}").document
+        } else {
+            app.get("${request.data}page/$page/").document
+        }
         val home     = document.select("article.series-card").mapNotNull { it.toMainPageResult() }
 
         return newHomePageResponse(list = HomePageList(request.name, home, true))
