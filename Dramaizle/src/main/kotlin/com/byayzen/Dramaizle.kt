@@ -10,7 +10,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import java.util.Locale
 
 class DramaFlix : MainAPI() {
-    override var mainUrl = "https://dramaflix.cc"
+    override var mainUrl = "https://dramaflix.net"
     override var name = "DramaFlix"
     override var lang = "tr"
     override val hasMainPage = true
