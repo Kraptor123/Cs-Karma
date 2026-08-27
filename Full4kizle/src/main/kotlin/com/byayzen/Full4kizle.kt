@@ -8,7 +8,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
 class Full4kizle : MainAPI() {
-    override var mainUrl = "https://plusizle.net"
+    override var mainUrl = "https://plusizle.org"
     override var name = "Full4Kİzle"
     override val hasMainPage = true
     override var lang = "tr"

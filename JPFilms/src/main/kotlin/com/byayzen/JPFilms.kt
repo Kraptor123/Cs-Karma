@@ -12,7 +12,7 @@ import org.json.JSONArray
 import org.jsoup.Jsoup
 
 class JPFilms : MainAPI() {
-    override var mainUrl = "https://jp-films.com"
+    override var mainUrl = "https://kodasusaka.com"
     override var name = "JPFilms"
     override val hasMainPage = true
     override var lang = "en"
