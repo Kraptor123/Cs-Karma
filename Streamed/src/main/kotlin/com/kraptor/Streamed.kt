@@ -299,22 +299,49 @@ class Streamed() : MainAPI() {
                         )
                         Log.d("Ayzen", "$index $sType ${streams.size}")
 
-                        streams.forEach {
-                            allStreams.add(Pair(it, sType))
+                        if (streams.isNotEmpty()) {
+                            streams.forEach {
+                                allStreams.add(Pair(it, sType))
+                            }
+                        } else {
+                            allStreams.add(
+                                Pair(
+                                    Stream(
+                                        id = sId,
+                                        streamNo = 1,
+                                        language = "English",
+                                        embedUrl = "https://embed.st/embed/$sType/$sId/1",
+                                        source = sType,
+                                        hd = true,
+                                        viewers = 0
+                                    ),
+                                    sType
+                                )
+                            )
                         }
                     } catch (e: Exception) {
+                        allStreams.add(
+                            Pair(
+                                Stream(
+                                    id = sId,
+                                    streamNo = 1,
+                                    language = "English",
+                                    embedUrl = "https://embed.st/embed/$sType/$sId/1",
+                                    source = sType,
+                                    hd = true,
+                                    viewers = 0
+                                ),
+                                sType
+                            )
+                        )
                     }
                 }
             }
 
             val streamsWithPositiveViewers = allStreams.filter { viewersOf(it.first) > 0 }
+            val zeroViewerStreams = allStreams.filter { viewersOf(it.first) <= 0 }
             val streamsToProcess: List<Pair<Stream, String>> =
-                if (streamsWithPositiveViewers.size >= 2) {
-                    streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) }
-                } else {
-                    val zeroViewerStreams = allStreams.filter { viewersOf(it.first) == 0 }
-                    streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) } + zeroViewerStreams
-                }
+                streamsWithPositiveViewers.sortedByDescending { viewersOf(it.first) } + zeroViewerStreams
 
             Log.d("Ayzen", "${streamsToProcess.size}")
 

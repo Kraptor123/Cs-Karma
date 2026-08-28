@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.lagradost.cloudstream3.*
@@ -38,7 +39,7 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
                 getVideoUrlWithWebView(appContext, url)
             }
             if (videoUrl != null) {
-                processVideoUrl(videoUrl, callback)
+                processVideoUrl(url, videoUrl, callback)
             }
         } catch (e: Exception) { }
     }
@@ -56,47 +57,58 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
                         settings.allowFileAccess = true
                         settings.allowContentAccess = true
                         settings.mediaPlaybackRequiresUserGesture = false
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.7103.48 Safari/537.36"
 
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
-//                                Log.d("kraptor_webview", "Sayfa yükleniyor: $url")
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
-//                                Log.d("kraptor_webview", "Sayfa yüklendi: $url")
 
-                                // Play butonuna tıkla
-                                Handler(Looper.getMainLooper()).postDelayed({
-                                    view?.evaluateJavascript("""
-                                        (function() {
-                                            try {
-                                                // JWPlayer play butonunu bul ve tıkla
-                                                var playButton = document.querySelector('.jw-icon-display');
-                                                if (playButton) {
-                                                    console.log('Play butonuna tıklanıyor...');
-                                                    playButton.click();
-                                                    return 'Play butonuna tıklandı';
-                                                }
-                                                
-                                                // Alternatif olarak direkt JWPlayer API'sini kullan
-                                                if (typeof jwplayer !== 'undefined') {
-                                                    jwplayer().play();
-                                                    return 'JWPlayer API ile oynatıldı';
-                                                }
-                                                
-                                                return 'Play butonu bulunamadı';
-                                            } catch(e) {
-                                                return 'Hata: ' + e.message;
+                                val playScript = """
+                                    (function() {
+                                        try {
+                                            // JWPlayer
+                                            var playButton = document.querySelector('.jw-icon-display, .jw-display-icon-container');
+                                            if (playButton) {
+                                                playButton.click();
                                             }
-                                        })();
-                                    """.trimIndent()) { result ->
-//                                        Log.d("kraptor_webview", "Play butonu sonucu: $result")
-                                    }
-                                }, 2000) // 2 saniye bekle, sayfa tam yüklensin
+                                            if (typeof jwplayer !== 'undefined') {
+                                                try { jwplayer().play(); } catch(e) {}
+                                            }
 
-//                                Log.d("kraptor_webview", "shouldInterceptRequest bekleniyor...")
+                                            // Clappr / Video tags
+                                            if (window.player && typeof window.player.play === 'function') {
+                                                try { window.player.play(); } catch(e) {}
+                                            }
+                                            var vids = document.querySelectorAll('video');
+                                            vids.forEach(function(v) {
+                                                try { v.muted = true; v.play(); } catch(e) {}
+                                            });
+
+                                            // Unmute or play buttons
+                                            var unmuteBtn = document.querySelector('button.unmute, #UnMutePlayer button, .player-poster, [data-player] button');
+                                            if (unmuteBtn) {
+                                                unmuteBtn.click();
+                                            }
+                                        } catch(e) {}
+                                    })();
+                                """.trimIndent()
+
+                                val playRunnable = object : Runnable {
+                                    var count = 0
+                                    override fun run() {
+                                        if (!captured.get() && count < 4) {
+                                            count++
+                                            view?.evaluateJavascript(playScript, null)
+                                            Handler(Looper.getMainLooper()).postDelayed(this, 1500)
+                                        }
+                                    }
+                                }
+                                Handler(Looper.getMainLooper()).postDelayed(playRunnable, 1000)
                             }
 
                             override fun shouldInterceptRequest(
@@ -104,11 +116,9 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
                                 request: WebResourceRequest?
                             ): android.webkit.WebResourceResponse? {
                                 val reqUrl = request?.url?.toString() ?: return null
-//                                Log.d("kraptor_webview", "İstek: $reqUrl")
 
-                                // Sadece .m3u8 ile biten URL'leri yakala
-                                if (reqUrl.endsWith(".m3u8") && !captured.get()) {
-//                                    Log.d("kraptor_webview", "✅ Video URL'si yakalandı: $reqUrl")
+                                // .m3u8 veya .mpd içeren URL'leri yakala (query parametreleri olabilir)
+                                if ((reqUrl.contains(".m3u8", ignoreCase = true) || reqUrl.contains(".mpd", ignoreCase = true)) && !captured.get()) {
                                     if (captured.compareAndSet(false, true)) {
                                         cont.resume(reqUrl)
                                         Handler(Looper.getMainLooper()).postDelayed({ destroy() }, 500)
@@ -125,14 +135,12 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
                     // Zaman aşımı ekle
                     Handler(Looper.getMainLooper()).postDelayed({
                         if (captured.compareAndSet(false, true)) {
-//                            Log.d("kraptor_webview", "Zaman aşımı: URL bulunamadı")
                             cont.resume(null)
                             webView?.destroy()
                         }
-                    }, 15000) // 15 saniye timeout
+                    }, 15000)
 
                 } catch (e: Exception) {
-//                    Log.e("kraptor_webview", "WebView oluşturma hatası: ${e.message}")
                     if (captured.compareAndSet(false, true)) {
                         cont.resume(null)
                         webView?.destroy()
@@ -148,30 +156,43 @@ open class EmbedStreams(context: Context) : ExtractorApi() {
         }
     }
 
-    private suspend fun processVideoUrl(videoUrl: String, callback: (ExtractorLink) -> Unit) {
-//       Log.d("kraptor_$name", "Video URL: $videoUrl")
-        val kaynakAdı = if (videoUrl.contains("alpha")) {
+    private suspend fun processVideoUrl(
+        embedUrl: String,
+        videoUrl: String,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val target = "$embedUrl $videoUrl".lowercase()
+        val kaynakAdı = if (target.contains("alpha")) {
             "Alpha-Most Reliable 720p 30fps"
-        } else if (videoUrl.contains("bravo")) {
+        } else if (target.contains("bravo")) {
             "Bravo-High FPS but Low Bitrate"
-        } else if (videoUrl.contains("charlie")) {
+        } else if (target.contains("charlie")) {
             "Charlie-May sometimes have poor quality"
-        } else if (videoUrl.contains("delta")) {
+        } else if (target.contains("delta")) {
             "Delta-Backup, not bad (may lag/fail to load)"
-        } else if (videoUrl.contains("echo")) {
+        } else if (target.contains("echo")) {
             "Echo-Decent quality"
-        } else if (videoUrl.contains("foxtrot")) {
+        } else if (target.contains("foxtrot")) {
             "Foxtrot"
-        } else if (videoUrl.contains("golf")) {
+        } else if (target.contains("golf")) {
             "Golf-High quality, direct from source"
-        } else if (videoUrl.contains("intel")) {
+        } else if (target.contains("intel")) {
             "Intel-Wide event coverage, questionable quality"
-        } else if (videoUrl.contains("admin") || videoUrl.contains("poocloud")) {
+        } else if (target.contains("admin") || target.contains("poocloud")) {
             "Admin-Added by admin"
-        } else if (videoUrl.contains("hotel")) {
+        } else if (target.contains("hotel")) {
             "Hotel-Very high quality"
         } else {
-            "Streamed"
+            val sourceFromUrl = if (embedUrl.contains("/embed/")) {
+                embedUrl.substringAfter("/embed/").substringBefore("/").trim()
+            } else {
+                ""
+            }
+            if (sourceFromUrl.isNotEmpty()) {
+                sourceFromUrl.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            } else {
+                "Streamed"
+            }
         }
 
         callback.invoke(newExtractorLink(
