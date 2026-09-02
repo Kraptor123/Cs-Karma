@@ -18,13 +18,21 @@ class FullRaces : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie)
 
     override val mainPage = mainPageOf(
-        "${mainUrl}" to "F1 Races",
+        "${mainUrl}/f1-replays" to "All F1 Races",
+        "${mainUrl}/2026" to "Formula 1 2026",
+        "${mainUrl}/2025" to "Formula 1 2025",
+        "${mainUrl}/watch/formula_1/formula_1_2024/21" to "Formula 1 2024",
+        "${mainUrl}/formula1-2023" to "Formula 1 2023",
+        "${mainUrl}/formula1-2022" to "Formula 1 2022",
+        "${mainUrl}/formula1-2021" to "Formula 1 2021",
+        "${mainUrl}/formula1-2020" to "Formula 1 2020",
+        "${mainUrl}/f1-2019" to "Formula 1 2019",
+        "${mainUrl}/f1-archive-races" to "F1 Archive Races 2000-2018",
         "${mainUrl}/f2-full-races" to "F2 Races",
         "${mainUrl}/f3-full-races" to "F3 Races",
         "${mainUrl}/nascar" to "Nascar Races",
         "${mainUrl}/indycar" to "Indycar Races",
-        "${mainUrl}/formula-e" to "Formula E Races",
-        "${mainUrl}/2026" to "2026 Races",
+        "${mainUrl}/formula-e" to "Formula E Races"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
