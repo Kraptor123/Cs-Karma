@@ -2,13 +2,10 @@
 
 # `Cs-Karma`
 
-`Kısa Kodlar`: **cskarma** ya da **karmator**
 <br>
 `Short Codes`: **cskarma** or **karmator**
 
 <hr>
-
-Uygulamanın kurulu olduğu cihazda alttaki logoya tıklayıp kurulumu gerçekleştirebilirsiniz. 
 <br>
 <br>
 You can install the repository by clicking the logo down below on the device where the app is installed.
@@ -23,7 +20,7 @@ You can install the repository by clicking the logo down below on the device whe
   <a href="https://linktr.ee/kraptorcs">All Of My Links</a>
 </h2>
 
-# `Geliştiriciler` | `Developers`
+# `Developers`
 
 <table>
   <tr>
