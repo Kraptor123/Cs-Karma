@@ -3,10 +3,8 @@
 # `Cs-Karma`
 
 <br>
-`Short Codes`: **cskarma** or **karmator**
+-`Short Codes`: **cskarma** or **karmator**
 
-<hr>
-<br>
 <br>
 You can install the repository by clicking the logo down below on the device where the app is installed.
 
