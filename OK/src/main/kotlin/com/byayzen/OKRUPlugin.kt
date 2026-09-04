@@ -8,5 +8,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 class OKRUPlugin: Plugin() {
     override fun load() {
         registerMainAPI(OKRU())
+        registerExtractorAPI(OkRuExtractor())
     }
 }

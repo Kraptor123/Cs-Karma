@@ -2,6 +2,7 @@
 
 package com.byayzen
 
+import com.lagradost.api.Log
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Document
 import com.lagradost.cloudstream3.*
@@ -249,6 +250,7 @@ class OKRU : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit): Boolean
     {
+        Log.d(this.name, data)
         loadExtractor(data, mainUrl, subtitleCallback, callback)
         return true
     }
