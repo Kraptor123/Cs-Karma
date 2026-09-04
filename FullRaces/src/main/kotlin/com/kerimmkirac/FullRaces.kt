@@ -18,14 +18,14 @@ class FullRaces : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie)
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/f1-replays" to "All F1 Races",
+        "${mainUrl}/f1-race-replays" to "All F1 Races",
         "${mainUrl}/2026" to "Formula 1 2026",
         "${mainUrl}/2025" to "Formula 1 2025",
         "${mainUrl}/watch/formula_1/formula_1_2024/21" to "Formula 1 2024",
-        "${mainUrl}/formula1-2023" to "Formula 1 2023",
+        "${mainUrl}/f1-2023" to "Formula 1 2023",
         "${mainUrl}/formula1-2022" to "Formula 1 2022",
         "${mainUrl}/formula1-2021" to "Formula 1 2021",
-        "${mainUrl}/formula1-2020" to "Formula 1 2020",
+        "${mainUrl}/f1-2020" to "Formula 1 2020",
         "${mainUrl}/f1-2019" to "Formula 1 2019",
         "${mainUrl}/f1-archive-races" to "F1 Archive Races 2000-2018",
         "${mainUrl}/f2-full-races" to "F2 Races",
@@ -38,7 +38,6 @@ class FullRaces : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get("${request.data}/?page$page").document
         val home = document.select("div.short_item").mapNotNull { it.toMainPageResult() }
-
         return newHomePageResponse(HomePageList(request.name, home, true))
     }
 
