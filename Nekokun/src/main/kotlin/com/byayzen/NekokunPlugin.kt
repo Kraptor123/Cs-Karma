@@ -9,5 +9,6 @@ class NekokunPlugin: Plugin() {
     override fun load() {
         registerMainAPI(Nekokun())
         registerExtractorAPI(NekolionsExtractor())
+        registerExtractorAPI(NekostreamExtractor())
     }
 }

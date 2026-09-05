@@ -47,7 +47,8 @@ class Nekokun : MainAPI() {
             else "${request.data.removeSuffix("/")}/page/$page/"
         }
         val document = app.get(url).document
-        val home = document.select("div.listupd article.bs").mapNotNull { it.toMainPageResult() }.distinctBy { it.url }
+        val home = document.select("div.listupd article.bs").mapNotNull { it.toMainPageResult() }
+            .distinctBy { it.url }
         return newHomePageResponse(request.name, home, hasNext = home.isNotEmpty())
     }
 
@@ -66,7 +67,9 @@ class Nekokun : MainAPI() {
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val document = if (page == 1) app.get("${mainUrl}/?s=${query}").document
         else app.get("${mainUrl}/page/$page/?s=${query}").document
-        val aramacevap = document.select("div.listupd article.bs").mapNotNull { it.toMainPageResult() }.distinctBy { it.url }
+        val aramacevap =
+            document.select("div.listupd article.bs").mapNotNull { it.toMainPageResult() }
+                .distinctBy { it.url }
         return newSearchResponseList(aramacevap, hasNext = aramacevap.isNotEmpty())
     }
 
@@ -102,7 +105,9 @@ class Nekokun : MainAPI() {
         val duration = getDurationFromString(durationtext.replace("hr.", "h").replace("min.", "m"))
 
         if (tvtype == TvType.Movie) {
-            return newMovieLoadResponse(title, url, TvType.Movie, url) {
+            val movieepisodeurl = fixUrlNull(document.selectFirst("div.eplister ul li a")?.attr("href")) ?: url
+            Log.d("Ayzen", movieepisodeurl)
+            return newMovieLoadResponse(title, url, TvType.Movie, movieepisodeurl) {
                 this.posterUrl = poster
                 this.plot = description
                 this.year = year
@@ -145,9 +150,9 @@ class Nekokun : MainAPI() {
             this.score = rating?.let { Score.from(it, 10) }
             this.duration = duration
             this.recommendations = recommendations
+            this.showStatus = animestatus(statustext)
             addActors(actors)
             addTrailer(trailer)
-            this.showStatus = animestatus(statustext)
         }
     }
 
