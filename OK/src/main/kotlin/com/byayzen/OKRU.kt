@@ -248,11 +248,26 @@ class OKRU : MainAPI() {
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit): Boolean
-    {
-        Log.d(this.name, data)
-        loadExtractor(data, mainUrl, subtitleCallback, callback)
-        return true
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val cleanData = data.trim()
+        Log.d(this.name, cleanData)
+
+        if (cleanData.contains("ok.ru") || cleanData.contains("odnoklassniki.ru")) {
+            var isFound = false
+            OkRuExtractor().getUrl(cleanData, mainUrl, subtitleCallback) {
+                isFound = true
+                callback(it)
+            }
+            return isFound
+        }
+
+        var isFound = false
+        loadExtractor(cleanData, mainUrl, subtitleCallback) {
+            isFound = true
+            callback(it)
+        }
+        return isFound
     }
 
 data class SearchItem(val name: String? = null, val imageUrl: String? = null, val movie: SearchMovie? = null)
