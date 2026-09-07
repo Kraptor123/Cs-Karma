@@ -10,9 +10,9 @@ import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
 @CloudstreamPlugin
-class HenaojaraPlugin: Plugin() {
+class AnimejaraPlugin: Plugin() {
     override fun load() {
-        registerMainAPI(Henaojara())
+        registerMainAPI(Animejara())
         registerExtractorAPI(StreamWishExtractor())
         registerExtractorAPI(Mp4Upload())
         registerExtractorAPI(FileMoon())
