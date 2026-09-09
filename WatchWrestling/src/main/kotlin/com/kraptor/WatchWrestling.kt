@@ -26,18 +26,18 @@ class WatchWrestling : MainAPI() {
 
     override val mainPage = mainPageOf(
         "${mainUrl}/" to "Wrestling",
-        "${mainUrl}/wwe/" to "WWE",
-        "${mainUrl}/wwe-raw/" to "WWE Raw",
-        "${mainUrl}/wwe-smackdown/" to "WWE Smackdown",
+        "${mainUrl}/wwe56/" to "WWE",
+        "${mainUrl}/wwe-raw53/" to "WWE Raw",
+        "${mainUrl}/wwe-smackdown56/" to "WWE Smackdown",
         "${mainUrl}/main-events/" to "WWE Main Event",
         "${mainUrl}/wwe-nxt-show/" to "WWE NXT",
         "${mainUrl}/wwe-ppv61/" to "WWE PPV",
-        "${mainUrl}/wwe-totaldvas29/" to "WWE Total Divas",
+        "${mainUrl}/wwe-totaldvas30/" to "WWE Total Divas",
         "${mainUrl}/impact-wrestlingss31/" to "IMPACT Wrestling",
-        "${mainUrl}/ufc42/" to "UFC",
+        "${mainUrl}/ufc43/" to "UFC",
         "${mainUrl}/njpw52/" to "NJPW",
         "${mainUrl}/roh25/" to "ROH",
-        "${mainUrl}/aew66/" to "AEW (All Elite Wrestling)",
+        "${mainUrl}/aew68/" to "AEW (All Elite Wrestling)",
         "${mainUrl}/other-wrestling31/" to "Other Wrestling",
     )
 
