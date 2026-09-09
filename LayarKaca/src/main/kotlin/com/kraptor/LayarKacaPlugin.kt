@@ -17,5 +17,6 @@ class LayarKacaPlugin: Plugin() {
         registerExtractorAPI(Turbovidhls())
         registerExtractorAPI(Shortink())
         registerExtractorAPI(AbyssExtractor())
+        registerExtractorAPI(PlayCdnExtractor())
     }
 }

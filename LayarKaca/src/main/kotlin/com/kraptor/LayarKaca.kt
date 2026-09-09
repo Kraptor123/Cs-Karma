@@ -12,66 +12,72 @@ import org.json.JSONObject
 import java.net.URI
 
 class LayarKaca : MainAPI() {
-    override var mainUrl              = "https://tv12.lk21official.cc"
-    override var name                 = "LayarKaca"
-    override val hasMainPage          = true
-    override var lang                 = "id"
-    override val hasQuickSearch       = false
-    override val supportedTypes       = setOf(TvType.Movie, TvType.TvSeries)
+    override var mainUrl = "https://tv12.lk21official.cc"
+    override var name = "LayarKaca"
+    override val hasMainPage = true
+    override var lang = "id"
+    override val hasQuickSearch = false
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
+
     //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
     private var seriesUrl = "https://tv6.nontondrama.my"
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/populer"  to "Popular",
-        "$seriesUrl/latest-series/page/"  to "Series Terbaru",
-        "${mainUrl}/quality/bluray"       to "Bluray",
-        "${mainUrl}/country/japan"        to "Jepang",
-        "${mainUrl}/country/china"        to "Cina",
-        "${mainUrl}/genre/action"         to "Action",
-        "${mainUrl}/genre/adventure"      to "Adventure",
-        "${mainUrl}/genre/animation"      to "Animation",
-        "${mainUrl}/genre/biography"      to "Biography",
-        "${mainUrl}/genre/comedy"         to "Comedy",
-        "${mainUrl}/genre/crime"          to "Crime",
-        "${mainUrl}/genre/documentary"    to "Documentary",
-        "${mainUrl}/genre/drama"          to "Drama",
-        "${mainUrl}/genre/family"         to "Family",
-        "${mainUrl}/genre/fantasy"        to "Fantasy",
-        "${mainUrl}/genre/history"        to "History",
-        "${mainUrl}/genre/horror"         to "Horror",
-        "${mainUrl}/genre/musical"        to "Musical",
-        "${mainUrl}/genre/mystery"        to "Mystery",
-        "${mainUrl}/genre/romance"        to "Romance",
-        "${mainUrl}/genre/sci-fi"         to "Sci-Fi",
-        "${mainUrl}/genre/sport"          to "Sport",
-        "${mainUrl}/genre/thriller"       to "Thriller",
-        "${mainUrl}/genre/war"            to "War",
-        "${mainUrl}/genre/western"        to "Western",
+        "${mainUrl}/populer" to "Popular",
+        "$seriesUrl/latest-series/page/" to "Series Terbaru",
+        "${mainUrl}/quality/bluray" to "Bluray",
+        "${mainUrl}/country/japan" to "Jepang",
+        "${mainUrl}/country/china" to "Cina",
+        "${mainUrl}/genre/action" to "Action",
+        "${mainUrl}/genre/adventure" to "Adventure",
+        "${mainUrl}/genre/animation" to "Animation",
+        "${mainUrl}/genre/biography" to "Biography",
+        "${mainUrl}/genre/comedy" to "Comedy",
+        "${mainUrl}/genre/crime" to "Crime",
+        "${mainUrl}/genre/documentary" to "Documentary",
+        "${mainUrl}/genre/drama" to "Drama",
+        "${mainUrl}/genre/family" to "Family",
+        "${mainUrl}/genre/fantasy" to "Fantasy",
+        "${mainUrl}/genre/history" to "History",
+        "${mainUrl}/genre/horror" to "Horror",
+        "${mainUrl}/genre/musical" to "Musical",
+        "${mainUrl}/genre/mystery" to "Mystery",
+        "${mainUrl}/genre/romance" to "Romance",
+        "${mainUrl}/genre/sci-fi" to "Sci-Fi",
+        "${mainUrl}/genre/sport" to "Sport",
+        "${mainUrl}/genre/thriller" to "Thriller",
+        "${mainUrl}/genre/war" to "War",
+        "${mainUrl}/genre/western" to "Western",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val document = app.get("${request.data}/page/$page").document
-        val home     = document.select("div.gallery-grid article a").mapNotNull { it.toMainPageResult() }
+        val home =
+            document.select("div.gallery-grid article a").mapNotNull { it.toMainPageResult() }
 
         return newHomePageResponse(request.name, home)
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
-        val title     = this.selectFirst("h3")?.text() ?: return null
-        val href      = fixUrlNull(this.attr("href")) ?: return null
-        val img       = this.selectFirst("img")
-        val posterUrl = fixUrlNull(img?.attr("data-src").takeUnless { it.isNullOrEmpty() } ?: img?.attr("src"))
-        val score     = this.selectFirst("span[itemprop=ratingValue]")?.text()
+        val title = this.selectFirst("h3")?.text() ?: return null
+        val href = fixUrlNull(this.attr("href")) ?: return null
+        val img = this.selectFirst("img")
+        val posterUrl =
+            fixUrlNull(img?.attr("data-src").takeUnless { it.isNullOrEmpty() } ?: img?.attr("src"))
+        val score = this.selectFirst("span[itemprop=ratingValue]")?.text()
 
         return newMovieSearchResponse(title, href, TvType.Movie) {
             this.posterUrl = posterUrl
-            this.score     = Score.from10(score)
+            this.score = Score.from10(score)
         }
     }
 
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val document = app.get("https://gudangvape.com/search.php?s=$query&page=$page", referer = "${mainUrl}/").text
+        val document = app.get(
+            "https://gudangvape.com/search.php?s=$query&page=$page",
+            referer = "${mainUrl}/"
+        ).text
         val mapper = mapper.readValue<SearchApi>(document)
         val aramaCevap = mapper.data.mapNotNull { it.toSearchResult() }
 
@@ -103,7 +109,8 @@ class LayarKaca : MainAPI() {
 
         val yil = Regex("\\d{4}").find(title)?.value?.toIntOrNull()
 
-        val tvType = if (document.selectFirst("#season-data") != null) TvType.TvSeries else TvType.Movie
+        val tvType =
+            if (document.selectFirst("#season-data") != null) TvType.TvSeries else TvType.Movie
         val description = document.selectFirst("div.meta-info")?.text()?.trim()
         val trailer = document.selectFirst("ul.action-left > li:nth-child(3) > a")?.attr("href")
         val rating = document.selectFirst("div.info-tag strong")?.text()
@@ -169,32 +176,72 @@ class LayarKaca : MainAPI() {
         }
     }
 
-    override suspend fun loadLinks(data: String, isCasting: Boolean, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit): Boolean {
-        Log.d("kraptor_$name", "data = ${data}")
+    data class VideoNodeResponse(
+        val embedUrl: String?
+    )
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
         val currentBaseUrl = if (data.startsWith(seriesUrl)) seriesUrl else mainUrl
-        val document = app.get(data).documentLarge
+        val document       = app.get(data).documentLarge
+        val videoElements  = document.select("ul#player-list a")
+        var isLinkFound    = false
 
-        val videolar = document.select("ul#player-list a")
+        videoElements.forEach { video ->
+            val playerUrl = video.attr("href")
 
-        videolar.forEach { video ->
-            val player = video.attr("href")
+            if (playerUrl.contains("videonode.de")) {
+                val match = Regex("""iframe3/([^/]+)/([^/?&#]+)""").find(playerUrl)
+                val host  = match?.groupValues?.get(1)
+                val id    = match?.groupValues?.get(2)
 
-            Log.d("kraptor_$name", "player = ${player}")
+                if (!host.isNullOrEmpty() && !id.isNullOrEmpty()) {
+                    val apiResponse = app.post(
+                        url     = "https://videonode.de/api.php",
+                        headers = mapOf(
+                            "Referer"          to playerUrl,
+                            "Origin"           to "https://videonode.de",
+                            "Content-Type"     to "application/x-www-form-urlencoded",
+                            "X-Requested-With" to "XMLHttpRequest"
+                        ),
+                        data    = mapOf(
+                            "host" to host,
+                            "id"   to id
+                        )
+                    ).parsedSafe<VideoNodeResponse>()
 
-            val playerAl = app.get(player, referer = "${mainUrl}/").document
-
-            val iframe = playerAl.selectFirst("iframe")?.attr("src").toString()
-
-            if (iframe.contains("https://short.icu")) {
-                val iframe =  app.get(iframe, allowRedirects = true).url
-                Log.d("kraptor_$name", "iframe » $iframe")
-                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+                    val embedUrl = apiResponse?.embedUrl
+                    if (!embedUrl.isNullOrEmpty()) {
+                        loadExtractor(embedUrl, "$currentBaseUrl/", subtitleCallback) { link ->
+                            isLinkFound = true
+                            callback(link)
+                        }
+                    }
+                }
             } else {
-                Log.d("kraptor_$name", "iframe » $iframe")
-                loadExtractor(iframe, "$currentBaseUrl/", subtitleCallback, callback)
+                val playerDoc = app.get(playerUrl, referer = "$mainUrl/").document
+                val iframeSrc = playerDoc.selectFirst("iframe")?.attr("src").orEmpty()
+
+                if (iframeSrc.isNotEmpty()) {
+                    val targetUrl = if (iframeSrc.contains("short.icu")) {
+                        app.get(iframeSrc, allowRedirects = true).url
+                    } else {
+                        iframeSrc
+                    }
+
+                    loadExtractor(targetUrl, "$currentBaseUrl/", subtitleCallback) { link ->
+                        isLinkFound = true
+                        callback(link)
+                    }
+                }
             }
         }
-        return true
+
+        return isLinkFound
     }
 
     fun getBaseUrl(url: String?): String {
@@ -214,7 +261,6 @@ class LayarKaca : MainAPI() {
             url
         }
     }
-
 }
 
 data class SearchApi(
