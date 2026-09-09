@@ -14,9 +14,7 @@ class OnShort : MainAPI() {
     override val hasMainPage          = true
     override var lang                 = "en"
     override val hasQuickSearch       = false
-    override val supportedTypes       = setOf(TvType.TvSeries)
-    override val vpnStatus            = VPNStatus.MightBeNeeded
-
+    override val supportedTypes       = setOf(TvType.AsianDrama)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/platform/shortmax/" to "ShortMax",
@@ -49,7 +47,7 @@ class OnShort : MainAPI() {
         }
         val home     = document.select("article.series-card").mapNotNull { it.toMainPageResult() }
 
-        return newHomePageResponse(list = HomePageList(request.name, home, true))
+        return newHomePageResponse(list = HomePageList(request.name, home, false))
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
@@ -57,7 +55,7 @@ class OnShort : MainAPI() {
         val href      = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
         val posterUrl = fixUrlNull(this.selectFirst("img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(title, href, TvType.AsianDrama) { this.posterUrl = posterUrl }
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
@@ -99,12 +97,12 @@ class OnShort : MainAPI() {
         val href      = fixUrlNull(this.url) ?: return null
         val posterUrl = fixUrlNull(this.cover)
 
-        return newMovieSearchResponse(title, href, TvType.TvSeries) { this.posterUrl = posterUrl }
+        return newMovieSearchResponse(title, href, TvType.AsianDrama) { this.posterUrl = posterUrl }
     }
 
     override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
 
-    
+
     override suspend fun load(url: String): LoadResponse? {
         Log.d(name, "Load aşaması: $url")
         val document = app.get(url).document
@@ -113,7 +111,7 @@ class OnShort : MainAPI() {
         val poster          = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description     = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
         val tags            = document.select("div.tag-cloud span").map { it.text().trim() }
-        val recommendations = document.select("article.series-card").mapNotNull { it.toMainPageResult() }
+        val recommendations = document.select("article.series-card").mapNotNull { it.toMainPageResult() }.distinctBy { it.name }
 
         val totalEpisodes = document.select("button.episode-button")
             .mapNotNull { it.attr("data-episode").toIntOrNull() }
@@ -126,7 +124,7 @@ class OnShort : MainAPI() {
             }
         }
 
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
+        return newTvSeriesLoadResponse(title, url, TvType.AsianDrama, episodes) {
             this.posterUrl       = poster
             this.plot            = description
             this.tags            = tags
@@ -161,29 +159,36 @@ class OnShort : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        Log.d(name, "loadLinks: data=$data")
+
         val pageUrl   = data.substringBeforeLast("||")
         val episodeNo = data.substringAfterLast("||").toIntOrNull() ?: return false
 
-        val shell = app.get(pageUrl).document.selectFirst("#onshort-player") ?: return false
+        Log.d(name, "loadLinks: pageUrl=$pageUrl, episodeNo=$episodeNo")
 
-        val postId   = shell.attr("data-post").takeIf { it.isNotBlank() } ?: return false
+        val document = app.get(pageUrl).document
+        val shell    = document.selectFirst("#onshort-player") ?: return false
+
+        val postId   = shell.attr("data-post").ifEmpty { return false }
         val ticket   = shell.attr("data-player-ticket")
-        val endpoint = shell.attr("data-player-endpoint")
-            .takeIf { it.isNotBlank() } ?: "${mainUrl}/wp-json/onshort-player/v1/episode"
+        val endpoint = shell.attr("data-player-endpoint").ifEmpty { "${mainUrl}/wp-json/onshort-player/v1/episode" }
+
+        val requestUrl = "$endpoint?post=$postId&episode=$episodeNo&_t=${System.currentTimeMillis()}"
+        Log.d(name, "loadLinks: requestUrl=$requestUrl")
 
         val response = app.get(
-            "$endpoint?post=$postId&episode=$episodeNo&_t=${System.currentTimeMillis()}",
+            requestUrl,
             referer = pageUrl,
             headers = mapOf(
                 "X-ONShort-Player" to "1",
                 "X-ONShort-Ticket" to ticket,
-                "Cache-Control" to "no-cache, no-store",
-                "Pragma" to "no-cache"
+                "Cache-Control"    to "no-cache, no-store",
+                "Pragma"           to "no-cache"
             )
         ).parsedSafe<OnShortEpisodeResponse>()
 
         if (response?.ok != true) {
-            Log.d(name, "loadLinks failed for $pageUrl ep $episodeNo: ${response?.message}")
+            Log.d(name, "loadLinks: failed message=${response?.message}")
             return false
         }
 
@@ -191,6 +196,10 @@ class OnShort : MainAPI() {
             ?.takeIf { it.isNotEmpty() }
             ?: response.url?.let { listOf(OnShortCandidate(it, response.quality, "hls")) }
             ?: emptyList()
+
+        Log.d(name, "loadLinks: candidatesCount=${candidates.size}")
+
+        var linkLoaded = false
 
         candidates.forEach { candidate ->
             val videoUrl = candidate.url ?: return@forEach
@@ -200,18 +209,20 @@ class OnShort : MainAPI() {
                 ExtractorLinkType.VIDEO
             }
 
+            Log.d(name, "loadLinks: videoUrl=$videoUrl, type=$linkType")
+
             callback.invoke(
                 newExtractorLink(
                     source = this.name,
                     name   = this.name,
                     url    = videoUrl,
-                    type   = linkType,
-                    initializer = {
-                        this.referer = "${mainUrl}/"
-                        this.quality = candidate.quality?.toIntOrNull() ?: getQualityFromName(candidate.quality ?: "")
-                    }
-                )
+                    type   = linkType
+                ) {
+                    this.referer = "${mainUrl}/"
+                    this.quality = candidate.quality?.toIntOrNull() ?: getQualityFromName(candidate.quality ?: "")
+                }
             )
+            linkLoaded = true
         }
 
         response.subtitles?.forEach { sub ->
@@ -219,6 +230,6 @@ class OnShort : MainAPI() {
             subtitleCallback.invoke(newSubtitleFile(sub.lang ?: sub.label ?: "und", subUrl))
         }
 
-        return candidates.isNotEmpty()
+        return linkLoaded
     }
-}
+    }
