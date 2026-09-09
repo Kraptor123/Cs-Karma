@@ -36,13 +36,12 @@ allprojects {
     }
 }
 
-fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) = extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
+fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) =
+    extensions.getByName<CloudstreamExtension>("cloudstream").configuration()
 
 fun Project.android(configuration: LibraryExtension.() -> Unit) {
     extensions.getByName<LibraryExtension>("android").apply {
         project.extensions.findByType(JavaPluginExtension::class.java)?.apply {
-            // Use Java 17 toolchain even if a higher JDK runs the build.
-            // We still use Java 8 for now which higher JDKs have deprecated.
             toolchain {
                 languageVersion.set(JavaLanguageVersion.of(17))
             }
@@ -58,7 +57,7 @@ subprojects {
 
     tasks.withType<KotlinJvmCompile>().configureEach {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
             freeCompilerArgs.addAll(
                 "-Xno-call-assertions",
                 "-Xno-param-assertions",
@@ -69,14 +68,23 @@ subprojects {
     }
 
     cloudstream {
-        // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "https://github.com/Kraptor123/Cs-Karma")
+        setRepo(
+            System.getenv("GITHUB_REPOSITORY")
+                ?: "https://github.com/Kraptor123/Cs-GizliKeyif"
+        )
 
         authors = listOf("kraptor")
     }
 
     android {
-        namespace = "com.kraptor.${project.name.lowercase().replace("-", "_")}"
+        namespace = "com.kraptor.${
+            project.name.lowercase()
+                .replace("-", "_")
+                .let {
+                    if (it.firstOrNull()?.isDigit() == true) "p$it" else it
+                }
+        }"
+
         compileSdk = 36
 
         defaultConfig {
@@ -88,37 +96,35 @@ subprojects {
         }
 
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_1_8
-            targetCompatibility = JavaVersion.VERSION_1_8
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
         }
     }
 
     dependencies {
-        val implementation by configurations
         val cloudstream by configurations
+        val implementation by configurations
+
         cloudstream("com.lagradost:cloudstream3:pre-release")
 
-        // Other dependencies
         implementation(kotlin("stdlib"))
-        implementation("com.github.Blatzar:NiceHttp:0.4.18")
-        implementation("org.jsoup:jsoup:1.22.2")
-        implementation("androidx.annotation:annotation:1.10.0")
-        // Do not bump above 2.13.1
-        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.13.1")
+        implementation("com.github.Blatzar:NiceHttp:0.4.13")
+        implementation("org.jsoup:jsoup:1.22.1")
+        implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.5")
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.13.5")
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-        // Do not bump above 1.8.1
-        implementation("org.mozilla:rhino:1.8.1")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+        implementation("org.mozilla:rhino:1.9.0")
         implementation("me.xdrop:fuzzywuzzy:1.4.0")
-        implementation("com.google.code.gson:gson:2.14.0")
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-        implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
+        implementation("com.google.code.gson:gson:2.13.2")
+        implementation("app.cash.quickjs:quickjs-android:0.9.2")
+        implementation("com.github.vidstige:jadb:v1.2.1")
     }
 }
 
-
 tasks.register("derle") {
     group = "help"
+
     doLast {
         println("Filtreleme modu aktif: status=1 olanlar disindaki eklentiler derleme disi birakildi.")
     }
@@ -129,6 +135,7 @@ gradle.taskGraph.whenReady {
         allTasks.forEach { task ->
             if (task.project != rootProject) {
                 val csExt = task.project.extensions.findByType<CloudstreamExtension>()
+
                 if (csExt != null && csExt.status != 1) {
                     task.enabled = false
                 }
