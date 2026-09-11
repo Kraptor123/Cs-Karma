@@ -9,5 +9,6 @@ class OKRUPlugin: Plugin() {
     override fun load() {
         registerMainAPI(OKRU())
         registerExtractorAPI(OkRuExtractor())
+        registerExtractorAPI(Odnoklassniki())
     }
 }

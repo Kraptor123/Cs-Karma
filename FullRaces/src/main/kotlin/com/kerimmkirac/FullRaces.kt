@@ -15,7 +15,7 @@ class FullRaces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Movie)
+    override val supportedTypes = setOf(TvType.Video)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/f1-race-replays" to "All F1 Races",
@@ -84,19 +84,36 @@ class FullRaces : MainAPI() {
             document.select("div[align=center]").joinToString("\n") { it.text().trim() }
 
 
-        return newMovieLoadResponse(title, url, TvType.Movie, url) {
+        return newMovieLoadResponse(title, url, TvType.Video, url) {
             this.posterUrl = poster
             this.plot = description
         }
     }
 
 
-    private fun Element.toRecommendationResult(): SearchResponse? {
-        val title = this.selectFirst("a img")?.attr("alt") ?: return null
-        val href = fixUrlNull(this.selectFirst("a")?.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("a img")?.attr("data-src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) { this.posterUrl = posterUrl }
+
+    private suspend fun loadCustomExtractor(
+        name: String,
+        url: String,
+        referer: String? = null,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        loadExtractor(url, referer, subtitleCallback) { link ->
+            val formattedName = "${link.source} | $name"
+            val updatedLink   = ExtractorLink(
+                source  = link.source,
+                name    = formattedName,
+                url     = link.url,
+                referer = link.referer,
+                quality = link.quality,
+                type    = link.type,
+                headers = link.headers,
+                extractorData = link.extractorData
+            )
+            callback(updatedLink)
+        }
     }
 
     override suspend fun loadLinks(
@@ -106,21 +123,46 @@ class FullRaces : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         Log.d("STF", "data » $data")
-        val document = app.get(data).document
+        val document   = app.get(data).document
+        var linksFound = false
 
-        val iframeUrls = document.select("div.video-responsive iframe, a.gp-src").mapNotNull {
-            it.attr("src").ifBlank { it.attr("href") }.let { src ->
-                if (src.startsWith("//")) "https:$src" else src
-            }.takeIf { cleanedSrc ->
-                cleanedSrc.startsWith("http")
+        val iframeElements = document.select("div.video-responsive iframe")
+        for (iframe in iframeElements) {
+            val src = iframe.attr("src").ifEmpty { continue }
+            val cleanUrl = fixUrl(src)
+            Log.d("STF", "iframe bulundu » $cleanUrl")
+            loadCustomExtractor(
+                name             = "Full Part",
+                url              = cleanUrl,
+                referer          = data,
+                subtitleCallback = subtitleCallback,
+                callback         = { link ->
+                    linksFound = true
+                    callback(link)
+                }
+            )
+        }
+
+        val buttonElements = document.select("a.su-button")
+        for (button in buttonElements) {
+            val href = button.attr("href").ifEmpty { continue }
+            val cleanUrl = fixUrl(href)
+            val partText = button.text().trim().let { text ->
+                if (text.equals("Watch", ignoreCase = true)) "Full Part" else text
             }
+            Log.d("STF", "Link bulundu » $cleanUrl ($partText)")
+            loadCustomExtractor(
+                name             = partText,
+                url              = cleanUrl,
+                referer          = data,
+                subtitleCallback = subtitleCallback,
+                callback         = { link ->
+                    linksFound = true
+                    callback(link)
+                }
+            )
         }
 
-        for (iframe in iframeUrls) {
-            Log.d("STF", "Found iframe » $iframe")
-            loadExtractor(iframe, data, subtitleCallback, callback)
-        }
-
-        return true
+        return linksFound
     }
 }

@@ -9,5 +9,7 @@ class FullRacesPlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(FullRaces())
         FileMoonExtractor.DOMAINS.forEach { registerExtractorAPI(FileMoonExtractor(it)) }
+        registerExtractorAPI(OkRuExtractor())
+        registerExtractorAPI(Odnoklassniki())
     }
 }
