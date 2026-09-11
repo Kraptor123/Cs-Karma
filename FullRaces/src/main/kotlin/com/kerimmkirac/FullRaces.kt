@@ -15,7 +15,7 @@ class FullRaces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Video)
+    override val supportedTypes = setOf(TvType.Live)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/f1-race-replays" to "All F1 Races",
