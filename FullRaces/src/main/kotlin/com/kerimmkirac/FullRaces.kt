@@ -32,7 +32,8 @@ class FullRaces : MainAPI() {
         "${mainUrl}/f3-full-races" to "F3 Races",
         "${mainUrl}/nascar" to "Nascar Races",
         "${mainUrl}/indycar" to "Indycar Races",
-        "${mainUrl}/formula-e" to "Formula E Races"
+        "${mainUrl}/formula-e" to "Formula E Races",
+        "${mainUrl}/others" to "Others"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -75,15 +76,10 @@ class FullRaces : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document
-
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("div.full_img img")?.attr("src"))
-
-
         val description =
-            document.select("div[align=center]").joinToString("\n") { it.text().trim() }
-
-
+            document.select("div.gp-top p, div.gp-top h2, div[align=center]").joinToString("\n") { it.text().trim() }.ifBlank { null }
         return newMovieLoadResponse(title, url, TvType.Video, url) {
             this.posterUrl = poster
             this.plot = description
@@ -124,11 +120,29 @@ class FullRaces : MainAPI() {
     ): Boolean {
         Log.d("STF", "data » $data")
         val document   = app.get(data).document
-        var linksFound = false
+        val linksFound = java.util.concurrent.atomic.AtomicBoolean(false)
+
+        val navElements = document.select("nav.gp-bar a.gp-src")
+        navElements.amap { nav ->
+            val href = nav.attr("href").ifEmpty { return@amap }
+            val cleanUrl = fixUrl(httpsify(href))
+            val partText = nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Full Part"
+            Log.d("STF", "Nav link bulundu » $cleanUrl ($partText)")
+            loadCustomExtractor(
+                name             = partText,
+                url              = cleanUrl,
+                referer          = data,
+                subtitleCallback = subtitleCallback,
+                callback         = { link ->
+                    linksFound.set(true)
+                    callback(link)
+                }
+            )
+        }
 
         val iframeElements = document.select("div.video-responsive iframe")
-        for (iframe in iframeElements) {
-            val src = iframe.attr("src").ifEmpty { continue }
+        iframeElements.amap { iframe ->
+            val src = iframe.attr("src").ifEmpty { return@amap }
             val cleanUrl = fixUrl(src)
             Log.d("STF", "iframe bulundu » $cleanUrl")
             loadCustomExtractor(
@@ -137,15 +151,15 @@ class FullRaces : MainAPI() {
                 referer          = data,
                 subtitleCallback = subtitleCallback,
                 callback         = { link ->
-                    linksFound = true
+                    linksFound.set(true)
                     callback(link)
                 }
             )
         }
 
         val buttonElements = document.select("a.su-button")
-        for (button in buttonElements) {
-            val href = button.attr("href").ifEmpty { continue }
+        buttonElements.amap { button ->
+            val href = button.attr("href").ifEmpty { return@amap }
             val cleanUrl = fixUrl(href)
             val partText = button.text().trim().let { text ->
                 if (text.equals("Watch", ignoreCase = true)) "Full Part" else text
@@ -157,12 +171,12 @@ class FullRaces : MainAPI() {
                 referer          = data,
                 subtitleCallback = subtitleCallback,
                 callback         = { link ->
-                    linksFound = true
+                    linksFound.set(true)
                     callback(link)
                 }
             )
         }
 
-        return linksFound
+        return linksFound.get()
     }
 }

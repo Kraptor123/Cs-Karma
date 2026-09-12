@@ -1,31 +1,34 @@
-package com.byayzen
+package com.kerimmkirac
 
+import android.util.Log
+import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.fixUrl
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.fixUrl
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import java.net.URI
 
 open class OkRuExtractor : ExtractorApi() {
     override val name            = "OkRU"
     override val mainUrl         = "https://ok.ru"
     override val requiresReferer = false
 
-    private val userAgent        = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
+    private val userAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"
 
     private fun mapQuality(quality: String): Int {
         return when (quality.lowercase()) {
-            "full"    -> Qualities.P1080.value
-            "hd"      -> Qualities.P720.value
-            "sd"      -> Qualities.P480.value
-            "low"     -> Qualities.P360.value
-            "lowest"  -> Qualities.P240.value
-            "mobile"  -> Qualities.P144.value
-            else      -> Qualities.Unknown.value
+            "full"   -> Qualities.P1080.value
+            "hd"     -> Qualities.P720.value
+            "sd"     -> Qualities.P480.value
+            "low"    -> Qualities.P360.value
+            "lowest" -> Qualities.P240.value
+            "mobile" -> Qualities.P144.value
+            else     -> Qualities.Unknown.value
         }
     }
 
@@ -35,15 +38,15 @@ open class OkRuExtractor : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         val mappedQuality = mapQuality(quality)
-        android.util.Log.d(name, "$quality -> $videoUrl")
+        Log.d(name, "$quality -> $videoUrl")
         callback(
             newExtractorLink(
                 name,
                 name,
-                videoUrl,
+                fixUrl(videoUrl),
                 ExtractorLinkType.VIDEO
             ) {
-                headers      = mutableMapOf(
+                headers = mutableMapOf(
                     "Referer"    to "$mainUrl/",
                     "Origin"     to mainUrl,
                     "User-Agent" to userAgent
@@ -59,10 +62,12 @@ open class OkRuExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        android.util.Log.d(name, url)
+        Log.d(name, url)
 
-        val id       = Regex("""(?:videoembed|video)/(\d+)""").find(url.trim())?.groupValues?.get(1) ?: return
-        val embedUrl = "$mainUrl/videoembed/$id"
+        val id =
+            Regex("""(?:videoembed|video)/(\d+)""").find(url.trim())?.groupValues?.get(1)
+                ?: return
+        val embedUrl = fixUrl("/videoembed/$id")
 
         val response = app.get(
             embedUrl,
@@ -72,63 +77,45 @@ open class OkRuExtractor : ExtractorApi() {
             )
         )
 
-        val html        = response.text
-        val dataOptions = response.document.selectFirst("[data-module=OKVideo]")?.attr("data-options")?.ifEmpty { null }
-            ?: Regex("""data-options="([^"]+)"""").find(html)?.groupValues?.get(1)?.replace("&quot;", "\"")
-            ?: return
+        val dataOptions =
+            response.document.selectFirst("[data-module=OKVideo]")?.attr("data-options")
+                ?.ifEmpty { null }
+                ?: Regex("""data-options="([^"]+)"""").find(response.text)?.groupValues?.get(1)
+                    ?.replace("&quot;", "\"")
+                ?: return
 
-        val originalUrl = Regex(""""originalUrl":"([^"]+)"""").find(dataOptions)?.groupValues?.get(1)?.replace("\\/", "/")
+        val originalUrl =
+            Regex(""""originalUrl":"([^"]+)"""").find(dataOptions)?.groupValues?.get(1)
+                ?.replace("\\/", "/")
         if (originalUrl != null && (originalUrl.contains("youtube.com") || originalUrl.contains("youtu.be"))) {
+            Log.d(name, "YouTube redirect: $originalUrl")
             loadExtractor(originalUrl, subtitleCallback, callback)
             return
         }
 
-        val ytContentId = Regex(""""(?:provider":"USER_YOUTUBE"[^}]*"contentId"|"contentId":"([^"]+)"[^}]*"provider":"USER_YOUTUBE"):"([^"]+)"""")
-            .find(dataOptions)?.let { it.groupValues[1].ifEmpty { it.groupValues[2] } }
+        val videosJson =
+            Regex(""""videos":(\[.*?\])""").find(dataOptions)?.groupValues?.get(1)
+                ?: return
 
-        if (!ytContentId.isNullOrEmpty()) {
-            loadExtractor("https://www.youtube.com/watch?v=$ytContentId", subtitleCallback, callback)
+        val videoLinks =
+            Regex("""\{"name":"([^"]+)","url":"([^"]+)"""").findAll(videosJson)
+                .map { it.groupValues[1] to it.groupValues[2] }
+                .sortedByDescending { mapQuality(it.first) }
+                .toList()
+
+        if (videoLinks.isEmpty()) {
+            Log.d(name, "No video links found")
             return
         }
 
-        val metadataUrl = Regex(""""metadataUrl":"([^"]+)"""").find(dataOptions)?.groupValues?.get(1)?.replace("\\u0026", "&")
-        if (metadataUrl != null) {
-            val metaUri     = URI(metadataUrl)
-            val baseUrl     = "${metaUri.scheme}://${metaUri.host}/"
-            val mpdResponse = app.get(
-                metadataUrl,
-                headers = mapOf(
-                    "Referer"    to "$mainUrl/",
-                    "Origin"     to mainUrl,
-                    "User-Agent" to userAgent
-                )
-            ).text
+        Log.d(name, "Links found: ${videoLinks.size}")
 
-            val videoRegex = Regex("""<Representation[^>]*quality="([^"]+)"[^>]*>\s*<BaseURL>([^<]+)</BaseURL>""")
-            val matches    = videoRegex.findAll(mpdResponse).toList()
-
-            if (matches.isNotEmpty()) {
-                val sortedMatches = matches.sortedByDescending { mapQuality(it.groupValues[1]) }
-                sortedMatches.forEach { match ->
-                    val quality      = match.groupValues[1]
-                    val videoPath    = match.groupValues[2].replace("&amp;", "&")
-                    val fullVideoUrl = if (videoPath.startsWith("http")) videoPath else baseUrl + videoPath.removePrefix("/")
-                    invokeLink(quality, fullVideoUrl, callback)
-                }
-                return
-            }
-        }
-
-        val videosJsonRegex = Regex("""\{"name":"([^"]+)","url":"([^"]+)"""")
-        val fallbackMatches = videosJsonRegex.findAll(dataOptions).toList()
-        val sortedFallbacks = fallbackMatches.sortedByDescending { mapQuality(it.groupValues[1]) }
-
-        sortedFallbacks.forEach { match ->
-            val quality  = match.groupValues[1]
-            val videoUrl = match.groupValues[2].replace("\\u0026", "&").replace("\\/", "/")
-
-            if (!videoUrl.contains("youtube.com") && !videoUrl.contains("youtu.be")) {
-                invokeLink(quality, videoUrl, callback)
+        videoLinks.forEach { (quality, videoUrl) ->
+            val cleanUrl = videoUrl
+                .replace("\\u0026", "&")
+                .replace("\\/", "/")
+            if (!cleanUrl.contains("youtube.com") && !cleanUrl.contains("youtu.be")) {
+                invokeLink(quality, cleanUrl, callback)
             }
         }
     }
