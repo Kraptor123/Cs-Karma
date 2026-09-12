@@ -10,7 +10,7 @@ import com.kraptor.Streamed
 class StreamedPlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(Streamed())
-        registerExtractorAPI(EmbedStreams(context))
-        registerExtractorAPI(EmbedSporty(context))
+        registerExtractorAPI(EmbedStreams())
+        registerExtractorAPI(EmbedSporty())
     }
 }
