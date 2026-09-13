@@ -1,13 +1,18 @@
-// ! Bu araç @ByAyzen tarafından | @cs-karma için yazılmıştır.
 package com.byayzen
 
+import android.content.Context
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
 @CloudstreamPlugin
 class MovixPlugin: Plugin() {
-    override fun load() {
+    override fun load(context: Context) {
         registerMainAPI(Movix())
+        this.openSettings = { ctx ->
+            try {
+                MovixSettings.showSettingsDialog(ctx, this.resources)
+            } catch (_: Exception) {}
+        }
         registerExtractorAPI(BlinkFluxExtractor())
         registerExtractorAPI(Uqload())
         registerExtractorAPI(UqloadIo())

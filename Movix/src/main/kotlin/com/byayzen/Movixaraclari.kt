@@ -121,6 +121,7 @@ data class TmdbSeasonDetail(
 
 data class TmdbDetailResponse(
     val id: Int?,
+    val imdb_id: String? = null,
     val title: String?,
     val name: String?,
     val original_title: String?,
@@ -180,7 +181,17 @@ data class TmdbSeason(
 data class MovixDownloadResponse(val sources: List<DownloadSource>?)
 
 
-data class MovixImdbResponse(val series: List<ImdbSeries>?)
+data class MovixImdbPlayerLink(
+    val player: String? = null,
+    val link: String? = null,
+    val is_hd: Boolean? = null
+)
+
+data class MovixImdbResponse(
+    val iframe_src: String? = null,
+    val player_links: List<MovixImdbPlayerLink>? = null,
+    val series: List<ImdbSeries>? = null
+)
 data class ImdbSeries(val seasons: List<ImdbSeason>?)
 data class ImdbSeason(val episodes: List<ImdbEpisode>?)
 data class ImdbEpisode(val number: String?, val versions: Map<String, ImdbVersion>?)
@@ -297,6 +308,26 @@ suspend fun loadcustomextractor(
     try {
         if (url.contains("frembed.click")) {
             FrembedExtractor.getLinks(url, subtitlecallback, callback)
+        }
+
+        if (url.contains("#")) {
+            VidStackExt().getUrl(url, referer, subtitlecallback) { link ->
+                launch {
+                    callback.invoke(
+                        newExtractorLink(
+                            upperBrand,
+                            "$upperBrand | ${link.name.ifBlank { "Vidstack" }}",
+                            link.url,
+                            type = link.type
+                        ) {
+                            this.quality = link.quality
+                            this.referer = link.referer
+                            this.headers = link.headers
+                        }
+                    )
+                }
+            }
+            return@coroutineScope
         }
 
         val isVideoUrl = url.contains(".m3u") || url.contains(".mp4") || url.contains(".mkv")

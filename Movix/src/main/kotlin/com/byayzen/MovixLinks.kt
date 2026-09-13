@@ -156,17 +156,34 @@ object MovixLinks {
         callback: (ExtractorLink) -> Unit
     ) {
         val links = mutableListOf<String>()
-        tryParseJson<MovixImdbResponse>(response)?.series?.forEach { series ->
-            series.seasons?.forEach { season ->
-                season.episodes?.filter {
-                    episode == null || it.number == episode || it.number?.toIntOrNull() == episode?.toIntOrNull()
-                }?.forEach { ep ->
-                    ep.versions?.values?.forEach { version ->
-                        version.players?.forEach { it.link?.let(links::add) }
+        try {
+            val parsed = tryParseJson<MovixImdbResponse>(response)
+            parsed?.iframe_src?.let { if (it.isNotBlank()) links.add(it) }
+            parsed?.player_links?.forEach { item ->
+                item.link?.let { if (it.isNotBlank()) links.add(it) }
+            }
+            parsed?.series?.forEach { series ->
+                series.seasons?.forEach { season ->
+                    season.episodes?.filter {
+                        episode == null || it.number == episode || it.number?.toIntOrNull() == episode?.toIntOrNull()
+                    }?.forEach { ep ->
+                        ep.versions?.values?.forEach { version ->
+                            version.players?.forEach { it.link?.let { l -> if (l.isNotBlank()) links.add(l) } }
+                        }
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.d("Movix", "[IMDB] Parse hatası: ${e.message}")
         }
+
+        if (links.isEmpty()) {
+            Regex("https?://[^\"]+").findAll(response).forEach { match ->
+                val l = match.value
+                if (!l.contains("api.movix.men")) links.add(l)
+            }
+        }
+
         processlinks(
             "IMDB",
             links.distinct().filter { it.isNotBlank() },
@@ -237,44 +254,71 @@ object MovixLinks {
         subtitlecallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        val linksWithDetails = mutableListOf<Pair<MovixSwiftflowLink, String>>()
-        Log.d("Movix", "$type | $episode")
-        tryParseJson<MovixSwiftflowResponse>(response)?.let { res ->
-            if (type == "movie") {
-                res.vf?.forEach { linksWithDetails.add(it to "VF") }
-                res.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
-                res.players?.vf?.forEach { linksWithDetails.add(it to "VF") }
-                res.players?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+        val linksWithDetails = mutableListOf<Pair<String, String>>()
+        try {
+            val json = parseToJsonElement(response).jsonObject
+            val playersObj = json["players"]?.jsonObject
+            val vfArr = playersObj?.get("vf")?.jsonArray ?: json["vf"]?.jsonArray
+            val vostfrArr = playersObj?.get("vostfr")?.jsonArray ?: json["vostfr"]?.jsonArray
 
-                val ep1 = res.episodes?.get("1") ?: res.episodes?.get("01") ?: res.episodes?.values?.firstOrNull()
-                ep1?.vf?.forEach { linksWithDetails.add(it to "VF") }
-                ep1?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
-            } else {
+            vfArr?.forEach { elem ->
+                val obj = elem.jsonObject
+                val url = obj["url"]?.toString()?.trim('"')
+                val label = obj["label"]?.toString()?.trim('"')
+                if (!url.isNullOrBlank()) {
+                    val brand = "SwiftFlow | VF${if (!label.isNullOrBlank()) " ($label)" else ""}"
+                    linksWithDetails.add(url to brand)
+                }
+            }
+            vostfrArr?.forEach { elem ->
+                val obj = elem.jsonObject
+                val url = obj["url"]?.toString()?.trim('"')
+                val label = obj["label"]?.toString()?.trim('"')
+                if (!url.isNullOrBlank()) {
+                    val brand = "SwiftFlow | VOSTFR${if (!label.isNullOrBlank()) " ($label)" else ""}"
+                    linksWithDetails.add(url to brand)
+                }
+            }
+
+            val episodesObj = json["episodes"]?.jsonObject
+            if (episodesObj != null) {
                 val epKey = episode ?: "1"
-                val targetEp = res.episodes?.get(epKey)
-                    ?: res.episodes?.get(epKey.toIntOrNull()?.toString() ?: "1")
-                    ?: res.episodes?.entries?.find { it.key.toIntOrNull() == epKey.toIntOrNull() }?.value
+                val epObj = episodesObj[epKey]?.jsonObject ?: episodesObj.values.firstOrNull()?.jsonObject
+                epObj?.get("vf")?.jsonArray?.forEach { elem ->
+                    val obj = elem.jsonObject
+                    val url = obj["url"]?.toString()?.trim('"')
+                    val label = obj["label"]?.toString()?.trim('"')
+                    if (!url.isNullOrBlank()) {
+                        val brand = "SwiftFlow | VF${if (!label.isNullOrBlank()) " ($label)" else ""}"
+                        linksWithDetails.add(url to brand)
+                    }
+                }
+                epObj?.get("vostfr")?.jsonArray?.forEach { elem ->
+                    val obj = elem.jsonObject
+                    val url = obj["url"]?.toString()?.trim('"')
+                    val label = obj["label"]?.toString()?.trim('"')
+                    if (!url.isNullOrBlank()) {
+                        val brand = "SwiftFlow | VOSTFR${if (!label.isNullOrBlank()) " ($label)" else ""}"
+                        linksWithDetails.add(url to brand)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("Movix", "[SwiftFlow] Parse hatası: ${e.message}")
+        }
 
-                targetEp?.vf?.forEach { linksWithDetails.add(it to "VF") }
-                targetEp?.vostfr?.forEach { linksWithDetails.add(it to "VOSTFR") }
+        if (linksWithDetails.isEmpty()) {
+            Regex("https?://[^\"]+").findAll(response).forEach { match ->
+                val u = match.value
+                if (u.contains("blinkflux") || u.contains("swiftflow") || u.contains("embed")) {
+                    linksWithDetails.add(u to "SwiftFlow")
+                }
             }
         }
 
-        val distinctItems = linksWithDetails.distinctBy { it.first.url }.filter { !it.first.url.isNullOrBlank() }
-        if (distinctItems.isEmpty()) {
-            return
-        }
-
-        Log.d("Movix", "${distinctItems.size}")
-        distinctItems.forEach { (item, lang) ->
-            val linkUrl = item.url ?: return@forEach
-            val label = item.label?.trim()
-            val brandName = buildString {
-                append("SwiftFlow")
-                if (lang.isNotBlank()) append(" | $lang")
-                if (!label.isNullOrBlank()) append(" ($label)")
-            }
-            Log.d("Movix", "$linkUrl")
+        val distinctItems = linksWithDetails.distinctBy { it.first }
+        Log.d("Movix", "[SwiftFlow] Bulunan link sayısı: ${distinctItems.size}")
+        distinctItems.forEach { (linkUrl, brandName) ->
             loadcustomextractor(brandName, linkUrl, mainUrl, subtitlecallback, callback)
         }
     }

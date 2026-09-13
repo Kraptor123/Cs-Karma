@@ -28,44 +28,26 @@ class Movix : MainAPI() {
     override val hasQuickSearch = true
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Anime, TvType.Live)
 
-    override val mainPage = mainPageOf(
-        "movie/now_playing" to "Nouveaux Films",
-        "tv/on_the_air" to "Nouvelles Séries",
-        "discover/movie?with_watch_providers=8&watch_region=FR" to "Netflix Films",
-        "discover/tv?with_watch_providers=8&watch_region=FR" to "Netflix Séries",
-        "discover/movie?with_watch_providers=119&watch_region=FR" to "Prime Video Films",
-        "discover/tv?with_watch_providers=119&watch_region=FR" to "Prime Video Séries",
-        "discover/movie?with_watch_providers=337&watch_region=FR" to "Disney+ Films",
-        "discover/tv?with_watch_providers=337&watch_region=FR" to "Disney+ Séries",
-        "tv/16" to "Anime",
-        "movie/28" to "Action",
-        "movie/12" to "Aventure",
-        "movie/16" to "Animation",
-        "movie/35" to "Comédie",
-        "movie/80" to "Crime",
-        "movie/99" to "Documentaire",
-        "movie/18" to "Drame",
-        "movie/10751" to "Famille",
-        "movie/14" to "Fantastique",
-        "movie/36" to "Histoire",
-        "movie/27" to "Horreur",
-        "movie/9648" to "Mystère",
-        "movie/10749" to "Romance",
-        "movie/878" to "Science-Fiction",
-        "movie/53" to "Thriller",
-        "movie/10752" to "Guerre",
-        "tv/10759" to "Action et Aventure",
-        "tv/35" to "Comédie TV",
-        "tv/80" to "Crime TV",
-        "tv/18" to "Drame TV",
-        "tv/10751" to "Famille TV",
-        "tv/10762" to "Enfants",
-        "tv/9648" to "Mystère TV",
-        "tv/10763" to "Actualités",
-        "tv/10764" to "Téléréalité",
-        "livetv/catalog/tv/northlive_sport" to "Live TV - Sports",
-        "livetv/catalog/tv/vavoo_france" to "Live TV - France",
-    )
+    override val mainPage: List<MainPageData>
+        get() {
+            val orderedKeys = MovixSettings.getOrderedCategories()
+            val categoryMap = MovixSettings.allCategories.associateBy { it.key }
+            val enabledPairs = mutableListOf<Pair<String, String>>()
+
+            for (key in orderedKeys) {
+                val cat = categoryMap[key] ?: continue
+                if (MovixSettings.isCategoryEnabled(cat.key, cat.isDefaultEnabled)) {
+                    enabledPairs.add(cat.key to cat.title)
+                }
+            }
+
+            val finalPairs = if (enabledPairs.isEmpty()) {
+                listOf("movie/now_playing" to "Nouveaux Films")
+            } else {
+                enabledPairs
+            }
+            return mainPageOf(*finalPairs.toTypedArray())
+        }
 
     private fun TmdbResult.toMainPageResult(type: String): SearchResponse? {
         val titleText =
@@ -106,6 +88,7 @@ class Movix : MainAPI() {
         val t = if (d.contains("movie")) "movie" else "tv"
 
         val url = when {
+            d.startsWith("trending/") -> "$tmdbbase/$d?api_key=$tmdbkey&language=$tmdblang&page=$page"
             d.contains("?") -> "$tmdbbase/$d&api_key=$tmdbkey&language=$tmdblang&page=$page"
             d.split("/").last().toIntOrNull() != null -> {
                 val id = d.split("/").last()
@@ -272,9 +255,13 @@ class Movix : MainAPI() {
             )
         }
 
+        var imdbId = id
         try {
             val tmdbres =
                 app.get("$tmdbbase/$type/$id?api_key=$tmdbkey").parsed<TmdbDetailResponse>()
+            if (!tmdbres.imdb_id.isNullOrBlank()) {
+                imdbId = tmdbres.imdb_id
+            }
             val title =
                 tmdbres.title ?: tmdbres.name ?: tmdbres.original_title ?: tmdbres.original_name
             val isanime =
@@ -328,7 +315,7 @@ class Movix : MainAPI() {
         val requests = mutableListOf(
             "Movix" to "$apibase/links/$type/$id$query",
             "MovixTmdb" to "$apibase/tmdb/$type/$id$query",
-            "IMDB" to "$apibase/imdb/$type/$id"
+            "IMDB" to "$apibase/imdb/$type/$imdbId"
         ) + movieRequests
 
         val dramaRequest = if (type == "tv") {
