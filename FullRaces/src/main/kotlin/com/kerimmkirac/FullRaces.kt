@@ -15,7 +15,7 @@ class FullRaces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Live)
+    override val supportedTypes = setOf(TvType.Live, TvType.Others)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/f1-race-replays" to "All F1 Races",
@@ -33,7 +33,7 @@ class FullRaces : MainAPI() {
         "${mainUrl}/nascar" to "Nascar Races",
         "${mainUrl}/indycar" to "Indycar Races",
         "${mainUrl}/formula-e" to "Formula E Races",
-        "${mainUrl}/others" to "Others"
+        "${mainUrl}/other" to "Others"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
