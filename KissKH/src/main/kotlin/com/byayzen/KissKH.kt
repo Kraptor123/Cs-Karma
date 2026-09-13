@@ -19,6 +19,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import okhttp3.Interceptor
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONObject
 
 class KissKH : MainAPI() {
     override var mainUrl = "https://kisskh.id"
@@ -288,7 +289,12 @@ class KissKH : MainAPI() {
         val videoKeyUrl = "$KisskhAPI${loadData.epsId}&version=2.8.10"
         Log.d("KISSKH", "Fetching video kkey from: $videoKeyUrl")
 
-        val kkey = app.get(videoKeyUrl, timeout = 10000).parsedSafe<Key>()?.key ?: ""
+        val videoKeyRes = app.get(videoKeyUrl, timeout = 10000).text
+        val kkey = try {
+            JSONObject(videoKeyRes).optString("key")
+        } catch (e: Exception) {
+            Regex(""""key"\s*:\s*"([^"]+)"""").find(videoKeyRes)?.groupValues?.get(1) ?: videoKeyRes.trim()
+        }
         Log.d("KISSKH", "Video kkey received: $kkey")
 
         val videoApiUrl = "$mainUrl/api/DramaList/Episode/${loadData.epsId}.png?err=false&ts=&time=&kkey=$kkey"
@@ -337,7 +343,12 @@ class KissKH : MainAPI() {
 
         val subKeyUrl = "$KisskhSub${loadData.epsId}&version=2.8.10"
         Log.d("KISSKH", "Fetching subtitle kkey from: $subKeyUrl")
-        val kkey1 = app.get(subKeyUrl, timeout = 10000).parsedSafe<Key>()?.key ?: ""
+        val subKeyRes = app.get(subKeyUrl, timeout = 10000).text
+        val kkey1 = try {
+            JSONObject(subKeyRes).optString("key")
+        } catch (e: Exception) {
+            Regex(""""key"\s*:\s*"([^"]+)"""").find(subKeyRes)?.groupValues?.get(1) ?: subKeyRes.trim()
+        }
         Log.d("KISSKH", "Subtitle kkey received: $kkey1")
 
         val subApiUrl = "$mainUrl/api/Sub/${loadData.epsId}?kkey=$kkey1"
