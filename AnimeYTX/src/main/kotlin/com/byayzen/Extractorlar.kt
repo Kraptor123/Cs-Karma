@@ -3,7 +3,6 @@ package com.byayzen
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.extractors.VidStack
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
@@ -53,11 +52,11 @@ class FireLoad : ExtractorApi() {
     }
 }
 
-class Coflix : VidStack() { override var mainUrl = "https://coflix.upn.one" }
+class Coflix : VidStackExt() { override var mainUrl = "https://coflix.upn.one" }
 
-class Embedseek : VidStack() { override var mainUrl = "https://movix1.embedseek.com" }
+class Embedseek : VidStackExt() { override var mainUrl = "https://movix1.embedseek.com" }
 
-class Ytplay : VidStack() { override var mainUrl = "https://ytplay.rpmvid.com" }
+class Ytplay : VidStackExt() { override var mainUrl = "https://ytplay.rpmvid.com" }
 
 open class Mytsumi : ExtractorApi() {
     override val name = "Mytsumi"

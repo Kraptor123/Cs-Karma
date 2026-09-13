@@ -679,39 +679,39 @@ class SendvidExtractor : ExtractorApi() {
 }
 
 
-class Coflix : VidStack() {
+class Coflix : VidStackExt() {
     override var mainUrl = "https://coflix.upn.one"
 }
 
-class Serix : VidStack() {
+class Serix : VidStackExt() {
     override var mainUrl = "https://serix.upns.live"
 }
 
-class Flemmix : VidStack() {
+class Flemmix : VidStackExt() {
     override var mainUrl = "https://flemmix.upns.pro"
 }
 
-class Embedseek : VidStack() {
+class Embedseek : VidStackExt() {
     override var mainUrl = "https://movix1.embedseek.com"
 }
 
-class Dismoiceline : VidStack() {
+class Dismoiceline : VidStackExt() {
     override var mainUrl = "https://dismoiceline.uns.bio"
 }
 
-class Neocine : VidStack() {
+class Neocine : VidStackExt() {
     override var mainUrl = "https://neocine.embedseek.com"
 }
 
-class Doremifasol : VidStack() {
+class Doremifasol : VidStackExt() {
     override var mainUrl = "https://doremifasol.ezplayer.me"
 }
 
-class MarcusP2P : VidStack() {
+class MarcusP2P : VidStackExt() {
     override var mainUrl = "https://marcus.p2pstream.vip"
 }
 
-class BllEmbedseek : VidStack() {
+class BllEmbedseek : VidStackExt() {
     override var mainUrl = "https://bll.embedseek.com"
 }
 

@@ -355,7 +355,7 @@ class AnimeYTX : MainAPI() {
 
         document.select("iframe").forEach { el ->
             val src = el.attr("data-src").ifEmpty { el.attr("src") }
-            if (src.isNotBlank() && src != "about:blank") {
+            if (src.isNotBlank() && src != "about:blank" && !src.contains(Regex("""\.(jpg|png|webp|gif|jpeg)(\?|$)""", RegexOption.IGNORE_CASE))) {
                 iframeUrls.add(src.replace("&amp;", "&"))
             }
         }
@@ -364,7 +364,7 @@ class AnimeYTX : MainAPI() {
             val inner = el.html()
             Regex("""(?:data-src|src)=["']([^"']+)["']""").findAll(inner).forEach { match ->
                 val src = match.groupValues[1]
-                if (src.isNotBlank() && src != "about:blank") {
+                if (src.isNotBlank() && src != "about:blank" && !src.contains(Regex("""\.(jpg|png|webp|gif|jpeg)(\?|$)""", RegexOption.IGNORE_CASE))) {
                     iframeUrls.add(src.replace("&amp;", "&"))
                 }
             }
@@ -376,12 +376,14 @@ class AnimeYTX : MainAPI() {
 
         Log.d("Ayzen", "Bulunan cerceve sayisi: ${iframeUrls.size}")
 
-        iframeUrls.forEach { iframeUrl ->
+        iframeUrls.toList().amap { iframeUrl ->
             Log.d("Ayzen", "Cerceve adresi: $iframeUrl")
             if (iframeUrl.contains("mytsumi.com")) {
-                val containerId = Regex("""[?&]value=([^&]+)""").find(iframeUrl)?.groupValues?.get(1) ?: return@forEach
+                val containerId = Regex("""[?&]value=([^&]+)""").find(iframeUrl)?.groupValues?.get(1) ?: return@amap
                 val targetUrl   = "https://mytsumi.com/multiplayer/contenedor.php?id=$containerId"
                 val pageText    = app.get(targetUrl, referer = iframeUrl).text
+
+                val extractedLinks = mutableListOf<Pair<String, Pair<Boolean, String>>>()
 
                 Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""").find(pageText)?.groupValues?.get(1)?.let { json ->
                     try {
@@ -393,23 +395,7 @@ class AnimeYTX : MainAPI() {
                             val tabName = tab.optString("tab_name", "Mytsumi")
 
                             if (rawUrl.isNotBlank() && rawUrl != "about:blank") {
-                                Log.d("Ayzen", "Oynatici adresi: $rawUrl")
-                                if (isMp4) {
-                                    callback(
-                                        newExtractorLink(
-                                            source = tabName,
-                                            name   = tabName,
-                                            url    = rawUrl,
-                                            type   = ExtractorLinkType.VIDEO
-                                        )
-                                    )
-                                    linkFound = true
-                                } else {
-                                    loadExtractor(rawUrl, targetUrl, subtitleCallback) { link ->
-                                        linkFound = true
-                                        callback(link)
-                                    }
-                                }
+                                extractedLinks.add(rawUrl to (isMp4 to tabName))
                             }
                         }
                     } catch (e: Exception) {
@@ -425,15 +411,34 @@ class AnimeYTX : MainAPI() {
                             for (i in 0 until items.length()) {
                                 val item  = items.getJSONObject(i)
                                 val dlUrl = item.getString("download_url").replace("\\/", "")
-                                Log.d("Ayzen", "Indirme adresi: $dlUrl")
-                                loadExtractor(dlUrl, targetUrl, subtitleCallback) { link ->
-                                    linkFound = true
-                                    callback(link)
+                                if (dlUrl.isNotBlank()) {
+                                    extractedLinks.add(dlUrl to (false to "Mytsumi"))
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         Log.d("Ayzen", "Indirme hatasi: ${e.message}")
+                    }
+                }
+
+                extractedLinks.amap { (rawUrl, info) ->
+                    val (isMp4, tabName) = info
+                    Log.d("Ayzen", "Oynatici adresi: $rawUrl")
+                    if (isMp4) {
+                        callback(
+                            newExtractorLink(
+                                source = tabName,
+                                name   = tabName,
+                                url    = rawUrl,
+                                type   = ExtractorLinkType.VIDEO
+                            )
+                        )
+                        linkFound = true
+                    } else {
+                        loadExtractor(rawUrl, targetUrl, subtitleCallback) { link ->
+                            linkFound = true
+                            callback(link)
+                        }
                     }
                 }
             } else {

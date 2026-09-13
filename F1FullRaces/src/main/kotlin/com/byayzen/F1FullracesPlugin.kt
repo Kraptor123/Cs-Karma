@@ -3,7 +3,6 @@ package com.byayzen
 
 import android.content.Context
 import com.lagradost.cloudstream3.extractors.Gofile
-import com.lagradost.cloudstream3.extractors.VidStack
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
@@ -21,7 +20,7 @@ class F1FullracesPlugin: Plugin() {
         registerExtractorAPI(MixDrop977())
         registerExtractorAPI(Luluvdo())
         registerExtractorAPI(Luluvdoo())
-        registerExtractorAPI(VIDStack())
+        registerExtractorAPI(VidStackExt())
 
 
     }

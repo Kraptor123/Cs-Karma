@@ -97,3 +97,11 @@ open class AbyssExtractor : ExtractorApi() {
 class Shortink : AbyssExtractor() {
     override var mainUrl = "https://short.ink"
 }
+
+class PlayerAbyss : AbyssExtractor() {
+    override var mainUrl = "https://player.abyssplayer.com"
+}
+
+class HydraX : AbyssExtractor() {
+    override var mainUrl = "https://playhydrax.com"
+}
