@@ -16,11 +16,11 @@ You can install the repository by clicking the logo down below on the device whe
 
 # CloudStream
 
-(https://github.com/recloudstream/cloudstream)[CloudStream]
+[https://github.com/recloudstream/cloudstream](CloudStream)
 
 # Official CloudStream Wiki
 
-(https://cloudstream.miraheze.org)[Wiki]
+[https://cloudstream.miraheze.org](Wiki)
 
 # Developers
 
