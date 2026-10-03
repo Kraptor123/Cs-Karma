@@ -13,5 +13,6 @@ class AnimeAVPlugin: Plugin() {
         registerExtractorAPI(PixelDrain())
         registerExtractorAPI(AnimeAVHLS())
         registerExtractorAPI(AnimeavUPNS())
+        FileMoonExtractor.DOMAINS.forEach { registerExtractorAPI(FileMoonExtractor(it)) }
     }
 }
