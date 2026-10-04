@@ -6,6 +6,7 @@ import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.LoadResponse.Companion.addMalId
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +20,6 @@ class AnimeAV : MainAPI() {
     override var lang           = "mx"
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.Anime)
-    //Movie, AnimeMovie, TvSeries, Cartoon, Anime, OVA, Torrent, Documentary, AsianDrama, Live, NSFW, Others, Music, AudioBook, CustomMedia, Audio, Podcast,
 
     private val categoryUrl = "${mainUrl}/catalogo"
 
@@ -109,59 +109,78 @@ class AnimeAV : MainAPI() {
         val requestUrl      = if (isEpisode) url.substringBeforeLast("/") else url
         val document        = app.get(requestUrl, referer = "$mainUrl/").document
 
-        val title           = document.selectFirst("h1")?.text()?.trim() ?: return null
-        val poster          = fixUrlNull(document.selectFirst("img.aspect-poster")?.attr("src"))
-        val backdrop        = fixUrlNull(document.selectFirst("img[src*=backdrops]")?.attr("src"))
-        val description     = document.selectFirst("div.entry.text-lead p")?.text()?.trim()
+        val sveltekitScript = document.selectFirst("script:containsData(sveltekit)")?.data()
+
+        val mediaId         = sveltekitScript?.let { Regex("""media:\{id:(\d+)""").find(it)?.groupValues?.get(1) }
+        val malId           = sveltekitScript?.let { Regex("""malId:(\d+)""").find(it)?.groupValues?.get(1) }
+        val title           = sveltekitScript?.let { Regex("""title:"([^"]+)"""").find(it)?.groupValues?.get(1) }
+            ?: document.selectFirst("h1")?.text()?.trim() ?: return null
+
+        val description     = sveltekitScript?.let { Regex("""synopsis:"([^"]+)"""").find(it)?.groupValues?.get(1) }
+            ?: document.selectFirst("div.entry.text-lead p")?.text()?.trim()
+
         val metaText        = document.select("div.flex-wrap.items-center.gap-2.text-sm span").text()
-        val year            = Regex("""\b(19|20)\d{2}\b""").find(metaText)?.value?.toIntOrNull()
-        val showStatus      = when {
-            metaText.contains("Finalizado", ignoreCase = true) -> ShowStatus.Completed
-            metaText.contains("emisión", ignoreCase = true) || metaText.contains("emision", ignoreCase = true) -> ShowStatus.Ongoing
-            else -> null
+        val year            = sveltekitScript?.let { Regex("""startDate:"(\d{4})""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+            ?: Regex("""\b(19|20)\d{2}\b""").find(metaText)?.value?.toIntOrNull()
+
+        val statusNum       = sveltekitScript?.let { Regex("""status:(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+        val showStatus      = when (statusNum) {
+            1 -> ShowStatus.Completed
+            0 -> ShowStatus.Ongoing
+            else -> when {
+                metaText.contains("Finalizado", ignoreCase = true) -> ShowStatus.Completed
+                metaText.contains("emisión", ignoreCase = true) || metaText.contains("emision", ignoreCase = true) -> ShowStatus.Ongoing
+                else -> null
+            }
         }
+
         val tags            = document.select("div.flex-wrap.gap-2 a[href*=genre]").map { it.text() }
-        val rating          = document.selectFirst("div.ic-star-solid div.text-lead")?.text()?.trim()?.toDoubleOrNull()
+        val rating          = sveltekitScript?.let { Regex("""score:([\d.]+)""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }
+            ?: document.selectFirst("div.ic-star-solid div.text-lead")?.text()?.trim()?.toDoubleOrNull()
+
         val duration        = document.selectFirst("span.runtime")?.text()?.split(" ")?.first()?.trim()?.toIntOrNull()
         val recommendations = document.select("article.bg-mute").mapNotNull { it.toRecommendationResult() }
 
-        val sveltekitScript = document.selectFirst("script:containsData(sveltekit)")?.data() ?: return null
+        val poster          = fixUrlNull(document.selectFirst("img.aspect-poster, img[src*=covers]")?.attr("src"))
+            ?: mediaId?.let { "$cdnUrl/covers/$it.jpg" }
+        Log.d("AnimeAV", "Poster URL: $poster")
 
-        val trailerId       = Regex("""trailer:"([^"]+)"""").find(sveltekitScript)?.groupValues?.get(1)
+        val trailerId       = sveltekitScript?.let { Regex("""trailer:"([^"]+)"""").find(it)?.groupValues?.get(1) }
         val trailer         = if (!trailerId.isNullOrBlank()) "https://www.youtube.com/embed/$trailerId" else null
 
         val slug            = requestUrl.substringAfterLast("/")
-        val mediaId         = Regex("""media:\{id:(\d+)""").find(sveltekitScript)?.groupValues?.get(1) ?: return null
-
-        val episodesIndex   = sveltekitScript.indexOf("episodes:[")
-        val episodes        = if (episodesIndex != -1) {
-            Regex("""\{id:\d+,number:(\d+)\}""").findAll(sveltekitScript.substring(episodesIndex))
-                .mapNotNull {
-                    it.groupValues[1].toIntOrNull()
-                }.map { epNum ->
-                    newEpisode(fixUrl("/media/$slug/$epNum")) {
-                        this.name      = "Episode $epNum"
-                        this.episode   = epNum
-                        this.season    = 1
-                        this.posterUrl = "$cdnUrl/screenshots/$mediaId/$epNum.jpg"
-                    }
-                }.toList()
+        val episodes        = if (sveltekitScript != null && mediaId != null) {
+            val episodesIndex = sveltekitScript.indexOf("episodes:[")
+            if (episodesIndex != -1) {
+                Regex("""\{id:\d+,number:(\d+)\}""").findAll(sveltekitScript.substring(episodesIndex))
+                    .mapNotNull { it.groupValues[1].toIntOrNull() }
+                    .map { epNum ->
+                        newEpisode(fixUrl("/media/$slug/$epNum")) {
+                            this.name      = "Episode $epNum"
+                            this.episode   = epNum
+                            this.season    = 1
+                            this.posterUrl = "$cdnUrl/screenshots/$mediaId/$epNum.jpg"
+                        }
+                    }.toList()
+            } else {
+                emptyList()
+            }
         } else {
             emptyList()
         }
 
         return newAnimeLoadResponse(title, requestUrl, TvType.Anime, true) {
-            this.posterUrl           = poster
-            this.backgroundPosterUrl = backdrop
-            this.plot                = description
-            this.year                = year
-            this.showStatus          = showStatus
-            this.tags                = tags
-            this.score               = Score.from10(rating)
-            this.episodes            = mutableMapOf(DubStatus.Subbed to episodes.distinctBy { it.episode }.sortedBy { it.episode })
-            this.duration            = duration
-            this.recommendations     = recommendations
+            this.posterUrl       = poster
+            this.plot            = description
+            this.year            = year
+            this.showStatus      = showStatus
+            this.tags            = tags
+            this.score           = Score.from10(rating)
+            this.episodes        = mutableMapOf(DubStatus.Subbed to episodes.distinctBy { it.episode }.sortedBy { it.episode })
+            this.duration        = duration
+            this.recommendations = recommendations
             addTrailer(trailer)
+            malId?.toIntOrNull()?.let { addMalId(it) }
         }
     }
 
