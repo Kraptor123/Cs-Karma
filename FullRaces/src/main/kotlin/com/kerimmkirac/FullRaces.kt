@@ -6,8 +6,10 @@ import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
-import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 class FullRaces : MainAPI() {
     override var mainUrl = "https://fullraces.com"
@@ -15,7 +17,7 @@ class FullRaces : MainAPI() {
     override val hasMainPage = true
     override var lang = "en"
     override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Live, TvType.Others)
+    override val supportedTypes = setOf(TvType.TvSeries, TvType.Live, TvType.Others)
 
     override val mainPage = mainPageOf(
         "${mainUrl}/f1-race-replays" to "All F1 Races",
@@ -43,34 +45,29 @@ class FullRaces : MainAPI() {
     }
 
     private fun Element.toMainPageResult(): SearchResponse? {
-        val anchor = this.selectFirst("div.short_content h3 a") ?: return null
-        val title = anchor.text().trim()
+        val anchor = selectFirst("div.short_content h3 a") ?: return null
         val href = fixUrlNull(anchor.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("div.poster img")?.attr("src"))
+        val poster = fixUrlNull(selectFirst("div.poster img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = posterUrl
+        return newTvSeriesSearchResponse(anchor.text().trim(), href, TvType.TvSeries) {
+            this.posterUrl = poster
         }
     }
-
 
     override suspend fun search(query: String): List<SearchResponse> {
         val document = app.get("$mainUrl/search/?q=$query").document
         return document.select("div.statvidp").mapNotNull { it.toSearchResult() }
     }
 
-
     private fun Element.toSearchResult(): SearchResponse? {
-        val anchor = this.selectFirst("div.tit33fdsq a") ?: return null
-        val title = anchor.text().trim()
+        val anchor = selectFirst("div.tit33fdsq a") ?: return null
         val href = fixUrlNull(anchor.attr("href")) ?: return null
-        val posterUrl = fixUrlNull(this.selectFirst("div.fhkds54sa img")?.attr("src"))
+        val poster = fixUrlNull(selectFirst("div.fhkds54sa img")?.attr("src"))
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
-            this.posterUrl = posterUrl
+        return newTvSeriesSearchResponse(anchor.text().trim(), href, TvType.TvSeries) {
+            this.posterUrl = poster
         }
     }
-
 
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
@@ -78,37 +75,43 @@ class FullRaces : MainAPI() {
         val document = app.get(url).document
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("div.full_img img")?.attr("src"))
-        val description =
-            document.select("div.gp-top p, div.gp-top h2, div[align=center]").joinToString("\n") { it.text().trim() }.ifBlank { null }
-        return newMovieLoadResponse(title, url, TvType.Video, url) {
+        val description = document.select("div.gp-top p, div.gp-top h2, div[align=center]")
+            .joinToString("\n") { it.text().trim() }
+            .ifBlank { null }
+
+        val sessions = buildList {
+            document.select("nav.gp-bar a.gp-src").forEach { nav ->
+                val href = nav.attr("href").ifEmpty { return@forEach }
+                val partText =
+                    nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() }
+                        ?: nav.text().trim().ifEmpty { "Full Part" }
+                add(SessionItem(partText, fixUrl(httpsify(href))))
+            }
+
+            document.select("div.video-responsive iframe").forEach { iframe ->
+                val src = iframe.attr("src").ifEmpty { return@forEach }
+                val cleanUrl = fixUrl(httpsify(src))
+                add(SessionItem(Titlecek(iframe, cleanUrl), cleanUrl))
+            }
+
+            document.select("a.su-button").forEach { button ->
+                val href = button.attr("href").ifEmpty { return@forEach }
+                val cleanUrl = fixUrl(httpsify(href))
+                add(SessionItem(Titlecek(button, cleanUrl), cleanUrl))
+            }
+        }.distinctBy { it.url }.ifEmpty { listOf(SessionItem("Full Race", url)) }
+
+        val episodeList = sessions.mapIndexed { index, session ->
+            newEpisode(session.url) {
+                this.name = session.name
+                this.episode = index + 1
+                this.season = 1
+            }
+        }
+
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodeList) {
             this.posterUrl = poster
             this.plot = description
-        }
-    }
-
-
-
-
-    private suspend fun loadCustomExtractor(
-        name: String,
-        url: String,
-        referer: String? = null,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ) {
-        loadExtractor(url, referer, subtitleCallback) { link ->
-            val formattedName = "${link.source} | $name"
-            val updatedLink   = ExtractorLink(
-                source  = link.source,
-                name    = formattedName,
-                url     = link.url,
-                referer = link.referer,
-                quality = link.quality,
-                type    = link.type,
-                headers = link.headers,
-                extractorData = link.extractorData
-            )
-            callback(updatedLink)
         }
     }
 
@@ -119,64 +122,129 @@ class FullRaces : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         Log.d("STF", "data » $data")
-        val document   = app.get(data).document
-        val linksFound = java.util.concurrent.atomic.AtomicBoolean(false)
+        val linksFound = AtomicBoolean(false)
 
-        val navElements = document.select("nav.gp-bar a.gp-src")
-        navElements.amap { nav ->
-            val href = nav.attr("href").ifEmpty { return@amap }
-            val cleanUrl = fixUrl(httpsify(href))
-            val partText = nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Full Part"
-            Log.d("STF", "Nav link bulundu » $cleanUrl ($partText)")
-            loadCustomExtractor(
-                name             = partText,
-                url              = cleanUrl,
-                referer          = data,
-                subtitleCallback = subtitleCallback,
-                callback         = { link ->
-                    linksFound.set(true)
-                    callback(link)
-                }
-            )
-        }
-
-        val iframeElements = document.select("div.video-responsive iframe")
-        iframeElements.amap { iframe ->
-            val src = iframe.attr("src").ifEmpty { return@amap }
-            val cleanUrl = fixUrl(src)
-            Log.d("STF", "iframe bulundu » $cleanUrl")
-            loadCustomExtractor(
-                name             = "Full Part",
-                url              = cleanUrl,
-                referer          = data,
-                subtitleCallback = subtitleCallback,
-                callback         = { link ->
-                    linksFound.set(true)
-                    callback(link)
-                }
-            )
-        }
-
-        val buttonElements = document.select("a.su-button")
-        buttonElements.amap { button ->
-            val href = button.attr("href").ifEmpty { return@amap }
-            val cleanUrl = fixUrl(href)
-            val partText = button.text().trim().let { text ->
-                if (text.equals("Watch", ignoreCase = true)) "Full Part" else text
+        suspend fun extract(name: String, url: String) {
+            loadCustomExtractor(name, url, data, subtitleCallback) { link ->
+                linksFound.set(true)
+                callback(link)
             }
-            Log.d("STF", "Link bulundu » $cleanUrl ($partText)")
-            loadCustomExtractor(
-                name             = partText,
-                url              = cleanUrl,
-                referer          = data,
-                subtitleCallback = subtitleCallback,
-                callback         = { link ->
-                    linksFound.set(true)
-                    callback(link)
-                }
-            )
+        }
+
+        if (data.contains("fullraces.com")) {
+            val document = app.get(data).document
+
+            document.select("nav.gp-bar a.gp-src").amap { nav ->
+                val href = nav.attr("href").ifEmpty { return@amap }
+                val cleanUrl = fixUrl(httpsify(href))
+                val partText =
+                    nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() }
+                        ?: "Full Part"
+                Log.d("STF", "Nav link bulundu » $cleanUrl ($partText)")
+                extract(partText, cleanUrl)
+            }
+
+            document.select("div.video-responsive iframe").amap { iframe ->
+                val src = iframe.attr("src").ifEmpty { return@amap }
+                val cleanUrl = fixUrl(httpsify(src))
+                Log.d("STF", "iframe bulundu » $cleanUrl")
+                extract(Titlecek(iframe, cleanUrl), cleanUrl)
+            }
+
+            document.select("a.su-button").amap { button ->
+                val href = button.attr("href").ifEmpty { return@amap }
+                val cleanUrl = fixUrl(httpsify(href))
+                val partText = Titlecek(button, cleanUrl)
+                Log.d("STF", "Link bulundu » $cleanUrl ($partText)")
+                extract(partText, cleanUrl)
+            }
+        } else {
+            loadExtractor(data, "$mainUrl/", subtitleCallback) { link ->
+                linksFound.set(true)
+                callback(link)
+            }
         }
 
         return linksFound.get()
     }
+
+    private suspend fun loadCustomExtractor(
+        name: String,
+        url: String,
+        referer: String? = null,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        loadExtractor(url, referer, subtitleCallback) { link ->
+            val formattedName = "${link.source} | $name"
+            CoroutineScope(Dispatchers.IO).launch {
+                callback(
+                    newExtractorLink(
+                        source = link.source,
+                        name   = formattedName,
+                        url    = link.url,
+                    ) {
+                        this.referer       = link.referer
+                        this.quality       = link.quality
+                        this.type          = link.type
+                        this.headers       = link.headers
+                        this.extractorData = link.extractorData
+                    }
+                )
+            }
+        }
+    }
+
+    private fun Titlecek(el: Element, href: String): String {
+        var sectionHeader: String? = null
+        var prev = el.parent()?.previousElementSibling() ?: el.previousElementSibling()
+        while (prev != null) {
+            val text = prev.text().trim()
+            if (text.isNotBlank() && !text.contains("---") && !text.startsWith("Disclaimer") && !text.startsWith(
+                    "You can watch"
+                )
+                && prev.selectFirst("strong, span, h2, h3") != null
+            ) {
+                sectionHeader = text
+                break
+            }
+            prev = prev.previousElementSibling() ?: prev.parent()?.previousElementSibling()
+        }
+
+        val lowerHref = href.lowercase()
+        val hostName = when {
+            lowerHref.contains("dailymotion.com") -> "Dailymotion"
+            lowerHref.contains("ok.ru") || lowerHref.contains("odnoklassniki") -> "OK.RU"
+            lowerHref.contains("filemoon") || lowerHref.contains("bysesukior") -> "Filemoon"
+            lowerHref.contains("mixdrop") -> "Mixdrop"
+            lowerHref.contains("streamtape") -> "Streamtape"
+            lowerHref.contains("dood") -> "Doodstream"
+            lowerHref.contains("vk.com") -> "VK"
+            else -> null
+        }
+
+        val buttonText = el.text().trim()
+        val isGeneric = buttonText.isBlank() ||
+                buttonText.equals("Watch", ignoreCase = true) ||
+                buttonText.equals("Full Part", ignoreCase = true)
+
+        val parts = listOfNotNull(
+            sectionHeader?.takeIf { it.isNotBlank() },
+            buttonText.takeIf {
+                !isGeneric && (sectionHeader == null || !sectionHeader.contains(
+                    buttonText,
+                    ignoreCase = true
+                ))
+            }
+        ).ifEmpty { listOf(hostName ?: "Full Part") }
+
+        val label = parts.joinToString(" - ")
+        return if (hostName != null && !label.contains(
+                hostName,
+                ignoreCase = true
+            )
+        ) "$label - $hostName" else label
+    }
 }
+
+private data class SessionItem(val name: String, val url: String)
