@@ -14,7 +14,7 @@ You can install the repository by clicking the logo down below on the device whe
   <a href="https://linktr.ee/kraptorcs">All Of My Links</a>
 </h2>
 
-## CloudStream
+## Official CloudStream Repository
 
 [CloudStream](https://github.com/recloudstream/cloudstream)
 
