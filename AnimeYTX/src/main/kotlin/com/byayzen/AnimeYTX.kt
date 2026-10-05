@@ -333,118 +333,89 @@ class AnimeYTX : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        data class MytsumiLink(val url: String, val label: String, val isDirect: Boolean)
+
         var linkFound = false
-        val headers   = mapOf(
-            "User-Agent"                to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
-            "Accept"                    to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language"           to "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Cookie"                    to "cf_clearance=z4kt4KEpD_kbNAhFvY.RNwZrgFvXtG_2g8R1ILswa.8-1788606738-1.2.1.1-ZZP84dahkkQXQCKL5wXJZSJdT2Pb5TG8p76zs_8RWt0tSuHNxOabyA8kXy_InYDItqvOGTVTHb530VFcPI877AG6y7M6xjkiBjnncY65TK_8FM5um0eCsZcAA8GwiPuBnJmf1DT_ePpyzffdSiteYyi___8EGZIO3xagLUXmnH9n_eWkzQBGtAu0OZU7uh1GqwhGT6s6_57_w5QDQA_nODuGfg8SwIvFsiifhvfyLm0XP1ETKRyf_N2lXZRXWt5IFjCp_S7VXPlYjbbqKYyqEqRYsGv.rdgysriYXhqPZCeEtHK11TMXo1xktIqEHZPn1aQtTGnsND4cnJyH31zCroQdc0H9OaJ5T4MGVh5eRp4",
-            "Upgrade-Insecure-Requests" to "1",
-            "Sec-Fetch-Dest"            to "document",
-            "Sec-Fetch-Mode"            to "navigate",
-            "Sec-Fetch-Site"            to "none",
-            "Sec-Fetch-User"            to "?1"
+        val headers = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+            "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         )
+        val imageRegex = Regex("""\.(jpg|png|webp|gif|jpeg)(\?|$)""", RegexOption.IGNORE_CASE)
+
+        fun String.isValidFrame() = isNotBlank() && this != "about:blank" && !imageRegex.containsMatchIn(this)
+        fun String.isDirectFile() = endsWith(".mp4") || endsWith(".m3u8")
 
         Log.d("Ayzen", "Bolum adresi: $data")
         val response = app.get(data, headers = headers)
         val document = response.document
-        val rawHtml  = response.text
+        val rawHtml = response.text
 
         val iframeUrls = mutableSetOf<String>()
 
         document.select("iframe").forEach { el ->
             val src = el.attr("data-src").ifEmpty { el.attr("src") }
-            if (src.isNotBlank() && src != "about:blank" && !src.contains(Regex("""\.(jpg|png|webp|gif|jpeg)(\?|$)""", RegexOption.IGNORE_CASE))) {
-                iframeUrls.add(src.replace("&amp;", "&"))
-            }
+            if (src.isValidFrame()) iframeUrls.add(src.replace("&amp;", "&"))
         }
 
+        val srcRegex = Regex("""(?:data-src|src)=["']([^"']+)["']""")
         document.select("template, noscript").forEach { el ->
-            val inner = el.html()
-            Regex("""(?:data-src|src)=["']([^"']+)["']""").findAll(inner).forEach { match ->
+            srcRegex.findAll(el.html()).forEach { match ->
                 val src = match.groupValues[1]
-                if (src.isNotBlank() && src != "about:blank" && !src.contains(Regex("""\.(jpg|png|webp|gif|jpeg)(\?|$)""", RegexOption.IGNORE_CASE))) {
-                    iframeUrls.add(src.replace("&amp;", "&"))
-                }
+                if (src.isValidFrame()) iframeUrls.add(src.replace("&amp;", "&"))
             }
         }
 
-        Regex("""https://mytsumi\.com/multiplayer/[^"'\s<>]+""").findAll(rawHtml).forEach { match ->
+        Regex("""https?://mytsumi\.com/[^"'\s<>]+""").findAll(rawHtml).forEach { match ->
             iframeUrls.add(match.value.replace("&amp;", "&"))
         }
 
-        Log.d("Ayzen", "Bulunan cerceve sayisi: ${iframeUrls.size}")
+        Log.d("Ayzen", "Bulunan iframe sayisi: ${iframeUrls.size}")
 
         iframeUrls.toList().amap { iframeUrl ->
-            Log.d("Ayzen", "Cerceve adresi: $iframeUrl")
-            if (iframeUrl.contains("mytsumi.com")) {
-                val containerId = Regex("""[?&]value=([^&]+)""").find(iframeUrl)?.groupValues?.get(1) ?: return@amap
-                val targetUrl   = "https://mytsumi.com/multiplayer/contenedor.php?id=$containerId"
-                val pageText    = app.get(targetUrl, referer = iframeUrl).text
+            Log.d("Ayzen", "iframe adresi: $iframeUrl")
 
-                val extractedLinks = mutableListOf<Pair<String, Pair<Boolean, String>>>()
-
-                Regex("""const\s+videoTabs\s*=\s*(\[.*?\]);""").find(pageText)?.groupValues?.get(1)?.let { json ->
-                    try {
-                        val jsonArray = JSONArray(json)
-                        for (i in 0 until jsonArray.length()) {
-                            val tab     = jsonArray.getJSONObject(i)
-                            val rawUrl  = tab.getString("url").replace("\\/", "")
-                            val isMp4   = tab.optBoolean("is_mp4", false)
-                            val tabName = tab.optString("tab_name", "Mytsumi")
-
-                            if (rawUrl.isNotBlank() && rawUrl != "about:blank") {
-                                extractedLinks.add(rawUrl to (isMp4 to tabName))
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.d("Ayzen", "Sekme hatasi: ${e.message}")
-                    }
-                }
-
-                Regex("""const\s+downloadsByQuality\s*=\s*(\{.*?\});""").find(pageText)?.groupValues?.get(1)?.let { json ->
-                    try {
-                        val dlJson = JSONObject(json)
-                        dlJson.keys().forEach { quality ->
-                            val items = dlJson.getJSONArray(quality)
-                            for (i in 0 until items.length()) {
-                                val item  = items.getJSONObject(i)
-                                val dlUrl = item.getString("download_url").replace("\\/", "")
-                                if (dlUrl.isNotBlank()) {
-                                    extractedLinks.add(dlUrl to (false to "Mytsumi"))
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.d("Ayzen", "Indirme hatasi: ${e.message}")
-                    }
-                }
-
-                extractedLinks.amap { (rawUrl, info) ->
-                    val (isMp4, tabName) = info
-                    Log.d("Ayzen", "Oynatici adresi: $rawUrl")
-                    if (isMp4) {
-                        callback(
-                            newExtractorLink(
-                                source = tabName,
-                                name   = tabName,
-                                url    = rawUrl,
-                                type   = ExtractorLinkType.VIDEO
-                            )
-                        )
-                        linkFound = true
-                    } else {
-                        loadExtractor(rawUrl, targetUrl, subtitleCallback) { link ->
-                            linkFound = true
-                            callback(link)
-                        }
-                    }
-                }
-            } else {
+            if (!iframeUrl.contains("mytsumi.com")) {
                 loadExtractor(iframeUrl, data, subtitleCallback) { link ->
                     linkFound = true
                     callback(link)
+                }
+                return@amap
+            }
+
+            val openUrl = when {
+                iframeUrl.contains("open=1") -> iframeUrl
+                iframeUrl.contains("?") -> "$iframeUrl&open=1"
+                else -> "$iframeUrl?open=1"
+            }
+            val openDoc = app.get(openUrl, referer = iframeUrl).document
+
+            val extractedLinks = mutableListOf<MytsumiLink>()
+
+            openDoc.select("button[data-player-url]").forEach { btn ->
+                val playerUrl = btn.attr("data-player-url").trim().replace("\\/", "/")
+                if (playerUrl.isBlank() || playerUrl == "about:blank") return@forEach
+                val label = btn.attr("data-player-label").ifEmpty { "Mytsumi" }
+                val isDirect = btn.attr("data-player-kind") == "video" || playerUrl.isDirectFile()
+                extractedLinks.add(MytsumiLink(playerUrl, label, isDirect))
+            }
+
+            openDoc.select("a.mytsumi-download-button[href]").forEach { a ->
+                val dlUrl = a.attr("href").trim().replace("\\/", "/")
+                if (dlUrl.isBlank() || dlUrl == "about:blank") return@forEach
+                val label = a.attr("title").ifEmpty { "Mytsumi Download" }
+                extractedLinks.add(MytsumiLink(dlUrl, label, dlUrl.isDirectFile()))
+            }
+
+            extractedLinks.distinctBy { it.url }.amap { item ->
+                if (item.isDirect) {
+                    val type = if (item.url.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                    callback(newExtractorLink(item.label, item.label, item.url, type))
+                    linkFound = true
+                } else {
+                    loadExtractor(item.url, openUrl, subtitleCallback) { link ->
+                        linkFound = true
+                        callback(link)
+                    }
                 }
             }
         }
