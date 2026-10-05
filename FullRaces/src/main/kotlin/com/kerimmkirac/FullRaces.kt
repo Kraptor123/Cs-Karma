@@ -2,7 +2,6 @@
 
 package com.kerimmkirac
 
-import android.util.Log
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
@@ -19,6 +18,12 @@ class FullRaces : MainAPI() {
     override val hasQuickSearch = false
     override val supportedTypes = setOf(TvType.TvSeries, TvType.Live, TvType.Others)
 
+    private val headers = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+        "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer" to mainUrl
+    )
+
     override val mainPage = mainPageOf(
         "${mainUrl}/f1-race-replays" to "All F1 Races",
         "${mainUrl}/2026" to "Formula 1 2026",
@@ -34,12 +39,12 @@ class FullRaces : MainAPI() {
         "${mainUrl}/f3-full-races" to "F3 Races",
         "${mainUrl}/nascar" to "Nascar Races",
         "${mainUrl}/indycar" to "Indycar Races",
-        "${mainUrl}/formula-e" to "Formula E Races",
-        "${mainUrl}/other" to "Others"
+        "$mainUrl/formula-e" to "Formula E Races",
+        "$mainUrl/other" to "Others"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val document = app.get("${request.data}/?page$page").document
+        val document = app.get("${request.data}/?page$page", headers = headers).document
         val home = document.select("div.short_item").mapNotNull { it.toMainPageResult() }
         return newHomePageResponse(HomePageList(request.name, home, true))
     }
@@ -47,7 +52,7 @@ class FullRaces : MainAPI() {
     private fun Element.toMainPageResult(): SearchResponse? {
         val anchor = selectFirst("div.short_content h3 a") ?: return null
         val href = fixUrlNull(anchor.attr("href")) ?: return null
-        val poster = fixUrlNull(selectFirst("div.poster img")?.attr("src"))
+        val poster = fixUrlNull(selectFirst("div.poster img")?.attr("src")?.takeIf { it.isNotBlank() })
 
         return newTvSeriesSearchResponse(anchor.text().trim(), href, TvType.TvSeries) {
             this.posterUrl = poster
@@ -55,14 +60,15 @@ class FullRaces : MainAPI() {
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
-        val document = app.get("$mainUrl/search/?q=$query").document
+        val document = app.get("$mainUrl/search/?q=$query", headers = headers).document
         return document.select("div.statvidp").mapNotNull { it.toSearchResult() }
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
         val anchor = selectFirst("div.tit33fdsq a") ?: return null
         val href = fixUrlNull(anchor.attr("href")) ?: return null
-        val poster = fixUrlNull(selectFirst("div.fhkds54sa img")?.attr("src"))
+        if (href.contains("content-policy-dcma")) return null
+        val poster = fixUrlNull(selectFirst("div.fhkds54sa img")?.attr("src")?.takeIf { it.isNotBlank() })
 
         return newTvSeriesSearchResponse(anchor.text().trim(), href, TvType.TvSeries) {
             this.posterUrl = poster
@@ -72,7 +78,7 @@ class FullRaces : MainAPI() {
     override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
 
     override suspend fun load(url: String): LoadResponse? {
-        val document = app.get(url).document
+        val document = app.get(url, headers = headers).document
         val title = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster = fixUrlNull(document.selectFirst("div.full_img img")?.attr("src"))
         val description = document.select("div.gp-top p, div.gp-top h2, div[align=center]")
@@ -121,33 +127,29 @@ class FullRaces : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d("STF", "data » $data")
         val linksFound = AtomicBoolean(false)
 
         suspend fun extract(name: String, url: String) {
-            loadCustomExtractor(name, url, data, subtitleCallback) { link ->
-                linksFound.set(true)
-                callback(link)
-            }
+            try {
+                loadCustomExtractor(name, url, data, subtitleCallback) { link ->
+                    linksFound.set(true)
+                    callback(link)
+                }
+            } catch (_: Exception) {}
         }
 
         if (data.contains("fullraces.com")) {
-            val document = app.get(data).document
+            val document = app.get(data, headers = headers).document
 
             document.select("nav.gp-bar a.gp-src").amap { nav ->
                 val href = nav.attr("href").ifEmpty { return@amap }
-                val cleanUrl = fixUrl(httpsify(href))
-                val partText =
-                    nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() }
-                        ?: "Full Part"
-                Log.d("STF", "Nav link bulundu » $cleanUrl ($partText)")
-                extract(partText, cleanUrl)
+                val partText = nav.selectFirst("b")?.text()?.trim().takeUnless { it.isNullOrEmpty() } ?: "Full Part"
+                extract(partText, fixUrl(httpsify(href)))
             }
 
             document.select("div.video-responsive iframe").amap { iframe ->
                 val src = iframe.attr("src").ifEmpty { return@amap }
                 val cleanUrl = fixUrl(httpsify(src))
-                Log.d("STF", "iframe bulundu » $cleanUrl")
                 extract(Titlecek(iframe, cleanUrl), cleanUrl)
             }
 
@@ -155,14 +157,16 @@ class FullRaces : MainAPI() {
                 val href = button.attr("href").ifEmpty { return@amap }
                 val cleanUrl = fixUrl(httpsify(href))
                 val partText = Titlecek(button, cleanUrl)
-                Log.d("STF", "Link bulundu » $cleanUrl ($partText)")
                 extract(partText, cleanUrl)
             }
         } else {
-            loadExtractor(data, "$mainUrl/", subtitleCallback) { link ->
-                linksFound.set(true)
-                callback(link)
-            }
+            try {
+                if (data.contains("ok.ru", true) || data.contains("odnoklassniki", true)) {
+                    OkRuExtractor().getUrl(data, null, subtitleCallback) { linksFound.set(true); callback(it) }
+                } else {
+                    loadExtractor(data, "$mainUrl/", subtitleCallback) { linksFound.set(true); callback(it) }
+                }
+            } catch (_: Exception) {}
         }
 
         return linksFound.get()
@@ -175,7 +179,7 @@ class FullRaces : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        loadExtractor(url, referer, subtitleCallback) { link ->
+        val consumer: (ExtractorLink) -> Unit = { link ->
             val formattedName = "${link.source} | $name"
             CoroutineScope(Dispatchers.IO).launch {
                 callback(
@@ -183,15 +187,20 @@ class FullRaces : MainAPI() {
                         source = link.source,
                         name   = formattedName,
                         url    = link.url,
+                        type   = link.type
                     ) {
                         this.referer       = link.referer
                         this.quality       = link.quality
-                        this.type          = link.type
                         this.headers       = link.headers
                         this.extractorData = link.extractorData
                     }
                 )
             }
+        }
+        if (url.contains("ok.ru", true) || url.contains("odnoklassniki", true)) {
+            OkRuExtractor().getUrl(url, referer, subtitleCallback, consumer)
+        } else {
+            loadExtractor(url, referer, subtitleCallback, consumer)
         }
     }
 
@@ -200,9 +209,7 @@ class FullRaces : MainAPI() {
         var prev = el.parent()?.previousElementSibling() ?: el.previousElementSibling()
         while (prev != null) {
             val text = prev.text().trim()
-            if (text.isNotBlank() && !text.contains("---") && !text.startsWith("Disclaimer") && !text.startsWith(
-                    "You can watch"
-                )
+            if (text.isNotBlank() && !text.contains("---") && !text.startsWith("Disclaimer") && !text.startsWith("You can watch")
                 && prev.selectFirst("strong, span, h2, h3") != null
             ) {
                 sectionHeader = text
@@ -231,19 +238,12 @@ class FullRaces : MainAPI() {
         val parts = listOfNotNull(
             sectionHeader?.takeIf { it.isNotBlank() },
             buttonText.takeIf {
-                !isGeneric && (sectionHeader == null || !sectionHeader.contains(
-                    buttonText,
-                    ignoreCase = true
-                ))
+                !isGeneric && (sectionHeader == null || !sectionHeader.contains(buttonText, ignoreCase = true))
             }
         ).ifEmpty { listOf(hostName ?: "Full Part") }
 
         val label = parts.joinToString(" - ")
-        return if (hostName != null && !label.contains(
-                hostName,
-                ignoreCase = true
-            )
-        ) "$label - $hostName" else label
+        return if (hostName != null && !label.contains(hostName, true)) "$label - $hostName" else label
     }
 }
 

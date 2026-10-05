@@ -11,5 +11,7 @@ class FullRacesPlugin: Plugin() {
         FileMoonExtractor.DOMAINS.forEach { registerExtractorAPI(FileMoonExtractor(it)) }
         registerExtractorAPI(OkRuExtractor())
         registerExtractorAPI(Odnoklassniki())
+        registerExtractorAPI(VkCom())
+        registerExtractorAPI(VkExtractor())
     }
 }
