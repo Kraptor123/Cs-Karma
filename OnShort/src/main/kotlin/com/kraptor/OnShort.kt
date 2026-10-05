@@ -133,18 +133,10 @@ class OnShort : MainAPI() {
     }
 
     data class OnShortEpisodeResponse(
-        @JsonProperty("ok") val ok: Boolean?,
         @JsonProperty("url") val url: String?,
         @JsonProperty("quality") val quality: String?,
-        @JsonProperty("candidates") val candidates: List<OnShortCandidate>?,
-        @JsonProperty("subtitles") val subtitles: List<OnShortSubtitle>?,
-        @JsonProperty("message") val message: String?
-    )
-
-    data class OnShortCandidate(
-        @JsonProperty("url") val url: String?,
-        @JsonProperty("quality") val quality: String?,
-        @JsonProperty("kind") val kind: String?
+        @JsonProperty("sources") val sources: Map<String, String>?,
+        @JsonProperty("subtitles") val subtitles: List<OnShortSubtitle>?
     )
 
     data class OnShortSubtitle(
@@ -159,77 +151,61 @@ class OnShort : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        Log.d(name, "loadLinks: data=$data")
-
         val pageUrl   = data.substringBeforeLast("||")
         val episodeNo = data.substringAfterLast("||").toIntOrNull() ?: return false
 
-        Log.d(name, "loadLinks: pageUrl=$pageUrl, episodeNo=$episodeNo")
-
         val document = app.get(pageUrl).document
-        val shell    = document.selectFirst("#onshort-player") ?: return false
+        val shell    = document.selectFirst("#onshort-player")
+        val postId   = shell?.attr("data-post")?.ifEmpty { null }
+            ?: shell?.attr("data-series")?.ifEmpty { null }
+            ?: document.selectFirst("input[name=post_id]")?.attr("value")
 
-        val postId   = shell.attr("data-post").ifEmpty { return false }
-        val ticket   = shell.attr("data-player-ticket")
-        val endpoint = shell.attr("data-player-endpoint").ifEmpty { "${mainUrl}/wp-json/onshort-player/v1/episode" }
+        val platform = shell?.attr("data-platform")?.ifEmpty { null }
+            ?: shell?.attr("data-provider")?.ifEmpty { null }
+            ?: "shortmax"
 
-        val requestUrl = "$endpoint?post=$postId&episode=$episodeNo&_t=${System.currentTimeMillis()}"
-        Log.d(name, "loadLinks: requestUrl=$requestUrl")
+        val requestUrl = "${mainUrl}/wp-json/onshort-$platform/v1/series/$postId/episode/$episodeNo?_t=${System.currentTimeMillis()}"
 
         val response = app.get(
             requestUrl,
             referer = pageUrl,
-            headers = mapOf(
-                "X-ONShort-Player" to "1",
-                "X-ONShort-Ticket" to ticket,
-                "Cache-Control"    to "no-cache, no-store",
-                "Pragma"           to "no-cache"
-            )
-        ).parsedSafe<OnShortEpisodeResponse>()
+            headers = mapOf("Cache-Control" to "no-cache", "Pragma" to "no-cache")
+        ).parsedSafe<OnShortEpisodeResponse>() ?: return false
 
-        if (response?.ok != true) {
-            Log.d(name, "loadLinks: failed message=${response?.message}")
-            return false
+        var loaded = false
+        val playHeaders = mapOf(
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:157.0) Gecko/20100101 Firefox/157.0",
+            "Referer"    to "https://akamai-static.shorttv.live/"
+        )
+
+        response.sources?.forEach { (qual, streamUrl) ->
+            if (streamUrl.isNotBlank()) {
+                callback.invoke(
+                    newExtractorLink(name, name, streamUrl, ExtractorLinkType.M3U8) {
+                        this.referer = "https://akamai-static.shorttv.live/"
+                        this.headers = playHeaders
+                        this.quality = qual.toIntOrNull() ?: getQualityFromName(qual)
+                    }
+                )
+                loaded = true
+            }
         }
 
-        val candidates = response.candidates?.filter { !it.url.isNullOrBlank() }
-            ?.takeIf { it.isNotEmpty() }
-            ?: response.url?.let { listOf(OnShortCandidate(it, response.quality, "hls")) }
-            ?: emptyList()
-
-        Log.d(name, "loadLinks: candidatesCount=${candidates.size}")
-
-        var linkLoaded = false
-
-        candidates.forEach { candidate ->
-            val videoUrl = candidate.url ?: return@forEach
-            val linkType = if (candidate.kind == "hls" || videoUrl.contains(".m3u8")) {
-                ExtractorLinkType.M3U8
-            } else {
-                ExtractorLinkType.VIDEO
-            }
-
-            Log.d(name, "loadLinks: videoUrl=$videoUrl, type=$linkType")
-
+        if (!loaded && !response.url.isNullOrBlank()) {
             callback.invoke(
-                newExtractorLink(
-                    source = this.name,
-                    name   = this.name,
-                    url    = videoUrl,
-                    type   = linkType
-                ) {
-                    this.referer = "${mainUrl}/"
-                    this.quality = candidate.quality?.toIntOrNull() ?: getQualityFromName(candidate.quality ?: "")
+                newExtractorLink(name, name, response.url, ExtractorLinkType.M3U8) {
+                    this.referer = "https://akamai-static.shorttv.live/"
+                    this.headers = playHeaders
+                    this.quality = response.quality?.toIntOrNull() ?: getQualityFromName(response.quality ?: "")
                 }
             )
-            linkLoaded = true
+            loaded = true
         }
 
         response.subtitles?.forEach { sub ->
-            val subUrl = sub.url ?: return@forEach
-            subtitleCallback.invoke(newSubtitleFile(sub.lang ?: sub.label ?: "und", subUrl))
+            sub.url?.let { subtitleCallback.invoke(newSubtitleFile(sub.lang ?: sub.label ?: "und", it)) }
         }
 
-        return linkLoaded
+        return loaded
     }
-    }
+}
