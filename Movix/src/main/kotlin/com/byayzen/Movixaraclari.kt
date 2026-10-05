@@ -306,8 +306,28 @@ suspend fun loadcustomextractor(
     val upperBrand = brand.uppercase()
 
     try {
-        if (url.contains("frembed.click")) {
+        if (url.contains("frembed.surf") || url.contains("frembed.click")) {
             FrembedExtractor.getLinks(url, subtitlecallback, callback)
+        }
+
+        if (url.contains("ansembed") || url.contains("ansembed.net")) {
+            Ansembed().getUrl(url, referer, subtitlecallback) { link ->
+                launch {
+                    callback.invoke(
+                        newExtractorLink(
+                            upperBrand,
+                            "$upperBrand | ${link.name.ifBlank { "Vidmoly" }}",
+                            link.url,
+                            type = link.type
+                        ) {
+                            this.quality = link.quality
+                            this.referer = link.referer
+                            this.headers = link.headers
+                        }
+                    )
+                }
+            }
+            return@coroutineScope
         }
 
         if (url.contains("#")) {

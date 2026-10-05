@@ -99,6 +99,10 @@ class Pamelachangemission : Voe() {
     override var mainUrl = "https://pamelachangemission.com"
 }
 
+class Teresapoliticallearn : Voe() {
+    override var mainUrl = "https://teresapoliticallearn.com"
+}
+
 open class Uqload : ExtractorApi() {
     override var name = "Uqload"
     override var mainUrl = "https://uqload.is"
@@ -725,6 +729,10 @@ class LuluVdo : LuluStream() {
 
 class Bysebuho : FilemoonV2() {
     override var mainUrl = "https://bysebuho.com"
+}
+
+class Kaydendown : FilemoonV2() {
+    override var mainUrl = "https://kaydendown.lol"
 }
 
 class Ansembed : Vidmoly() {

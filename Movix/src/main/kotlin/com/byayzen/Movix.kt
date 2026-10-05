@@ -269,6 +269,15 @@ class Movix : MainAPI() {
 
             if (isanime && !title.isNullOrBlank()) {
                 launch {
+                    AnimeSama.fetchAnimeSamaLinks(
+                        title,
+                        season,
+                        episode,
+                        subCallback,
+                        callback
+                    )
+                }
+                launch {
                     val animelinks = fetchAnimeLinks(
                         mainUrl,
                         apibase,
@@ -302,14 +311,17 @@ class Movix : MainAPI() {
             "Cpasmal" to "$apibase/cpasmal/$type/$id",
             "Purstream" to "$apibase/purstream/movie/$id/stream",
             "SwiftFlow" to "$apibase/swiftflow/movie/$id",
-            "Frembed" to "https://frembed.click/api/public/v1/movies/$id"
+            "KissKh" to "$apibase/kisskh/$type/$id",
+            "Frembed" to "https://frembed.surf/api/public/v1/movies/$id"
         ) else listOf(
-            "FStream" to "$apibase/fstream/$type/$id/season/$season",
-            "Wiflix" to "$apibase/wiflix/$type/$id/$season",
+            "FStream" to "$apibase/fstream/$type/$id/season/$season?episode=$episode",
+            "Wiflix" to "$apibase/wiflix/$type/$id/$season?episode=$episode",
             "Cpasmal" to "$apibase/cpasmal/$type/$id/$season/$episode",
-            "Purstream" to "$apibase/purstream/tv/$id/stream$query",
-            "SwiftFlow" to "$apibase/swiftflow/tv/$id/season/$season",
-            "Frembed" to "https://frembed.click/api/public/v1/tv/$id?sa=$season&epi=$episode"
+            "Purstream" to "$apibase/purstream/tv/$id/stream?season=$season&episode=$episode",
+            "SwiftFlow" to "$apibase/swiftflow/tv/$id/season/$season?episode=$episode",
+            "J1F" to "$apibase/j1f/$type/$id/season/$season?episode=$episode",
+            "KissKh" to "$apibase/kisskh/$type/$id$query",
+            "Frembed" to "https://frembed.surf/api/public/v1/tv/$id?sa=$season&epi=$episode"
         )
 
         val requests = mutableListOf(
@@ -384,7 +396,7 @@ class Movix : MainAPI() {
                                 callback
                             )
 
-                            "Movix" -> MovixLinks.parselinks(
+                            "KissKh", "Movix" -> MovixLinks.parselinks(
                                 response,
                                 type,
                                 mainUrl,

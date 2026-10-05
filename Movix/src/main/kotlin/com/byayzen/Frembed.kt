@@ -17,11 +17,11 @@ object FrembedExtractor {
             val id = url.substringAfterLast("/")
 
             val apiUrl = if (isMovie) {
-                "https://frembed.click/api/films?id=$id&idType=tmdb"
+                "https://frembed.surf/api/public/v1/movies/$id"
             } else {
                 val sa = url.substringAfter("sa=", "").substringBefore("&")
                 val epi = url.substringAfter("epi=", "")
-                "https://frembed.click/api/series?id=$id&sa=$sa&epi=$epi"
+                "https://frembed.surf/api/public/v1/tv/$id?sa=$sa&epi=$epi"
             }
 
             val headers = mapOf(
@@ -45,7 +45,7 @@ object FrembedExtractor {
             matches.forEach { match ->
                 val path = match.groupValues[2]
                 if (path.isNotBlank() && path.startsWith("/api/stream")) {
-                    val streamUrl = "https://frembed.click$path"
+                    val streamUrl = "https://frembed.surf$path"
                     val streamHeaders = headers.toMutableMap()
                     streamHeaders["Accept"] =
                         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"

@@ -65,5 +65,7 @@ class MovixPlugin: Plugin() {
         registerExtractorAPI(Johnbeyondnation())
         registerExtractorAPI(Uqloadvc())
         registerExtractorAPI(Ansembed())
+        registerExtractorAPI(Kaydendown())
+        registerExtractorAPI(Teresapoliticallearn())
     }
 }
