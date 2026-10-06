@@ -6,8 +6,8 @@ import com.lagradost.cloudstream3.utils.*
 import android.util.Log
 
 open class WcoStreamExtractor : ExtractorApi() {
-    override val name = "WcoStream"
-    override val mainUrl = "https://embed.wcostream.com"
+    override val name            = "WcoStream"
+    override val mainUrl         = "https://embed.wcostream.com"
     override val requiresReferer = true
 
     override suspend fun getUrl(
@@ -17,32 +17,53 @@ open class WcoStreamExtractor : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         Log.d("kraptor_Wco", url)
-        val qp = url.substringAfter("?", "").split("&")
-            .associate { val p = it.split("=", limit = 2); p[0] to (p.getOrNull(1) ?: "") }
 
-        val fileRaw = qp["file"] ?: return
-        val embed = qp["embed"] ?: ""
-
-        val v: String
-        val apiPath: String
-
-        if (qp.containsKey("fullhd")) {
-            val fullhdVal = qp["fullhd"] ?: "1"
-            v = "$embed/${fileRaw.replace(".flv", ".mp4").replace("%2F", "/")}"
-            apiPath = "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&fullhd=$fullhdVal"
-        } else {
-            val hdVal = qp["hd"] ?: "1"
-            v = fileRaw.replace(".flv", ".mp4").replace("%2F", "/")
-            apiPath = "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&hd=$hdVal"
+        val vjsUrl = when {
+            url.contains("video-js.php") -> url
+            url.contains("index.php")    -> url.replace("index.php", "video-js.php")
+            url.contains("embed.php")    -> url.replace("embed.php", "video-js.php")
+            else                         -> url
         }
 
-        Log.d("kraptor_Wco", v)
+        val vjsResponse = try {
+            app.get(
+                vjsUrl,
+                referer = referer ?: "$mainUrl/"
+            )
+        } catch (e: Exception) {
+            Log.d("kraptor_Wco", e.toString())
+            null
+        }
+
+        val cookies      = vjsResponse?.cookies ?: emptyMap()
+        val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+
+        val apiPath = vjsResponse?.text?.let { html ->
+            Regex("""getJSON\(["']([^"']*getvidlink[^"']*)["']""").find(html)?.groupValues?.get(1)?.let {
+                fixUrl(it)
+            }
+        } ?: run {
+            val qp      = url.substringAfter("?", "").split("&")
+                .associate { val p = it.split("=", limit = 2); p[0] to (p.getOrNull(1) ?: "") }
+            val fileRaw = qp["file"] ?: return
+            val embed   = qp["embed"] ?: ""
+            val v       = if (qp.containsKey("fullhd")) {
+                "$embed/${fileRaw.replace(".flv", ".mp4").replace("%2F", "/")}"
+            } else {
+                fileRaw.replace(".flv", ".mp4").replace("%2F", "/")
+            }
+            val hdParam = if (qp.containsKey("fullhd")) "fullhd=${qp["fullhd"] ?: "1"}" else "hd=${qp["hd"] ?: "1"}"
+            "$mainUrl/inc/embed/getvidlink.php?v=$v&embed=$embed&$hdParam"
+        }
+
+        Log.d("kraptor_Wco", apiPath)
 
         val cevap = try {
             val response = app.get(
                 apiPath,
-                referer = url,
-                headers = mapOf("X-Requested-With" to "XMLHttpRequest")
+                referer = vjsUrl,
+                headers = mapOf("X-Requested-With" to "XMLHttpRequest"),
+                cookies = cookies
             )
             Log.d("kraptor_Wco", response.text)
             mapper.readValue<WcoCevap>(response.text)
@@ -57,9 +78,18 @@ open class WcoStreamExtractor : ExtractorApi() {
         Log.d("kraptor_Wco", host)
 
         if (!cevap.sub.isNullOrEmpty()) {
-            val subUrl = "$host/getvid?evid=${cevap.sub}"
+            val subUrl = fixUrl("$host/getvid?evid=${cevap.sub}")
             Log.d("kraptor_Wco", subUrl)
-            subtitleCallback(SubtitleFile(lang = "en", url = subUrl))
+            subtitleCallback(newSubtitleFile(lang = "en", url = subUrl))
+        }
+
+        val headersMap = if (cookieHeader.isNotEmpty()) {
+            mapOf(
+                "Referer" to "$mainUrl/",
+                "Cookie"  to cookieHeader
+            )
+        } else {
+            mapOf("Referer" to "$mainUrl/")
         }
 
         listOfNotNull(
@@ -70,38 +100,30 @@ open class WcoStreamExtractor : ExtractorApi() {
             Log.d("kraptor_Wco", "$kalite: $evid")
             try {
                 val vidPath = "$host/getvid?evid=$evid&json"
-                val raw = app.get(
+                val raw     = app.get(
                     vidPath,
                     referer = "$mainUrl/",
-                    headers = mapOf("Origin" to mainUrl)
+                    headers = mapOf("Origin" to mainUrl),
+                    cookies = cookies
                 ).text.trim().replace("\"", "").replace("\\", "")
                 Log.d("kraptor_Wco", raw)
 
-                if (raw.startsWith("http")) {
-                    var videoUrl = raw
-                    if (videoUrl.contains("/getvid?evid=")) {
-                        try {
-                            val resp = app.get(
-                                videoUrl,
-                                referer = host,
-                                headers = mapOf("Origin" to host.removeSuffix("/"))
-                            )
-                            val finalUrl = resp.url
-                            if (finalUrl.startsWith("http") && !finalUrl.contains("/getvid?evid=")) {
-                                videoUrl = finalUrl
-                            }
-                        } catch (e: Exception) {
-                            Log.d("kraptor_Wco", e.toString())
-                        }
-                    }
+                val normalized = when {
+                    raw.startsWith("http") -> raw.replace("//getvid", "/getvid")
+                    raw.startsWith("/")    -> fixUrl(raw.replace("//getvid", "/getvid"))
+                    else                   -> ""
+                }
+
+                if (normalized.isNotEmpty()) {
                     callback(
                         newExtractorLink(
-                            source = name,
-                            name = "Wcoflix $kalite",
-                            url = videoUrl,
-                            type = INFER_TYPE
+                            source  = name,
+                            name    = "Wcoflix $kalite",
+                            url     = normalized,
+                            type    = ExtractorLinkType.VIDEO
                         ) {
                             this.referer = "$mainUrl/"
+                            this.headers = headersMap
                         }
                     )
                 }
@@ -113,10 +135,10 @@ open class WcoStreamExtractor : ExtractorApi() {
 }
 
 data class WcoCevap(
-    val enc: String? = null,
+    val enc: String?    = null,
     val server: String? = null,
-    val cdn: String? = null,
-    val hd: String? = null,
+    val cdn: String?    = null,
+    val hd: String?     = null,
     val fullhd: String? = null,
-    val sub: String? = null
+    val sub: String?    = null
 )

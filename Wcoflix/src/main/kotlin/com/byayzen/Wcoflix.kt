@@ -7,22 +7,21 @@ import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.network.WebViewResolver
 
 class Wcoflix : MainAPI() {
-    override var mainUrl = "https://www.wcoforever.net"
-    override var name = "WCoflix"
-    override val hasMainPage = true
-    override var lang = "en"
-    override val hasQuickSearch = false
-    override val supportedTypes = setOf(TvType.Anime, TvType.Cartoon)
+    override var mainUrl         = "https://www.wcoforever.net"
+    override var name            = "WCoflix"
+    override val hasMainPage     = true
+    override var lang            = "en"
+    override val hasQuickSearch  = false
+    override val supportedTypes  = setOf(TvType.Anime, TvType.Cartoon)
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/" to "Latest Contents",
+        "${mainUrl}/"         to "Latest Contents",
         "${mainUrl}/#cartoon" to "Cartoon",
-        "${mainUrl}/#dubbed" to "Dubbed Anime",
-        "${mainUrl}/#subbed" to "Subbed Anime",
-        "${mainUrl}/#movies" to "Movies"
+        "${mainUrl}/#dubbed"  to "Dubbed Anime",
+        "${mainUrl}/#subbed"  to "Subbed Anime",
+        "${mainUrl}/#movies"  to "Movies"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
@@ -30,10 +29,10 @@ class Wcoflix : MainAPI() {
         val category = request.data.substringAfterLast("#", "latest")
 
         val elements = when (category) {
-            "dubbed" -> document.select("div.recent-release:has(a[name=dubbed]) + div#sidebar_right ul.items li")
+            "dubbed"  -> document.select("div.recent-release:has(a[name=dubbed]) + div#sidebar_right ul.items li")
             "cartoon" -> document.select("div.recent-release:has(a[name=cartoon]) + div#sidebar_right ul.items li")
-            "subbed" -> document.select("div.recent-release:has(a[name=subbed]) + div#sidebar_right ul.items li")
-            else -> {
+            "subbed"  -> document.select("div.recent-release:has(a[name=subbed]) + div#sidebar_right ul.items li")
+            else      -> {
                 document.select("div.recent-release-main > div#sidebar_right").first()?.select("ul.items li")
             }
         }
@@ -44,17 +43,14 @@ class Wcoflix : MainAPI() {
 
     private fun Element.toMainPageResult(): SearchResponse? {
         val titleElement = this.selectFirst("div.recent-release-episodes a")
-        val title = titleElement?.text()?.trim() ?: return null
+        val title        = titleElement?.text()?.trim() ?: return null
 
-        val rawHref = titleElement.attr("href")
-        val href = fixUrl(rawHref)
+        val rawHref      = titleElement.attr("href")
+        val href         = fixUrl(rawHref)
 
-        val posterUrl = fixUrlNull(this.selectFirst("div.img img")?.attr("src"))
+        val posterUrl    = fixUrlNull(this.selectFirst("div.img img")?.attr("src"))
 
-        val type = when {
-            title.contains("Movie", ignoreCase = true) || href.contains("/movie/", ignoreCase = true) -> TvType.Movie
-            else -> TvType.TvSeries
-        }
+        val type         = if (title.contains("Cartoon", ignoreCase = true)) TvType.Cartoon else TvType.Anime
 
         return newMovieSearchResponse(title, href, type) {
             this.posterUrl = posterUrl
@@ -64,32 +60,32 @@ class Wcoflix : MainAPI() {
     override suspend fun search(query: String, page: Int): SearchResponseList {
         if (page > 1) return newSearchResponseList(emptyList(), hasNext = false)
 
-        val url = "https://www.wcoflix.tv/search"
+        val url  = "https://www.wcoflix.tv/search"
         val body = mapOf(
-            "catara" to query,
+            "catara"  to query,
             "konuara" to "series"
         )
 
-        val document = app.post(url, data = body).document
-
+        val document   = app.post(url, data = body).document
         val aramaCevap = document.select("ul.items li").mapNotNull { it.toSearchResult() }
 
         return newSearchResponseList(aramaCevap, hasNext = false)
     }
 
     private fun Element.toSearchResult(): SearchResponse? {
-        val anchor = this.selectFirst("div.recent-release-episodes a") ?: return null
-        val title = anchor.text() ?: return null
-        val href = fixUrlNull(anchor.attr("href")) ?: return null
+        val anchor    = this.selectFirst("div.recent-release-episodes a") ?: return null
+        val title     = anchor.text().trim().ifEmpty { return null }
+        val href      = fixUrlNull(anchor.attr("href")) ?: return null
 
         val posterUrl = fixUrlNull(this.selectFirst("div.img img")?.attr("src"))
+        val type      = if (title.contains("Cartoon", ignoreCase = true)) TvType.Cartoon else TvType.Anime
 
-        return newMovieSearchResponse(title, href, TvType.Movie) {
+        return newMovieSearchResponse(title, href, type) {
             this.posterUrl = posterUrl
         }
     }
 
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
+    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1).items
 
     override suspend fun load(url: String): LoadResponse? {
         var document = app.get(url).document
@@ -108,32 +104,32 @@ class Wcoflix : MainAPI() {
             ?: document.selectFirst("h1")?.text()?.trim()
             ?: return null
 
-        val poster = fixUrlNull(document.selectFirst("div#sidebar_cat img.img5")?.attr("src"))
+        val poster      = fixUrlNull(document.selectFirst("div#sidebar_cat img.img5")?.attr("src"))
         val description = document.selectFirst("div#sidebar_cat p")?.text()?.trim()
-        val tags = document.select("div#sidebar_cat a.genre-buton").map { it.text() }
+        val tags        = document.select("div#sidebar_cat a.genre-buton").map { it.text() }
 
-        val bolumler = document.select("div#episodeList a.dark-episode-item, div#sidebar_right3 div.cat-eps a")
-        val alt = mutableListOf<Episode>()
-        val dub = mutableListOf<Episode>()
+        val bolumler    = document.select("div#episodeList a.dark-episode-item, div#sidebar_right3 div.cat-eps a")
+        val alt         = mutableListOf<Episode>()
+        val dub         = mutableListOf<Episode>()
 
         bolumler.forEach { el ->
-            val lnk = fixUrlNull(el.attr("href")) ?: return@forEach
-            val ad = el.selectFirst("span")?.text() ?: el.text()
+            val lnk    = fixUrlNull(el.attr("href")) ?: return@forEach
+            val ad     = el.selectFirst("span")?.text() ?: el.text()
 
             val sznHam = el.attr("data-season")
-            val sznNo = if (sznHam.isEmpty()) {
+            val sznNo  = if (sznHam.isEmpty()) {
                 Regex("Season (\\d+)").find(ad)?.groupValues?.get(1)?.toIntOrNull() ?: 1
             } else {
                 Regex("s(\\d+)").find(sznHam)?.groupValues?.get(1)?.toIntOrNull() ?: 1
             }
 
-            val blmNo = Regex("Episode (\\d+)").find(ad)?.groupValues?.get(1)?.toIntOrNull()
-            val dil = el.attr("data-lang").ifEmpty { ad }.lowercase()
+            val blmNo  = Regex("Episode (\\d+)").find(ad)?.groupValues?.get(1)?.toIntOrNull()
+            val dil    = el.attr("data-lang").ifEmpty { ad }.lowercase()
 
-            val ep = newEpisode(lnk) {
-                this.name = ad
+            val ep     = newEpisode(lnk) {
+                this.name    = ad
                 this.episode = blmNo
-                this.season = sznNo
+                this.season  = sznNo
             }
 
             if (dil.contains("dub")) {
@@ -148,14 +144,14 @@ class Wcoflix : MainAPI() {
 
         return newAnimeLoadResponse(title, finalUrl, TvType.Anime) {
             this.posterUrl = poster
-            this.plot = description
-            this.tags = tags
-            this.episodes = mutableMapOf(
+            this.plot      = description
+            this.tags      = tags
+            this.episodes  = mutableMapOf(
                 DubStatus.Subbed to alt,
                 DubStatus.Dubbed to dub
             )
         }
-        }
+    }
 
     override suspend fun loadLinks(
         data: String,
@@ -164,16 +160,22 @@ class Wcoflix : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         Log.d("kraptor_WcoFLix", data)
-        val response = app.get(data)
+        val response        = app.get(data)
         Log.d("kraptor_WcoFLix", response.url)
         Log.d("kraptor_WcoFLix", response.code.toString())
         val episodeDocument = response.document
 
-        val embedUrl = episodeDocument.selectFirst("iframe")?.attr("src") ?: ""
+        val embedUrl        = episodeDocument.selectFirst("iframe")?.attr("src").orEmpty()
         Log.d("kraptor_WcoFLix", embedUrl)
 
-        loadExtractor(embedUrl, referer = "${mainUrl}/", subtitleCallback, callback)
+        if (embedUrl.isEmpty()) return false
 
-        return true
+        var found           = false
+        loadExtractor(embedUrl, referer = "$mainUrl/", subtitleCallback) { link ->
+            found           = true
+            callback(link)
+        }
+
+        return found
     }
 }
