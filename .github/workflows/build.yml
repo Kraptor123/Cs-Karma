@@ -53,11 +53,16 @@ jobs:
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
         run: |
+          PROP="$GITHUB_WORKSPACE/src/gradle.properties"
           rm -f $GITHUB_WORKSPACE/src/gradle/gradle-daemon-jvm.properties
-          if grep -q "^org.gradle.java.home=" $GITHUB_WORKSPACE/src/gradle.properties; then
-            sed -i "s|^org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME_21_X64|" $GITHUB_WORKSPACE/src/gradle.properties
+          # dosya newline ile bitmiyorsa once newline ekle (yoksa satirlar yapisir: 'noneorg.gradle...')
+          if [ -n "$(tail -c 1 "$PROP")" ]; then
+            echo "" >> "$PROP"
+          fi
+          if grep -q "^org.gradle.java.home=" "$PROP"; then
+            sed -i "s|^org.gradle.java.home=.*|org.gradle.java.home=$JAVA_HOME_21_X64|" "$PROP"
           else
-            echo "org.gradle.java.home=$JAVA_HOME_21_X64" >> $GITHUB_WORKSPACE/src/gradle.properties
+            echo "org.gradle.java.home=$JAVA_HOME_21_X64" >> "$PROP"
           fi
           echo "Daemon JDK: $JAVA_HOME_21_X64"
           "$JAVA_HOME_21_X64/bin/java" -version
@@ -73,7 +78,6 @@ jobs:
       - name: Build Plugins
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_21_X64 }}
-          ORG_GRADLE_PROJECT_orgGradleJavaHome: ${{ env.JAVA_HOME_21_X64 }}
         run: |
           cd $GITHUB_WORKSPACE/src
           chmod +x gradlew
