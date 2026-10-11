@@ -41,8 +41,10 @@ val ortakKaynaklar = mapOf(
 fun Project.ortakGerekiyorMu(simge: String): Boolean {
     val kok = file("src/main/kotlin")
     if (!kok.isDirectory) return false
-    return kok.walkTopDown().any { dosya ->
-    }
+    return kok.walkTopDown()
+        .filter { dosya: File -> dosya.isFile && dosya.name.endsWith(".kt") }
+        .map { dosya: File -> dosya.readText() }
+        .any { metin: String -> metin.contains(simge) }
 }
 
 subprojects {
@@ -93,7 +95,7 @@ subprojects {
         // ! Ortak: sadece kullanan eklentiye derle
         ortakKaynaklar.forEach { (dizin, simge) ->
             if (project.ortakGerekiyorMu(simge)) {
-                sourceSets["main"].kotlin.srcDir(rootProject.file(dizin))
+                sourceSets["main"].kotlin.directories.add(rootProject.file(dizin).path)
             }
         }
 
