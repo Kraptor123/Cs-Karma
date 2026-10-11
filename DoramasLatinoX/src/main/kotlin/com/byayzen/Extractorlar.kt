@@ -1,19 +1,18 @@
-package com.kraptor
+package com.byayzen
 
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.ExtractorLink
-import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.*
+import com.lagradost.cloudstream3.extractors.Dailymotion
+import com.cskarma.ortak.extractor.*
 import java.net.URI
+import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class AnimeavUPNS : ExtractorApi() {
-    override val name = "AnimeAVUpns"
-    override val mainUrl = "https://animeav1.uns.bio"
+class DoramasLatinoXExtractor : ExtractorApi() {
+    override val name = "DoramasLatinoX"
+    override val mainUrl = "https://doramasfoxito.p2pplay.online"
     override val requiresReferer = true
 
     private val TAG = "DoramasExtractor"
@@ -63,6 +62,7 @@ class AnimeavUPNS : ExtractorApi() {
         return try {
             URI(url).let { "${it.scheme}://${it.host}" }
         } catch (e: Exception) {
+            com.lagradost.api.Log.e("Vidstack", "getBaseUrl fallback: ${e.message}")
             mainUrl
         }
     }
@@ -86,3 +86,4 @@ object AesHelper {
         return chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     }
 }
+

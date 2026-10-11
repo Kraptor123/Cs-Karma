@@ -1,6 +1,7 @@
 // ! Bu araç @ByAyzen tarafından | @CS-Karma için yazılmıştır.
 package com.byayzen
 
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.extractors.FileMoon
 import com.lagradost.cloudstream3.extractors.Gofile
 import com.lagradost.cloudstream3.extractors.Mediafire

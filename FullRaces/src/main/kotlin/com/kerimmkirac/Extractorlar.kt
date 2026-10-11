@@ -1,11 +1,11 @@
-package com.byayzen
+// ! Bu araç @kerimmkirac tarafından | @CS-Karma için yazılmıştır!
 
-import com.lagradost.cloudstream3.SubtitleFile
-import com.lagradost.cloudstream3.utils.ExtractorApi
-import com.lagradost.cloudstream3.utils.*
-import com.lagradost.cloudstream3.*
+package com.kerimmkirac
+
 import android.util.Log
+import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.network.WebViewResolver
+import com.lagradost.cloudstream3.utils.*
 
 open class VkExtractor : ExtractorApi() {
     override val name = "Vk"
@@ -18,25 +18,26 @@ open class VkExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        Log.d("VkVideo", "Start")
+        Log.d("VkVideo", "URL: $url")
         val commonUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
 
         val headers = mapOf(
             "User-Agent" to commonUserAgent,
             "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Referer" to mainUrl,
+            "Referer" to "$mainUrl/",
         )
 
         var response = app.get(url, headers = headers)
 
         if (response.text.contains("hash429") || response.text.contains("challenge.html")) {
-            Log.d("VkVideo", "")
+            Log.d("VkVideo", "Challenge Fallback Devrede.")
             response = app.get(url, interceptor = WebViewResolver(Regex(".*video_ext\\.php.*")), headers = headers)
         }
 
-        var foundLinks = linkcikart(response.text, commonUserAgent, callback)
+        var foundLinks = extractLinksFromText(response.text, commonUserAgent, callback)
+
         if (!foundLinks && url.contains("hash=")) {
-            Log.d("VkVideo", "")
+            Log.d("VkVideo", "HTML içinde HLS/DASH linki bulunamadı. fallback başlıyor.")
 
             val oid = Regex("""oid=([^&]+)""").find(url)?.groupValues?.get(1)
             val id = Regex("""id=([^&]+)""").find(url)?.groupValues?.get(1)
@@ -50,7 +51,7 @@ open class VkExtractor : ExtractorApi() {
                     ?: fallbackTokenRegex.find(response.text)?.groupValues?.get(1)
 
                 if (token != null) {
-                    Log.d("VkVideo", "")
+                    Log.d("VkVideo", "Token bulundu, API'ye istek atılıyor...")
                     val apiUrl = "https://api.vk.com/method/video.get?v=5.269&client_id=52461373"
                     val postData = mapOf(
                         "owner_id" to "",
@@ -66,17 +67,18 @@ open class VkExtractor : ExtractorApi() {
                         headers = headers,
                         data = postData
                     )
-                    linkcikart(apiResponse.text, commonUserAgent, callback)
+
+                    extractLinksFromText(apiResponse.text, commonUserAgent, callback)
                 } else {
-                    Log.d("VkVideo", "")
+                    Log.d("VkVideo", "API Token bulunamadı!")
                 }
             }
         }
 
-        Log.d("VkVideo", "")
+        Log.d("VkVideo", "Done")
     }
 
-    private suspend fun linkcikart(
+    private suspend fun extractLinksFromText(
         text: String,
         userAgent: String,
         callback: (ExtractorLink) -> Unit
@@ -101,10 +103,10 @@ open class VkExtractor : ExtractorApi() {
                         videoUrl,
                         linkType
                     ) {
-                        this.referer = mainUrl
+                        this.referer = "$mainUrl/"
                         this.headers = mapOf(
                             "User-Agent" to userAgent,
-                            "Referer" to mainUrl
+                            "Referer" to "$mainUrl/"
                         )
                     }
                 )

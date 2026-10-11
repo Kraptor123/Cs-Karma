@@ -1,5 +1,6 @@
 package com.byayzen
 
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.base64Decode
@@ -143,4 +144,9 @@ open class Voe : ExtractorApi() {
     }
 
     private fun reverse(input: String): String = input.reversed()
+}
+
+class GDTVid : VidStackExt() {
+    override var name = "GDTVid"
+    override var mainUrl = "https://gdtvid.p2pplay.pro"
 }

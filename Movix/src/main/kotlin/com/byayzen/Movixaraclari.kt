@@ -13,6 +13,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import com.lagradost.cloudstream3.app
+import com.cskarma.ortak.extractor.VidStackExt
 import okhttp3.Request
 
 

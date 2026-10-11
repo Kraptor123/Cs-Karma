@@ -13,3 +13,4 @@
 .cxx
 local.properties
 .vscode
+gradle/gradle-daemon-jvm.properties

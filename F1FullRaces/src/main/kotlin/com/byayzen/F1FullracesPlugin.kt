@@ -2,6 +2,7 @@
 package com.byayzen
 
 import android.content.Context
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.extractors.Gofile
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
@@ -11,15 +12,6 @@ class F1FullracesPlugin: Plugin() {
     override fun load(context: Context) {
         registerMainAPI(F1Fullraces())
         registerExtractorAPI(Gofile())
-        registerExtractorAPI(MixDrop())
-        registerExtractorAPI(MixDropBz())
-        registerExtractorAPI(MixDropAg())
-        registerExtractorAPI(LulusStream())
-        registerExtractorAPI(MixDropCh())
-        registerExtractorAPI(MixDropTo())
-        registerExtractorAPI(MixDrop977())
-        registerExtractorAPI(Luluvdo())
-        registerExtractorAPI(Luluvdoo())
         registerExtractorAPI(VidStackExt())
 
 

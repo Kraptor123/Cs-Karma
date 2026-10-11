@@ -2,6 +2,7 @@
 package com.kraptor
 
 import android.content.Context
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 

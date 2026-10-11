@@ -33,6 +33,18 @@ fun Project.cloudstream(configuration: CloudstreamExtension.() -> Unit) =
 fun Project.android(configuration: LibraryExtension.() -> Unit) =
     extensions.getByName<LibraryExtension>("android").configuration()
 
+
+val ortakKaynaklar = mapOf(
+    "_ortak/extractor" to "cskarma.ortak.extractor"
+)
+
+fun Project.ortakGerekiyorMu(simge: String): Boolean {
+    val kok = file("src/main/kotlin")
+    if (!kok.isDirectory) return false
+    return kok.walkTopDown().any { dosya ->
+    }
+}
+
 subprojects {
     apply(plugin = "com.android.library")
     apply(plugin = "com.lagradost.cloudstream3.gradle")
@@ -76,6 +88,13 @@ subprojects {
 
         defaultConfig {
             minSdk = 21
+        }
+
+        // ! Ortak: sadece kullanan eklentiye derle
+        ortakKaynaklar.forEach { (dizin, simge) ->
+            if (project.ortakGerekiyorMu(simge)) {
+                sourceSets["main"].kotlin.srcDir(rootProject.file(dizin))
+            }
         }
 
         lint {

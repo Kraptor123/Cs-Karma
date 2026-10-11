@@ -1,6 +1,7 @@
 // ! Bu araç @byayzen tarafından | @CS-Karma için yazılmıştır.
 package com.byayzen
 
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.extractors.OkRuSSL
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin

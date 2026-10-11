@@ -1,5 +1,6 @@
 package com.byayzen
 
+import com.cskarma.ortak.extractor.*
 import com.lagradost.cloudstream3.extractors.FileMoon
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
@@ -20,10 +21,4 @@ class GnulaHDPlugin: Plugin() {
         registerExtractorAPI(Voe())
         registerExtractorAPI(GDTVid())
     }
-}
-
-
-class GDTVid : VidStackExt() {
-    override var name = "GDTVid"
-    override var mainUrl = "https://gdtvid.p2pplay.pro"
 }

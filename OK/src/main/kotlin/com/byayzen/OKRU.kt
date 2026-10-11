@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.cskarma.ortak.extractor.*
 
 class OKRU : MainAPI() {
     override var mainUrl = "https://ok.ru"

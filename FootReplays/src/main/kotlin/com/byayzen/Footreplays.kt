@@ -145,7 +145,12 @@ class Footreplays : MainAPI() {
                     name = customName,
                     url = link.url,
                     type = link.type
-                )
+                ) {
+                    this.referer       = link.referer
+                    this.headers       = link.headers
+                    this.quality       = link.quality
+                    this.extractorData = link.extractorData
+                }
             }
             callback(extractedLink)
         }

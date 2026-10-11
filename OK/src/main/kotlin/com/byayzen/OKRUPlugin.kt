@@ -3,6 +3,8 @@ package com.byayzen
 
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
+import com.cskarma.ortak.extractor.Odnoklassniki
+import com.cskarma.ortak.extractor.OkRuExtractor
 
 @CloudstreamPlugin
 class OKRUPlugin: Plugin() {
