@@ -11,8 +11,8 @@ import com.lagradost.cloudstream3.utils.*
 import java.util.concurrent.atomic.AtomicInteger
 
 class Yablom : MainAPI() {
-    override var mainUrl              = "https://yablom.com"
-    override var name                 = "Yablom"
+    override var mainUrl              = "https://yakmov.com"
+    override var name                 = "Yakmov"
     override val hasMainPage          = true
     override var lang                 = "fr"
     override val hasQuickSearch       = false
@@ -24,14 +24,14 @@ class Yablom : MainAPI() {
     companion object {
         private val requestCounter = AtomicInteger(0)
         private const val AUTH_COOKIE = "g=true"
-        private const val TAG = "YablomLog"
+        private const val TAG = "YakmovLog"
     }
 
     override val mainPage = mainPageOf(
-        "/euvcw7/c/yablom/29/0" to "À l'affiche",
-        "/euvcw7/c/yablom/2/0"  to "Animation",
-        "/euvcw7/c/yablom/26/0" to "Documentaire",
-        "/euvcw7/c/yablom/3/0"  to "Spectacle"
+        "/0003909/c/yakmov/29/0" to "À l'affiche",
+        "/0003909/c/yakmov/2/0"  to "Animation",
+        "/0003909/c/yakmov/26/0" to "Documentaire",
+        "/0003909/c/yakmov/3/0"  to "Spectacle"
     )
 
     private val defaultHeaders = mapOf(
@@ -44,7 +44,7 @@ class Yablom : MainAPI() {
         val catId = request.data.split("/").filter { it.isNotEmpty() }.getOrNull(3) ?: ""
         val limit = 20
         val offset = (page - 1) * limit
-        val url = "$mainUrl/euvcw7/api_category.php?catid=$catId&offset=$offset&limit=$limit&folder=euvcw7&pr=yablom"
+        val url = "$mainUrl/0003909/api_category.php?catid=$catId&offset=$offset&limit=$limit&folder=0003909&pr=yakmov"
 
         val res = app.get(url, headers = defaultHeaders, referer = "$mainUrl${request.data}")
         val response = res.text
@@ -56,12 +56,12 @@ class Yablom : MainAPI() {
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val limit = 20
         val offset = (page - 1) * limit
-        val url = "$mainUrl/euvcw7/api_search.php?searchword=$query&offset=$offset&limit=$limit&folder=euvcw7&pr=yablom"
+        val url = "$mainUrl/0003909/api_search.php?searchword=$query&offset=$offset&limit=$limit&folder=0003909&pr=yakmov"
 
         val res = app.get(
             url = url,
             headers = defaultHeaders + ("X-Requested-With" to "XMLHttpRequest"),
-            referer = "$mainUrl/euvcw7/home/yablom"
+            referer = "$mainUrl/0003909/home/yakmov"
         )
 
         val response = res.text
