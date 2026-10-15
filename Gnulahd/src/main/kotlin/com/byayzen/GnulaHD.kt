@@ -20,22 +20,39 @@ class GnulaHD : MainAPI() {
 
     private val tag = "gnula_${name}"
 
-    data class PlayerResponse(val p: String? = null)
-    data class GnulaLang(val label: String, val servers: List<GnulaServer>)
-    data class GnulaServer(val title: String, val src: String)
-
     override val mainPage = mainPageOf(
-        "$mainUrl/ver/?type=Pelicula&order=latest" to "Últimas Películas",
-        "$mainUrl/ver/?type=Serie&order=latest" to "Últimas Series",
-        "$mainUrl/ver/anime/" to "Últimos Animes",
-        "$mainUrl/ver/?type=Pelicula&order=popular" to "Películas Populares",
-        "$mainUrl/ver/?type=Serie&order=popular" to "Series Populares"
+        "$mainUrl/ver/peliculas/" to "Todos los géneros",
+        "$mainUrl/ver/peliculas/?genero=drama" to "Drama",
+        "$mainUrl/ver/peliculas/?genero=comedia" to "Comedia",
+        "$mainUrl/ver/peliculas/?genero=suspenso" to "Suspenso",
+        "$mainUrl/ver/peliculas/?genero=accion" to "Acción",
+        "$mainUrl/ver/peliculas/?genero=terror" to "Terror",
+        "$mainUrl/ver/peliculas/?genero=romance" to "Romance",
+        "$mainUrl/ver/peliculas/?genero=crimen" to "Crimen",
+        "$mainUrl/ver/peliculas/?genero=aventura" to "Aventura",
+        "$mainUrl/ver/peliculas/?genero=familia" to "Familia",
+        "$mainUrl/ver/peliculas/?genero=ciencia-ficcion" to "Ciencia ficción",
+        "$mainUrl/ver/peliculas/?genero=fantasia" to "Fantasía",
+        "$mainUrl/ver/peliculas/?genero=animacion" to "Animación",
+        "$mainUrl/ver/peliculas/?genero=misterio" to "Misterio",
+        "$mainUrl/ver/peliculas/?genero=documental" to "Documental",
+        "$mainUrl/ver/peliculas/?genero=pelicula-de-tv" to "Película de TV",
+        "$mainUrl/ver/peliculas/?genero=historia" to "Historia",
+        "$mainUrl/ver/peliculas/?genero=musica" to "Música",
+        "$mainUrl/ver/peliculas/?genero=belica" to "Bélica",
+        "$mainUrl/ver/peliculas/?genero=oeste" to "Oeste",
+        "$mainUrl/ver/peliculas/?genero=thriller" to "Thriller",
+        "$mainUrl/ver/peliculas/?genero=ciencia-ficcion-y-fantasia" to "Ciencia Ficción y Fantasía",
+        "$mainUrl/ver/peliculas/?genero=accion-y-aventura" to "Acción y Aventura"
     )
 
     private fun Element.TypeSearchResponse(type: TvType): SearchResponse? {
         val title  = this.attr("title").ifEmpty { return null }
         val href   = fixUrl(this.attr("href").ifEmpty { return null })
-        val poster = fixUrlNull(this.selectFirst("img")?.attr("src")?.substringBefore("?"))
+        val img        = this.selectFirst("img")
+        val posterUrl  = img?.attr("data-lazy-src")?.ifEmpty { null }
+            ?: img?.attr("src")?.takeUnless { it.startsWith("data:") }
+        val poster = fixUrlNull(posterUrl?.substringBefore("?"))
 
         return when (type) {
             TvType.TvSeries -> newTvSeriesSearchResponse(title, href, type) { this.posterUrl = poster }
@@ -54,14 +71,9 @@ class GnulaHD : MainAPI() {
         }
 
         Log.d(tag, "getMainPage: ${request.name} page=$page")
-        val type = when {
-            request.data.contains("/anime/") -> TvType.Anime
-            request.data.contains("type=Serie") -> TvType.TvSeries
-            else -> TvType.Movie
-        }
 
         val home = app.get(url).document.select("div.gnrd-grid a.gnrd-card")
-            .mapNotNull { it.TypeSearchResponse(type) }
+            .mapNotNull { it.TypeSearchResponse(TvType.Movie) }
 
         return newHomePageResponse(request.name, home, hasNext = home.isNotEmpty())
     }
@@ -212,32 +224,24 @@ class GnulaHD : MainAPI() {
         Log.d(tag, data)
         var isLinkFound = false
 
-        val queryId  = Regex("""[?&]id=(\d+)""").find(data)?.groupValues?.get(1)
-        val queryTok = Regex("""[?&]t=([a-f0-9]+)""").find(data)?.groupValues?.get(1)
+        val pageUrl = data.substringBefore("?")
+        val page    = app.get(pageUrl).text
 
-        val (id, tok) = if (!queryId.isNullOrEmpty() && !queryTok.isNullOrEmpty()) {
-            queryId to queryTok
-        } else if (data.contains("|")) {
-            val parts = data.split("|")
-            parts.getOrNull(0) to parts.getOrNull(1)
-        } else if (data.startsWith("http")) {
-            val doc = app.get(data).document
-            val epElement = doc.selectFirst("a.gnrd-epc, div.gnrd-player, #player, button[data-id]")
-            epElement?.attr("data-id")?.ifEmpty { null } to epElement?.attr("data-t")?.ifEmpty { null }
-        } else {
-            null to null
-        }
+        val gnrd  = Regex("""window\.GNRD=\{([^}]*)\}""").find(page)?.groupValues?.get(1) ?: return false
+        val id    = Regex("""\bpid:(\d+)""").find(gnrd)?.groupValues?.get(1)
+        val tok   = Regex("""\btok:"([^"]*)""").find(gnrd)?.groupValues?.get(1)
+        val key64 = Regex("""\bk:"([^"]*)""").find(gnrd)?.groupValues?.get(1)
 
-        if (id.isNullOrEmpty() || tok.isNullOrEmpty()) return false
+        if (id.isNullOrEmpty() || tok.isNullOrEmpty() || key64.isNullOrEmpty()) return false
 
         val apiUrl = "$mainUrl/wp-json/gnrd/v1/player?id=$id&t=$tok"
         val response = app.get(
             apiUrl,
-            headers = mapOf("Referer" to "$mainUrl/", "X-Requested-With" to "XMLHttpRequest")
+            headers = mapOf("Referer" to pageUrl, "X-Requested-With" to "gnrd")
         ).parsedSafe<PlayerResponse>()
 
         val pField = response?.p ?: return false
-        val langs  = decryptPlayerData(pField) ?: return false
+        val langs  = decryptPlayerData(pField, key64) ?: return false
 
         for (lang in langs) {
             for (srv in lang.servers) {
@@ -291,17 +295,21 @@ class GnulaHD : MainAPI() {
         }
     }
 
-    private fun decryptPlayerData(encoded: String): List<GnulaLang>? {
+    private fun decryptPlayerData(encoded: String, key64: String): List<GnulaLang>? {
         return try {
-            val raw = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
-            val key = byteArrayOf(103, 78, 55, 100)
-            val dec = ByteArray(raw.size) { i -> (raw[i].toInt() xor key[i % 4].toInt()).toByte() }
-            val jsonStr = String(dec, Charsets.UTF_8)
-            val obj = JSONObject(jsonStr)
+            val key        = android.util.Base64.decode(key64, android.util.Base64.DEFAULT)
+            val raw        = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
+            val dec        = ByteArray(raw.size) { i -> (raw[i].toInt() xor key[i % key.size].toInt()).toByte() }
+            val obj        = JSONObject(String(dec, Charsets.UTF_8))
             val langsArray = obj.optJSONArray("langs")?.toString() ?: return null
             parseJson<List<GnulaLang>>(langsArray)
         } catch (e: Exception) {
+            Log.d(tag, "decryptPlayerData: ${e.message}")
             null
         }
     }
+
+    data class PlayerResponse(val p: String? = null)
+    data class GnulaLang(val label: String, val servers: List<GnulaServer>)
+    data class GnulaServer(val src: String)
 }
