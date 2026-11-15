@@ -21,10 +21,10 @@ jobs:
         with:
           token: ${{ github.token }}  # PAT kullan
 
-      - name: Python 3.11.8 Yükle
+      - name: Python 3.11 Yükle
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11.8
+          python-version: "3.11"
 
       - name: Python Sürümünü Göster
         run: python -c "import sys; print(sys.version)"
