@@ -10,9 +10,7 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -247,14 +245,21 @@ class Flixlatam : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val response = app.get(data, headers = mapOf("Referer" to mainUrl))
+        val episodeMatch = Regex("""#s(\d+)-e(\d+)$""").find(data)
+        val pageUrl      = if (episodeMatch != null) {
+            "${data.substringBefore("#")}/temporada/${episodeMatch.groupValues[1]}/capitulo/${episodeMatch.groupValues[2]}"
+        } else {
+            data
+        }
+
+        val response  = app.get(pageUrl, headers = mapOf("Referer" to mainUrl))
         val iframeUrl = response.document.selectFirst("div.play iframe")?.attr("src")
             ?: response.document.selectFirst("iframe[src*='embed69']")?.attr("src")
             ?: response.document.selectFirst("iframe[src*='/vidurl/']")?.attr("src")
             ?: return false
 
         val finalIframeUrl = fixUrlNull(iframeUrl) ?: return false
-        return resolveEmbed69(finalIframeUrl, data, subtitleCallback, callback)
+        return resolveEmbed69(finalIframeUrl, pageUrl, subtitleCallback, callback)
     }
 
     private suspend fun resolveEmbed69(
@@ -264,43 +269,22 @@ class Flixlatam : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         try {
-            val html = app.get(url, headers = mapOf("Referer" to referer)).text
-
-            val powChallenge = Regex("""const POW_CHALLENGE\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return false
-            val powDifficulty = Regex("""const POW_DIFFICULTY\s*=\s*(\d+);""").find(html)?.groupValues?.get(1)?.toIntOrNull() ?: 3
-            val powSalt = Regex("""const POW_SALT\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return false
-
-            Log.d(name, "PoW: $powChallenge | $powDifficulty | $powSalt")
-
-            val aesKey = withContext(Dispatchers.Default) {
-                solvePow(powChallenge, powDifficulty, powSalt)
-            }
-
-            val dataLinkJson = Regex("""let\s+dataLink\s*=\s*(\[[\s\S]*?\]);""").find(html)?.groupValues?.get(1) ?: return false
-            val dataList = AppUtils.parseJson<List<Map<String, Any>>>(dataLinkJson)
+            val response = app.get(url, headers = mapOf("Referer" to referer))
+            val links    = response.document.select("li[data-url]").map { it.attr("data-url") }
+                .ifEmpty { decryptDataLinks(response.text) }
             var foundAny = false
 
-            dataList.forEach { entry ->
-                val allEmbeds = (entry["sortedEmbeds"] as? List<*>) ?: listOf<Any>()
-                val downloadEmbeds = (entry["downloadEmbeds"] as? List<*>) ?: listOf<Any>()
+            links.filter { it.startsWith("http") }.forEach { link ->
+                val fixedUrl = link
+                    .replace("dintezuvio.com", "vidhide.com")
+                    .replace("hglink.to", "streamwish.to")
+                    .replace("minochinos.com", "vidhide.com")
+                    .replace("ghbrisk.com", "streamwish.to")
 
-                (allEmbeds + downloadEmbeds).forEach { item ->
-                    val embed = item as? Map<String, Any>
-                    val encryptedLink = embed?.get("link") as? String ?: return@forEach
-
-                    val decryptedLink = decryptAES(encryptedLink, aesKey)
-
-                    if (decryptedLink != null && decryptedLink.startsWith("http")) {
-                        val fixedUrl = decryptedLink
-                            .replace("dintezuvio.com", "vidhide.com")
-                            .replace("hglink.to", "streamwish.to")
-                            .replace("minochinos.com", "vidhide.com")
-                            .replace("ghbrisk.com", "streamwish.to")
-
-                        Log.d(name, fixedUrl)
-                        loadExtractor(fixedUrl, url, subtitleCallback, callback)
-                        foundAny = true
-                    }
+                Log.d(name, fixedUrl)
+                loadExtractor(fixedUrl, url, subtitleCallback) {
+                    foundAny = true
+                    callback(it)
                 }
             }
             return foundAny
@@ -310,19 +294,18 @@ class Flixlatam : MainAPI() {
         return false
     }
 
-    private fun solvePow(challenge: String, difficulty: Int, salt: String): ByteArray {
-        val prefix = "0".repeat(difficulty)
-        var nonce = 0
-        val digest = MessageDigest.getInstance("SHA-256")
+    private fun decryptDataLinks(html: String): List<String> {
+        val challenge    = Regex("""const LINK_CHALLENGE\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return emptyList()
+        val salt         = Regex("""const LINK_SALT\s*=\s*'([^']+)';""").find(html)?.groupValues?.get(1) ?: return emptyList()
+        val dataLinkJson = Regex("""let\s+dataLink\s*=\s*(\[[\s\S]*?\]);""").find(html)?.groupValues?.get(1) ?: return emptyList()
+        val aesKey       = MessageDigest.getInstance("SHA-256").digest("$challenge$salt".toByteArray(Charsets.UTF_8))
+        val dataList     = AppUtils.parseJson<List<Map<String, Any>>>(dataLinkJson)
 
-        while (true) {
-            val hashBytes = digest.digest("$challenge$nonce".toByteArray(Charsets.UTF_8))
-            val hashHex = hashBytes.joinToString("") { "%02x".format(it) }
-
-            if (hashHex.startsWith(prefix)) {
-                return digest.digest("$challenge$nonce$salt".toByteArray(Charsets.UTF_8))
-            }
-            nonce++
+        return dataList.flatMap { entry ->
+            (entry["sortedEmbeds"] as? List<*>).orEmpty() + (entry["downloadEmbeds"] as? List<*>).orEmpty()
+        }.mapNotNull { item ->
+            val encryptedLink = (item as? Map<*, *>)?.get("link") as? String ?: return@mapNotNull null
+            decryptAES(encryptedLink, aesKey)?.replace("`", "")?.trim()
         }
     }
 

@@ -9,8 +9,9 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.LoadResponse.Companion.addActors
 import com.lagradost.cloudstream3.LoadResponse.Companion.addTrailer
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import java.net.URLDecoder
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -37,7 +38,7 @@ class WatchWrestling : MainAPI() {
         "${mainUrl}/ufc43/" to "UFC",
         "${mainUrl}/njpw52/" to "NJPW",
         "${mainUrl}/roh25/" to "ROH",
-        "${mainUrl}/aew68/" to "AEW (All Elite Wrestling)",
+        "${mainUrl}/aew69/" to "AEW (All Elite Wrestling)",
         "${mainUrl}/other-wrestling31/" to "Other Wrestling",
     )
 
@@ -110,7 +111,8 @@ class WatchWrestling : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean = coroutineScope {
         val document = app.get(data).document
-        val jobs = mutableListOf<kotlinx.coroutines.Job>()
+        val jobs     = mutableListOf<kotlinx.coroutines.Job>()
+        val found    = AtomicBoolean(false)
 
         val directRepeaters = document.select("div#displayContent div.episodeRepeater")
         val innerDoc = if (directRepeaters.isNotEmpty()) {
@@ -142,39 +144,45 @@ class WatchWrestling : MainAPI() {
                 ?.trim() ?: "Server"
 
             block.select("a").forEach { linkElement ->
-                var videoUrl = linkElement.attr("href")
+                val href      = linkElement.attr("href")
                 val partLabel = linkElement.text().trim()
 
-                if (videoUrl.isNotBlank()) {
-                    if (videoUrl.startsWith("//")) {
-                        videoUrl = "https:$videoUrl"
-                    }
+                if (href.isNotBlank()) {
+                    val videoUrl = fixUrl(
+                        if (href.contains("away.php")) URLDecoder.decode(href.substringAfter("to="), "UTF-8") else href
+                    )
 
                     val job = launch {
                         try {
-                            val midDoc = app.get(videoUrl, referer = data).document
-                            val fastvidSrc = midDoc.select("iframe").firstOrNull()?.attr("src")
+                            val midDoc     = app.get(videoUrl, referer = data).document
+                            val fastvidSrc = midDoc.selectFirst("iframe")?.attr("src")
 
                             if (!fastvidSrc.isNullOrBlank() && !fastvidSrc.startsWith("javascript")) {
-                                val fastvidUrl =
-                                    if (fastvidSrc.startsWith("//")) "https:$fastvidSrc" else fastvidSrc
-                                val fastDoc = app.get(fastvidUrl, referer = videoUrl).document
-                                val embedSrc = fastDoc.select("iframe").firstOrNull()?.attr("src")
+                                val fastvidUrl = fixUrl(fastvidSrc)
+                                val fastDoc    = app.get(fastvidUrl, referer = videoUrl).document
+                                val embedSrc   = fastDoc.selectFirst("iframe")?.attr("src")
+                                val sourceName = "$hostTitle - $partLabel"
 
                                 if (!embedSrc.isNullOrBlank() && !embedSrc.startsWith("javascript")) {
-                                    val embedUrl =
-                                        if (embedSrc.startsWith("//")) "https:$embedSrc" else embedSrc
-                                    loadCustomExtractor(
-                                        name = "$hostTitle - $partLabel",
-                                        url = embedUrl,
-                                        referer = fastvidUrl,
-                                        subtitleCallback = subtitleCallback,
-                                        callback = callback
-                                    )
+                                    if (loadCustomExtractor(sourceName, fixUrl(embedSrc), fastvidUrl, subtitleCallback, callback)) {
+                                        found.set(true)
+                                    }
+                                } else {
+                                    val encoded = fastDoc.selectFirst("script:containsData(atob)")?.data()
+                                        ?.let { Regex("""file:window\.atob\("([^"]+)"\)""").find(it) }
+                                        ?.groupValues?.get(1)
+                                    if (encoded != null) {
+                                        callback.invoke(
+                                            newExtractorLink(sourceName, sourceName, fixUrl(base64Decode(encoded)), ExtractorLinkType.M3U8) {
+                                                this.referer = fastvidUrl
+                                            }
+                                        )
+                                        found.set(true)
+                                    }
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.d("Ayzen", "$hostTitle-$partLabel hata: ${e.message}")
+                            Log.d("WatchWrestling", "$hostTitle-$partLabel hata: ${e.message}")
                         }
                     }
                     jobs.add(job)
@@ -183,35 +191,30 @@ class WatchWrestling : MainAPI() {
         }
 
         jobs.joinAll()
-        true
+        found.get()
     }
 
-    suspend fun loadCustomExtractor(
-        name: String? = null,
+    private suspend fun loadCustomExtractor(
+        name: String,
         url: String,
-        referer: String? = null,
+        referer: String,
         subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit,
-        quality: Int? = null,
-    ) {
-        loadExtractor(url, referer, subtitleCallback) { link ->
-            if (link.url.isNotBlank() && link.url.startsWith("http")) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    callback.invoke(
-                        newExtractorLink(
-                            source = name ?: link.source,
-                            name = name ?: link.name,
-                            url = link.url,
-                        ) {
-                            this.quality = quality ?: link.quality
-                            this.type = link.type
-                            this.referer = link.referer
-                            this.headers = link.headers
-                            this.extractorData = link.extractorData
-                        }
-                    )
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        val links = Collections.synchronizedList(mutableListOf<ExtractorLink>())
+        loadExtractor(url, referer, subtitleCallback) { links.add(it) }
+        val valid = links.toList().filter { it.url.startsWith("http") }
+        valid.forEach { link ->
+            callback.invoke(
+                newExtractorLink(name, name, link.url) {
+                    this.quality       = link.quality
+                    this.type          = link.type
+                    this.referer       = link.referer
+                    this.headers       = link.headers
+                    this.extractorData = link.extractorData
                 }
-            }
+            )
         }
+        return valid.isNotEmpty()
     }
 }

@@ -13,7 +13,7 @@ import com.lagradost.cloudstream3.utils.*
 import kotlinx.coroutines.*
 
 class Streamed() : MainAPI() {
-    override var mainUrl = "https://streamed.pk"
+    override var mainUrl = "https://mutstreams.pk"
     override var name = "Streamed"
     override val hasMainPage = true
     override var lang = "en"
@@ -23,46 +23,39 @@ class Streamed() : MainAPI() {
 
 
     override val mainPage = mainPageOf(
-        "${mainUrl}/api/matches/live/popular" to "Live Popular",
-        "${mainUrl}/api/matches/live" to "Live",
-        "${mainUrl}/api/matches/all-today/popular" to "Today's Popular Matches",
-        "${mainUrl}/api/matches/football/popular" to "Football",
-        "${mainUrl}/api/matches/fight/popular" to "Fight",
-        "${mainUrl}/api/matches/american-football/popular" to "American Football",
-        "${mainUrl}/api/matches/basketball/popular" to "Basketball",
-        "${mainUrl}/api/matches/tennis/popular" to "Tennis",
-        "${mainUrl}/api/matches/hockey/popular" to "Hockey",
-        "${mainUrl}/api/matches/baseball/popular" to "Baseball",
-        "${mainUrl}/api/matches/darts/popular" to "Darts",
-        "${mainUrl}/api/matches/motor-sports/popular" to "Motor Sports",
-        "${mainUrl}/api/matches/golf/popular" to "Golf",
-        "${mainUrl}/api/matches/billiards/popular" to "Billiards",
-        "${mainUrl}/api/matches/afl/popular" to "AFL",
-        "${mainUrl}/api/matches/cricket/popular" to "Cricket",
-        "${mainUrl}/api/matches/other/popular" to "Other"
+        "live"              to "Live",
+        "football"          to "Football",
+        "fight"             to "Fight",
+        "american-football" to "American Football",
+        "basketball"        to "Basketball",
+        "tennis"            to "Tennis",
+        "hockey"            to "Hockey",
+        "baseball"          to "Baseball",
+        "darts"             to "Darts",
+        "motor-sports"      to "Motor Sports",
+        "golf"              to "Golf",
+        "billiards"         to "Billiards",
+        "afl"               to "AFL",
+        "cricket"           to "Cricket",
+        "rugby"             to "Rugby",
+        "other"             to "Other"
     )
 
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
 
-        val textdoc = app.get(request.data).text
-        val document = textdoc
-        val mapper = jacksonObjectMapper().registerKotlinModule()
-        val matches: List<Matches> = mapper.readValue(document)
+        val mapper  = jacksonObjectMapper().registerKotlinModule()
+        val matches = mapper.readValue<List<Matches>>(app.get("$mainUrl/api/matches/live").text)
 
         val items = matches
             .filter { it.sources?.isNotEmpty() == true }
+            .filter { request.data == "live" || it.category == request.data }
             .mapNotNull { match ->
                 val title = match.title ?: return@mapNotNull null
                 val firstSourceId =
                     match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
                 val href = "$mainUrl/watch/${firstSourceId}"
-                val poster = "${match.poster}"
-                val posterUrl = if (poster.contains("api")) {
-                    "${mainUrl}${match.poster}"
-                } else {
-                    "${mainUrl}/api/images/badge/${match.id}.webp"
-                }
+                val posterUrl = fixUrlNull(match.poster)
                 newLiveSearchResponse(title, href, TvType.Live) {
                     this.posterUrl = posterUrl
                     this.posterHeaders =
@@ -83,7 +76,7 @@ class Streamed() : MainAPI() {
         val mapper = jacksonObjectMapper().registerKotlinModule()
 
         val matches = mutableListOf<Matches>()
-        val txt = app.get("$mainUrl/api/matches/all").text
+        val txt = app.get("$mainUrl/api/matches/live").text
         val list: List<Matches> = mapper.readValue(txt)
         matches.addAll(list)
 
@@ -122,12 +115,7 @@ class Streamed() : MainAPI() {
             val firstSourceId =
                 match.sources?.firstOrNull()?.id ?: match.id ?: return@mapNotNull null
             val href = "$mainUrl/watch/${firstSourceId}"
-            val poster = match.poster ?: ""
-            val posterUrl = if (poster.contains("api")) {
-                "${mainUrl}${match.poster}"
-            } else {
-                "${mainUrl}/api/images/badge/${match.id}.webp"
-            }
+            val posterUrl = fixUrlNull(match.poster)
 
             newLiveSearchResponse(title, href, TvType.Live) {
                 this.posterUrl = posterUrl
@@ -162,7 +150,7 @@ class Streamed() : MainAPI() {
         val sourceId = url.substringAfterLast("/")
 
         val mapper = jacksonObjectMapper().registerKotlinModule()
-        val txt = app.get("$mainUrl/api/matches/all").text
+        val txt = app.get("$mainUrl/api/matches/live").text
         val matches: List<Matches> = mapper.readValue(txt)
 
         val match = matches.find { match ->
@@ -171,12 +159,7 @@ class Streamed() : MainAPI() {
 
         val title = match.title ?: "Bilinmeyen Başlık"
 
-        val poster = match.poster ?: ""
-        val posterUrl = if (poster.contains("api")) {
-            "${mainUrl}${match.poster}"
-        } else {
-            "${mainUrl}/api/images/badge/${match.id}.webp"
-        }
+        val posterUrl = fixUrlNull(match.poster)
 
         val description = match.date?.let { dateTimestamp ->
             val currentTime = System.currentTimeMillis()
@@ -251,7 +234,7 @@ class Streamed() : MainAPI() {
         val mapper = jacksonObjectMapper().registerKotlinModule()
 
         try {
-            val apiUrl = "$mainUrl/api/matches/all"
+            val apiUrl = "$mainUrl/api/matches/live"
 
             Log.d("Ayzen", apiUrl)
             val response = app.get(apiUrl)

@@ -36,6 +36,7 @@ class FlixlatamPlugin: Plugin() {
         registerExtractorAPI(Vidspeeder())
         registerExtractorAPI(Travid())
         registerExtractorAPI(Moorearn())
+        registerExtractorAPI(Morencius())
         registerExtractorAPI(Uqload())
         registerExtractorAPI(Uqloadcx())
         registerExtractorAPI(Uqloadto())

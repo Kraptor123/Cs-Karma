@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Element
+import java.net.URLEncoder
 
 class BasketballReplays : MainAPI() {
     override var mainUrl = "https://basketballreplays.net"
@@ -31,10 +32,12 @@ class BasketballReplays : MainAPI() {
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val baseUrl = "${mainUrl}/search/?q=${query}&m=site&m=publ&t=0"
-        val document = app.get(baseUrl).document
-        val items = document.select("table.eBlock").mapNotNull { it.toSearchResult() }
-        val hasNext = document.selectFirst("a.swchItem-next") != null
+        val searchUrl = "${mainUrl}/search/?q=${URLEncoder.encode(query, "UTF-8")}&t=0&p=${page};md=publ|site"
+        val first     = app.get(searchUrl, allowRedirects = false)
+        val location  = first.headers["Location"]
+        val document  = if (location == null) first.document else app.get(fixUrl(location), cookies = first.cookies).document
+        val items     = document.select("table.eBlock").mapNotNull { it.toSearchResult() }
+        val hasNext   = document.selectFirst("a.swchItem-next") != null
         return newSearchResponseList(items, hasNext)
     }
 
@@ -44,7 +47,7 @@ class BasketballReplays : MainAPI() {
         return newMovieSearchResponse(title, href, TvType.Others)
     }
 
-    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query)
+    override suspend fun quickSearch(query: String): List<SearchResponse>? = search(query, 1).items
 
     override suspend fun load(url: String): LoadResponse? {
         val document = app.get(url).document

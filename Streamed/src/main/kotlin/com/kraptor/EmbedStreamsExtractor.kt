@@ -1,6 +1,8 @@
 package com.kraptor
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.network.WebViewResolver
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -150,5 +152,35 @@ open class EmbedStreams : ExtractorApi() {
         headers["User-Agent"] = PLAYER_USER_AGENT
 
         return headers
+    }
+}
+
+open class Embedder : ExtractorApi() {
+    override val name            = "Embedder"
+    override val mainUrl         = "https://embedder.st"
+    override val requiresReferer = false
+
+    data class Playback(
+        @JsonProperty("url") val url: String?
+    )
+
+    override suspend fun getUrl(
+        url: String,
+        referer: String?,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ) {
+        val path     = url.substringAfter("/embed/", "").ifEmpty { return }
+        val playback = app.get("$mainUrl/playback/$path", referer = url).parsedSafe<Playback>()?.url ?: return
+
+        callback.invoke(newExtractorLink(
+            source = name,
+            name   = "$name ${path.substringBefore("/")} ${path.substringAfterLast("/")}",
+            url    = "$mainUrl$playback",
+            type   = ExtractorLinkType.M3U8
+        ) {
+            this.quality = Qualities.Unknown.value
+            this.referer = "$mainUrl/"
+        })
     }
 }

@@ -8,10 +8,10 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
-import java.util.concurrent.atomic.AtomicInteger
+import java.net.URLEncoder
 
 class Yablom : MainAPI() {
-    override var mainUrl              = "https://yakmov.com"
+    override var mainUrl              = "https://pobram.com"
     override var name                 = "Yakmov"
     override val hasMainPage          = true
     override var lang                 = "fr"
@@ -22,16 +22,17 @@ class Yablom : MainAPI() {
     override val getMainPageTimeoutMs = 300L
 
     companion object {
-        private val requestCounter = AtomicInteger(0)
         private const val AUTH_COOKIE = "g=true"
-        private const val TAG = "YakmovLog"
+        private const val TAG         = "Yakmov"
+        private const val FOLDER      = "17b12da"
+        private const val PR          = "pobram"
     }
 
     override val mainPage = mainPageOf(
-        "/0003909/c/yakmov/29/0" to "À l'affiche",
-        "/0003909/c/yakmov/2/0"  to "Animation",
-        "/0003909/c/yakmov/26/0" to "Documentaire",
-        "/0003909/c/yakmov/3/0"  to "Spectacle"
+        "/$FOLDER/c/$PR/29/0" to "À l'affiche",
+        "/$FOLDER/c/$PR/2/0"  to "Animation",
+        "/$FOLDER/c/$PR/26/0" to "Documentaire",
+        "/$FOLDER/c/$PR/3/0"  to "Spectacle"
     )
 
     private val defaultHeaders = mapOf(
@@ -41,10 +42,10 @@ class Yablom : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        val catId = request.data.split("/").filter { it.isNotEmpty() }.getOrNull(3) ?: ""
-        val limit = 20
+        val catId  = request.data.split("/").filter { it.isNotEmpty() }.getOrNull(3) ?: ""
+        val limit  = 20
         val offset = (page - 1) * limit
-        val url = "$mainUrl/0003909/api_category.php?catid=$catId&offset=$offset&limit=$limit&folder=0003909&pr=yakmov"
+        val url    = "$mainUrl/$FOLDER/api_category.php?catid=$catId&offset=$offset&limit=$limit&folder=$FOLDER&pr=$PR"
 
         val res = app.get(url, headers = defaultHeaders, referer = "$mainUrl${request.data}")
         val response = res.text
@@ -54,14 +55,14 @@ class Yablom : MainAPI() {
     }
 
     override suspend fun search(query: String, page: Int): SearchResponseList {
-        val limit = 20
+        val limit  = 20
         val offset = (page - 1) * limit
-        val url = "$mainUrl/0003909/api_search.php?searchword=$query&offset=$offset&limit=$limit&folder=0003909&pr=yakmov"
+        val url    = "$mainUrl/$FOLDER/api_search.php?searchword=${URLEncoder.encode(query, "UTF-8")}&offset=$offset&limit=$limit&folder=$FOLDER&pr=$PR"
 
         val res = app.get(
             url = url,
             headers = defaultHeaders + ("X-Requested-With" to "XMLHttpRequest"),
-            referer = "$mainUrl/0003909/home/yakmov"
+            referer = "$mainUrl/$FOLDER/home/$PR"
         )
 
         val response = res.text
@@ -83,18 +84,12 @@ class Yablom : MainAPI() {
 
             Pair(results, data.hasMore ?: false)
         } catch (e: Exception) {
+            Log.d(TAG, "parseJsonData: ${e.message}")
             Pair(emptyList(), false)
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val currentCount = requestCounter.incrementAndGet()
-
-        if (currentCount <= 2) {
-            Log.d(TAG, "LOAD ENGELLENDİ: Preload koruması aktif. İstek No: #$currentCount | URL: $url")
-            return null
-        }
-
         val res = app.get(url, headers = defaultHeaders)
         val document = res.document
 
@@ -137,16 +132,11 @@ class Yablom : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val res = app.get(data, headers = defaultHeaders)
+        val res      = app.get(data, headers = defaultHeaders)
         val document = res.document
-        val iframe = document.selectFirst("div.film-player iframe")?.attr("src")
+        val iframe   = document.selectFirst("div.film-player iframe")?.attr("src") ?: return false
 
-        if (iframe != null) {
-            val fixedIframe = fixUrl(iframe)
-            loadExtractor(fixedIframe, "$mainUrl/", subtitleCallback, callback)
-        }
-
-        return true
+        return loadExtractor(fixUrl(iframe), "$mainUrl/", subtitleCallback, callback)
     }
 }
 

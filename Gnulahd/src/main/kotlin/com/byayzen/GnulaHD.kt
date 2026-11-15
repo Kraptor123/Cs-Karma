@@ -227,12 +227,10 @@ class GnulaHD : MainAPI() {
         val pageUrl = data.substringBefore("?")
         val page    = app.get(pageUrl).text
 
-        val gnrd  = Regex("""window\.GNRD=\{([^}]*)\}""").find(page)?.groupValues?.get(1) ?: return false
-        val id    = Regex("""\bpid:(\d+)""").find(gnrd)?.groupValues?.get(1)
-        val tok   = Regex("""\btok:"([^"]*)""").find(gnrd)?.groupValues?.get(1)
-        val key64 = Regex("""\bk:"([^"]*)""").find(gnrd)?.groupValues?.get(1)
-
-        if (id.isNullOrEmpty() || tok.isNullOrEmpty() || key64.isNullOrEmpty()) return false
+        val id  = Regex("""_gnrdPid=(\d+)""").find(page)?.groupValues?.get(1) ?: return false
+        val tok = Regex("""_gnrdTok="([^"]+)"""").find(page)?.groupValues?.get(1) ?: return false
+        val key = Regex("""function gnrdUnpack\(s\)\{.*?k=\[([\d,]+)]""").find(page)?.groupValues?.get(1)
+            ?.split(",")?.map { it.toInt().toByte() }?.toByteArray() ?: return false
 
         val apiUrl = "$mainUrl/wp-json/gnrd/v1/player?id=$id&t=$tok"
         val response = app.get(
@@ -241,7 +239,7 @@ class GnulaHD : MainAPI() {
         ).parsedSafe<PlayerResponse>()
 
         val pField = response?.p ?: return false
-        val langs  = decryptPlayerData(pField, key64) ?: return false
+        val langs  = decryptPlayerData(pField, key) ?: return false
 
         for (lang in langs) {
             for (srv in lang.servers) {
@@ -295,9 +293,8 @@ class GnulaHD : MainAPI() {
         }
     }
 
-    private fun decryptPlayerData(encoded: String, key64: String): List<GnulaLang>? {
+    private fun decryptPlayerData(encoded: String, key: ByteArray): List<GnulaLang>? {
         return try {
-            val key        = android.util.Base64.decode(key64, android.util.Base64.DEFAULT)
             val raw        = android.util.Base64.decode(encoded, android.util.Base64.DEFAULT)
             val dec        = ByteArray(raw.size) { i -> (raw[i].toInt() xor key[i % key.size].toInt()).toByte() }
             val obj        = JSONObject(String(dec, Charsets.UTF_8))

@@ -107,6 +107,7 @@ class OnShort : MainAPI() {
         Log.d(name, "Load aşaması: $url")
         val document = app.get(url).document
 
+        val runtimeUrl      = fixUrlNull(document.selectFirst("#onshort-player")?.attr("data-runtime")) ?: return null
         val title           = document.selectFirst("h1")?.text()?.trim() ?: return null
         val poster          = fixUrlNull(document.selectFirst("meta[property=og:image]")?.attr("content"))
         val description     = document.selectFirst("meta[property=og:description]")?.attr("content")?.trim()
@@ -118,7 +119,7 @@ class OnShort : MainAPI() {
             .maxOrNull() ?: 0
 
         val episodes = (1..totalEpisodes).map { epNum ->
-            newEpisode("$url||$epNum") {
+            newEpisode("$runtimeUrl||$epNum") {
                 this.name    = "Episode $epNum"
                 this.episode = epNum
             }
@@ -132,17 +133,14 @@ class OnShort : MainAPI() {
         }
     }
 
-    data class OnShortEpisodeResponse(
-        @JsonProperty("url") val url: String?,
-        @JsonProperty("quality") val quality: String?,
-        @JsonProperty("sources") val sources: Map<String, String>?,
-        @JsonProperty("subtitles") val subtitles: List<OnShortSubtitle>?
+    data class OnShortRuntimeResponse(
+        @JsonProperty("episodes") val episodes: List<OnShortEpisodeResponse>?,
+        @JsonProperty("episode_resolver") val episodeResolver: String?
     )
 
-    data class OnShortSubtitle(
-        @JsonProperty("url") val url: String?,
-        @JsonProperty("lang") val lang: String?,
-        @JsonProperty("label") val label: String?
+    data class OnShortEpisodeResponse(
+        @JsonProperty("episode") val episode: Int?,
+        @JsonProperty("url") val url: String?
     )
 
     override suspend fun loadLinks(
@@ -151,61 +149,23 @@ class OnShort : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val pageUrl   = data.substringBeforeLast("||")
-        val episodeNo = data.substringAfterLast("||").toIntOrNull() ?: return false
+        val runtimeUrl = data.substringBeforeLast("||")
+        val episodeNo  = data.substringAfterLast("||").toIntOrNull() ?: return false
 
-        val document = app.get(pageUrl).document
-        val shell    = document.selectFirst("#onshort-player")
-        val postId   = shell?.attr("data-post")?.ifEmpty { null }
-            ?: shell?.attr("data-series")?.ifEmpty { null }
-            ?: document.selectFirst("input[name=post_id]")?.attr("value")
+        val runtime  = app.get(runtimeUrl, referer = "${mainUrl}/").parsedSafe<OnShortRuntimeResponse>() ?: return false
+        val episode  = runtime.episodes?.firstOrNull { it.episode == episodeNo }
+            ?: runtime.episodeResolver?.let {
+                app.get(it.replace("{episode}", "$episodeNo"), referer = "${mainUrl}/").parsedSafe<OnShortEpisodeResponse>()
+            }
+        val videoUrl = fixUrlNull(episode?.url) ?: return false
+        Log.d(name, "Bölüm $episodeNo: $videoUrl")
 
-        val platform = shell?.attr("data-platform")?.ifEmpty { null }
-            ?: shell?.attr("data-provider")?.ifEmpty { null }
-            ?: "shortmax"
-
-        val requestUrl = "${mainUrl}/wp-json/onshort-$platform/v1/series/$postId/episode/$episodeNo?_t=${System.currentTimeMillis()}"
-
-        val response = app.get(
-            requestUrl,
-            referer = pageUrl,
-            headers = mapOf("Cache-Control" to "no-cache", "Pragma" to "no-cache")
-        ).parsedSafe<OnShortEpisodeResponse>() ?: return false
-
-        var loaded = false
-        val playHeaders = mapOf(
-            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:157.0) Gecko/20100101 Firefox/157.0",
-            "Referer"    to "https://akamai-static.shorttv.live/"
+        callback.invoke(
+            newExtractorLink(name, name, videoUrl, if (videoUrl.contains(".m3u8")) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO) {
+                this.quality = Qualities.Unknown.value
+            }
         )
 
-        response.sources?.forEach { (qual, streamUrl) ->
-            if (streamUrl.isNotBlank()) {
-                callback.invoke(
-                    newExtractorLink(name, name, streamUrl, ExtractorLinkType.M3U8) {
-                        this.referer = "https://akamai-static.shorttv.live/"
-                        this.headers = playHeaders
-                        this.quality = qual.toIntOrNull() ?: getQualityFromName(qual)
-                    }
-                )
-                loaded = true
-            }
-        }
-
-        if (!loaded && !response.url.isNullOrBlank()) {
-            callback.invoke(
-                newExtractorLink(name, name, response.url, ExtractorLinkType.M3U8) {
-                    this.referer = "https://akamai-static.shorttv.live/"
-                    this.headers = playHeaders
-                    this.quality = response.quality?.toIntOrNull() ?: getQualityFromName(response.quality ?: "")
-                }
-            )
-            loaded = true
-        }
-
-        response.subtitles?.forEach { sub ->
-            sub.url?.let { subtitleCallback.invoke(newSubtitleFile(sub.lang ?: sub.label ?: "und", it)) }
-        }
-
-        return loaded
+        return true
     }
 }

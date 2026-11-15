@@ -29,7 +29,7 @@ open class YablomExtractor : ExtractorApi() {
                     source = this.name,
                     name = this.name,
                     url = it,
-                    type = INFER_TYPE,
+                    type = ExtractorLinkType.M3U8,
                     initializer = {
                         this.referer = url
                     }

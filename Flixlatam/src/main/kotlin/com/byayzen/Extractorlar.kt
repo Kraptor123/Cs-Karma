@@ -219,6 +219,9 @@ class Dintezuvio : VidHidePro() {
 class Moorearn : VidHidePro() {
     override var mainUrl = "https://moorearn.com"
 }
+class Morencius : VidHidePro() {
+    override var mainUrl = "https://morencius.com"
+}
 class Travid : VidHidePro() {
     override var mainUrl = "https://travid.pro"
 }

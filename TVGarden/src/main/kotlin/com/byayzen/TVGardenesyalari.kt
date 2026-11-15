@@ -1,7 +1,7 @@
 package com.byayzen
 
 object TVGardenesyalari {
-    const val API_BASE_URL = "https://raw.githubusercontent.com/famelack/famelack-data/refs/heads/main/tv/raw/countries"
+    const val API_BASE_URL = "https://raw.githubusercontent.com/famelack/famelack-data/refs/heads/main/tv/countries"
     
     val countries = listOf(
         "tr", "us", "uk", "de", "fr", "es", "it", "nl", "ru", "jp",

@@ -41,15 +41,14 @@ class JPFilms : MainAPI() {
         val isTvSeries = request.data.contains("/tv-series")
         val type       = if (isTvSeries) TvType.TvSeries else TvType.Movie
 
-        val home = document.select("article.group").mapNotNull { it.toSearchResult(type) }
+        val home = document.select("a.ht-card").mapNotNull { it.toSearchResult(type) }
 
         return newHomePageResponse(request.name, home, hasNext = home.isNotEmpty())
     }
 
     private fun Element.toSearchResult(type: TvType): SearchResponse? {
-        val title  = this.selectFirst("h3")?.text() ?: return null
-        val link   = this.selectFirst("a")
-        val href   = fixUrlNull(link?.attr("href")?.ifEmpty { return null }) ?: return null
+        val title  = this.selectFirst("h3.ht-card-title")?.text() ?: return null
+        val href   = fixUrl(this.attr("href").ifEmpty { return null })
         val poster = fixUrlNull(this.selectFirst("img")?.attr("src")?.ifEmpty { null })
 
         return if (type == TvType.TvSeries) {
@@ -64,7 +63,7 @@ class JPFilms : MainAPI() {
 
         Log.d(tag, "search: $query page=$page")
         val document      = app.get(url).document
-        val searchResults = document.select("article.group").mapNotNull { it.toSearchResult(TvType.Movie) }
+        val searchResults = document.select("a.ht-card").mapNotNull { it.toSearchResult(TvType.Movie) }
 
         return newSearchResponseList(searchResults, searchResults.isNotEmpty())
     }
@@ -86,7 +85,7 @@ class JPFilms : MainAPI() {
         val tags   = document.select("div.cls-info-people:matches(Genre|Country) a").map { it.text() }
         val actors = document.select("div.cls-info-people:contains(Cast:) a").map { Actor(it.text()) }
 
-        val recommendations = document.select("section:has(h2:contains(Recommended)) article.group").mapNotNull { it.toSearchResult(TvType.Movie) }
+        val recommendations = document.select("section:has(h2:contains(Related)) a.ht-card").mapNotNull { it.toSearchResult(TvType.Movie) }
 
         val isTvSeries = document.select("nav.cls-crumb a[href*='/tv-series']").isNotEmpty()
         val watchPath  = document.selectFirst("a.cls-btn-watch")?.attr("href")?.ifEmpty { null } ?: return null
@@ -145,7 +144,7 @@ class JPFilms : MainAPI() {
             .replace("\\\\", "\\")
 
         val scriptData = if (nextData.contains(""""sources_url":""")) nextData else html
-        val pattern     = Regex("""\{"id":\d+,"name":"[^"]*","slug":"[^"]*","lang":"[^"]*","season":\d+,"number":$epParam,"sources_url":"([^"]+)"""")
+        val pattern     = Regex("""\{"id":\d+,"name":"[^"]*","slug":"[^"]*","lang":"[^"]*","season":\d+,"number":$epParam,[^{}]*?"sources_url":"([^"]+)"""")
         val match       = pattern.find(scriptData)
 
         val sourcesUrl = if (match != null) {
